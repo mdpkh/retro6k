@@ -1,3 +1,6 @@
+#misc Windows
+**/Thumbs.db
+
 #visual studio builds and project stuff
 /.vs/
 /.vs/**
@@ -10,3 +13,31 @@
 #convenience bat files
 /retro6k.bat
 /retro6kdebug.bat
+
+#LaTeX/MikTex output
+**/*.aux
+**/*.lof
+**/*.log
+**/*.lot
+**/*.out
+**/*.synctex.gz
+**/*.toc
+**/*.pdf
+!sdk/char??.pdf
+
+#assembler output in SDK folder
+sdk/*.R6kCart
+sdk/*.rom
+sdk/*.txt
+
+#misc things to keep to myself
+sdk/chicago.png
+sdk/scs.svg
+sdk/extractcharsvg.py
+sdk/cropcharsvg.py
+sdk/makecharpdf.py
+sdk/vasm6502*.exe
+sdk/vasm.bat
+sdk/vasmhr.bat
+sdk/packhifont.py
+sdk/colorcycle.c

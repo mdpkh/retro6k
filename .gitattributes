@@ -1,0 +1,5 @@
+**/*.pdf binary -delta
+**/*.png binary -delta
+**/*.rom binary delta
+**/*.svg text delta
+**/*.tex text delta
