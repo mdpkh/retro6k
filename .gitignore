@@ -1,0 +1,12 @@
+#visual studio builds and project stuff
+/.vs/
+/.vs/**
+/x86/
+/x86/**
+/x64/
+/x64/**
+/retro6k.vcxproj*
+
+#convenience bat files
+/retro6k.bat
+/retro6kdebug.bat
