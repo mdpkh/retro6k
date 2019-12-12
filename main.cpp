@@ -276,7 +276,7 @@ inline void DisplayMemType(char* dest, unsigned char pf)
 		'R', 'A', 'M',
 		'N', 'V', 'M',
 	};
-	char* src = (char*)typewords + 3 * (pf & PF_TMASK);
+	char* src = (char*)typewords + 3ll * (pf & PF_TMASK);
 	*dest = *src;
 	*++dest = *++src;
 	*++dest = *++src;
@@ -350,7 +350,7 @@ inline void DisplayOpcode(char* dest, unsigned char opc)
 		0x53, 0x45, 0x44, 0x53, 0x42, 0x43, 0x3F, 0x3F, 0x3F, 0x49, 0x53, 0x42,
 		0x3F, 0x3F, 0x3F, 0x53, 0x42, 0x43, 0x49, 0x4E, 0x43, 0x49, 0x53, 0x42
 	};
-	char* src = (char*)mnemonics + 3 * opc;
+	char* src = (char*)mnemonics + 3ll * opc;
 	*dest = *src;
 	*++dest = *++src;
 	*++dest = *++src;
@@ -365,7 +365,7 @@ void DrawText(const char* text, int &x, const int y0, unsigned char fg, unsigned
 		unsigned short gbits[16];
 		for (unsigned short* src = (unsigned short*)hifont[(unsigned char)*text].bmp, * dst = gbits; src < hifont[(unsigned char)*text].bmp + 16; ++src, ++dst)
 			*dst = *src;
-		unsigned char* rowstart = (unsigned char*)destsurf->pixels + destsurf->pitch * y0 + x;
+		unsigned char* rowstart = (unsigned char*)destsurf->pixels + (long long)destsurf->pitch * y0 + x;
 		for (int gy = 0; gy < 16; ++gy)
 		{
 			for (int gx = 0; gx < gw; ++gx)
@@ -623,7 +623,7 @@ inline void UIBeepUnavailable()
 
 void DrawLogo(int x0, int y0, SDL_Surface* destsurf) {
 	char* sptr = (char*)aboutlogopixels;
-	char* rptr = (char*)(destsurf->pixels) + y0 * destsurf->pitch + x0;
+	char* rptr = (char*)(destsurf->pixels) + y0 * (long long)destsurf->pitch + x0;
 	for (int y = 0; y < 27; ++y)
 	{
 		char* dptr = rptr;
@@ -1657,7 +1657,7 @@ void DoPickFile(filetype ft, std::string &path)
 				}
 				else
 				{
-					int nfiles = filelist.size();
+					int nfiles = (int)filelist.size();
 					switch (event.key.keysym.sym)
 					{
 					case SDLK_HOME:
@@ -2426,7 +2426,7 @@ void InstallROM()
 		if (infile.is_open())
 		{
 			std::streamsize readsize = 0x1000;
-			char* romptr = (char*)sysram + 0xC000 + 0x1000 * i;
+			char* romptr = (char*)sysram + 0xC000ll + 0x1000ll * i;
 			while (readsize && infile.good())
 			{
 				infile.read(romptr, readsize);
@@ -2498,12 +2498,12 @@ bool LoadCartridge(const char* infilename)
 	}
 	// read BAS ROM & factory-state non-volatile memory
 	infile.seekg(datastart);
-	for (int p = 0x20; p < 0xc0; ++p)
+	for (unsigned char p = 0x20; p < 0xc0; ++p)
 	{
 		if (syspflags[p] & PF_TROM)
 		{
 			readsize = 0x100;
-			readptr = (char*)sysram + (p << 8);
+			readptr = (char*)sysram + ((long long)p << 8);
 			while (readsize && infile.good())
 			{
 				infile.read(readptr, readsize);
@@ -2658,7 +2658,7 @@ void PaintCell(unsigned char col, unsigned char row, unsigned char glyph, unsign
 		faddr++;
 		for (int ry = 0; ry < pixheight; ++ry, ++cy)
 		{
-			unsigned char* dst = (unsigned char*)cellcanvas->pixels + cellcanvas->pitch * cy;
+			unsigned char* dst = (unsigned char*)cellcanvas->pixels + (long long)cellcanvas->pitch * cy;
 			for (int gx = 0, cx = 0; gx < 8; ++gx)
 			{
 				for (int rx = 0; rx < pixwidth; ++rx, ++dst)
@@ -2721,10 +2721,10 @@ void RenderScanline(int scanline, SDL_Surface* framebuffer, SDL_Surface* winsurf
 		return;
 	int y0 = scanline * winsurface->h / 576;
 	int y1 = (scanline + 1) * winsurface->h / 576;
-	unsigned char* src = (unsigned char*)(framebuffer->pixels) + framebuffer->pitch * y0;
-	unsigned char* dst = (unsigned char*)(winsurface->pixels) + winsurface->pitch * y0;
+	unsigned char* src = (unsigned char*)(framebuffer->pixels) + (long long)framebuffer->pitch * y0;
+	unsigned char* dst = (unsigned char*)(winsurface->pixels) + (long long)winsurface->pitch * y0;
 	//pitch is assumed same for both surfaces
-	unsigned char* stop = (unsigned char*)(framebuffer->pixels) + framebuffer->pitch * y1;
+	unsigned char* stop = (unsigned char*)(framebuffer->pixels) + (long long)framebuffer->pitch * y1;
 	while (src < stop)
 	{
 		*dst = *src;
