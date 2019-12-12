@@ -24,6 +24,7 @@
 **/*.toc
 **/*.pdf
 !sdk/char??.pdf
+!sdk/fvmc.pdf
 
 #assembler output in SDK folder
 sdk/*.R6kCart
