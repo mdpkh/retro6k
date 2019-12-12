@@ -84,9 +84,9 @@ int debuglogexpectargs = 0;
 dlogentry* partialinst = nullptr;
 std::random_device seedgen;
 std::mt19937 floatgen;
-char* cartpath;
-char* savepath;
-char* screencappath;
+std::filesystem::path cartpath;
+std::filesystem::path savepath;
+std::filesystem::path screencappath;
 
 int pixwidth;
 int pixheight;
@@ -380,7 +380,7 @@ void DrawText(const char* text, int &x, const int y0, unsigned char fg, unsigned
 	}
 }
 
-inline void DrawTextC(const char* text, const int x0, const int y0, unsigned char fg, unsigned char bg, SDL_Surface* destsurf)
+inline void DrawTextCX(const char* text, const int x0, const int y0, unsigned char fg, unsigned char bg, SDL_Surface* destsurf)
 {
 	int tx0 = x0;
 	DrawText(text, tx0, y0, fg, bg, destsurf);
@@ -433,12 +433,41 @@ dlogentry* ExtendLog(dlogentry::dletype etype)
 	return newentry;
 }
 
-void GenerateAudio(void* userdata, Uint8* stream, int len) //callback to fill audio buffer
+void GenerateStereoAudio(void* userdata, Uint8* stream, int len) //callback to fill audio buffer
 {
 	if (!menuhassound)
 	{
-		static unsigned short phase[4];
-		for (; len > 0; len -= soundspec.channels)
+		static unsigned short phase[4]{ 0, 0, 0, 0 };
+		short lev[16]{
+			-(soundvolregister[0] & (short)0xf0) >> 3,
+			(soundvolregister[0] & (short)0xf0) >> 3,
+			-(soundvolregister[0] & (short)0xf) << 1,
+			(soundvolregister[0] & (short)0xf) << 1,
+			-(soundvolregister[1] & (short)0xf0) >> 3,
+			(soundvolregister[1] & (short)0xf0) >> 3,
+			-(soundvolregister[1] & (short)0xf) << 1,
+			(soundvolregister[1] & (short)0xf) << 1,
+			-(soundvolregister[2] & (short)0xf0) >> 3,
+			(soundvolregister[2] & (short)0xf0) >> 3,
+			-(soundvolregister[2] & (short)0xf) << 1,
+			(soundvolregister[2] & (short)0xf) << 1,
+			-(soundvolregister[3] & (short)0xf0) >> 3,
+			(soundvolregister[3] & (short)0xf0) >> 3,
+			-(soundvolregister[3] & (short)0xf) << 1,
+			(soundvolregister[3] & (short)0xf) << 1,
+		};
+		int t = soundspec.freq >> 1;
+		for (int v = 0; v < 4; v++)
+		{
+			if (!soundfreqregister[v])
+			{
+				lev[v << 2    ] = 0;
+				lev[v << 2 | 1] = 0;
+				lev[v << 2 | 2] = 0;
+				lev[v << 2 | 3] = 0;
+			}
+		}
+		for (; len > 0; len -= 2)
 		{
 			phase[0] += soundfreqregister[0];
 			phase[1] += soundfreqregister[1];
@@ -453,23 +482,30 @@ void GenerateAudio(void* userdata, Uint8* stream, int len) //callback to fill au
 			if (phase[3] > soundspec.freq)
 				phase[3] -= soundspec.freq;
 			*stream = soundspec.silence
-				+ (phase[0] < (soundspec.freq >> 1)) * ((soundvolregister[0] & 0xf0) >> 2)
-				- (phase[1] < (soundspec.freq >> 1)) * ((soundvolregister[1] & 0xf0) >> 2)
-				+ (phase[2] < (soundspec.freq >> 1)) * ((soundvolregister[2] & 0xf0) >> 2)
-				- (phase[3] < (soundspec.freq >> 1)) * ((soundvolregister[3] & 0xf0) >> 2);
+				+ lev[     (int)(phase[0] >= t)]
+				- lev[4  | (int)(phase[1] >= t)]
+				+ lev[8  | (int)(phase[2] >= t)]
+				- lev[12 | (int)(phase[3] >= t)];
 			++stream;
 			*stream = soundspec.silence
-				+ (phase[0] < (soundspec.freq >> 1)) * ((soundvolregister[0] & 0x0f) << 2)
-				- (phase[1] < (soundspec.freq >> 1)) * ((soundvolregister[1] & 0x0f) << 2)
-				+ (phase[2] < (soundspec.freq >> 1)) * ((soundvolregister[2] & 0x0f) << 2)
-				- (phase[3] < (soundspec.freq >> 1)) * ((soundvolregister[3] & 0x0f) << 2);
+				+ lev[2  | (int)(phase[0] >= t)]
+				- lev[6  | (int)(phase[1] >= t)]
+				+ lev[10 | (int)(phase[2] >= t)]
+				- lev[14 | (int)(phase[3] >= t)];
 			++stream;
 		}
 	}
 	else
 	{
-		static unsigned short phase;
-		for (; len > 0; len -= soundspec.channels)
+		static unsigned short phase{ 0 };
+		short lev[2]{ -13, 13 };
+		int t = soundspec.freq >> 1;
+		if (!menubeepfreq || !menubeepdur)
+		{
+			lev[0] = 0;
+			lev[1] = 0;
+		}
+		for (; len > 0; len -= 2)
 		{
 			if (menubeepdur)
 			{
@@ -478,9 +514,9 @@ void GenerateAudio(void* userdata, Uint8* stream, int len) //callback to fill au
 			}
 			if (phase > soundspec.freq)
 				phase -= soundspec.freq;
-			*stream = soundspec.silence + ((phase < (soundspec.freq >> 1)) << 4);
+			*stream = soundspec.silence + lev[(int)(phase >= t)];
 			++stream;
-			*stream = soundspec.silence + ((phase < (soundspec.freq >> 1)) << 4);
+			*stream = soundspec.silence + lev[(int)(phase >= t)];
 			++stream;
 		}
 	}
@@ -716,7 +752,7 @@ void DoDebugger() {
 	SDL_Surface* winbuffer = SDL_CreateRGBSurfaceWithFormat(
 		0,
 		480,
-		pixheight * 144 - 16,
+		pixheight * 141,
 		8,
 		SDL_PIXELFORMAT_INDEX8);
 	SDL_SetSurfaceBlendMode(winbuffer, SDL_BLENDMODE_BLEND);
@@ -1402,7 +1438,16 @@ void DoMenu(int quickoption)
 				else
 				{
 					// Insert Cartridge
-					UIBeepUnavailable();
+					UIBeepTakeAction();
+					SDL_SetSurfaceAlphaMod(menubuffer, 0xaa);
+					SDL_BlitSurface(restorescreen, NULL, mwsurface, &winpos);
+					SDL_BlitSurface(menubuffer, &menurect, mwsurface, &animrect);
+					PickAndInsertCartridge();
+					SDL_SetSurfaceAlphaMod(menubuffer, 0xf8);
+					SDL_BlitSurface(restorescreen, NULL, mwsurface, &winpos);
+					SDL_BlitSurface(menubuffer, &menurect, mwsurface, &animrect);
+					SDL_UpdateWindowSurface(mainwindow);
+					goto exitmenu;
 				}
 				break;
 			case 4:
@@ -1473,12 +1518,12 @@ exitmenu:
 	soundfreqregister[3] = restorefreq[3];
 }
 
-void DoPickFile(filetype ft)
+void DoPickFile(filetype ft, std::string &path)
 {
 	SDL_Surface* winbuffer = SDL_CreateRGBSurfaceWithFormat(
 		0,
 		480,
-		400,
+		pixheight * 109,
 		8,
 		SDL_PIXELFORMAT_INDEX8);
 	SDL_SetSurfaceBlendMode(winbuffer, SDL_BLENDMODE_BLEND);
@@ -1502,58 +1547,95 @@ void DoPickFile(filetype ft)
 		return;
 	}
 	SDL_SetSurfaceBlendMode(restorescreen, SDL_BLENDMODE_NONE);
-	SDL_Rect winpos;
-	winpos.w = winbuffer->w;
-	winpos.h = winbuffer->h;
-	SDL_GetWindowSize(mainwindow, &winpos.x, &winpos.y);
-	winpos.x -= winpos.w;
-	winpos.y -= winpos.h;
-	winpos.x >>= 1;
-	winpos.y >>= 1;
-	SetHWPalette(winbuffer->format->palette);
-	SDL_UpdateWindowSurface(mainwindow);
-	SDL_BlitSurface(mwsurface, &winpos, restorescreen, NULL);
+	int winmacrox, winmacroy;
 	const char* titles[4] = {
 		"Choose a File\x85",
-		"Choose a ROM File\x85",
-		"Choose a Cartridge File\x85",
+		"Choose a ROM Chip\x85",
+		"Choose a Cartridge\x85",
 		"Choose a Cartridge Save File\x85",
 	};
+	const char* exts[4] = {
+		"",
+		".rom",
+		".r6kcart",
+		".r6ksave",
+	};
 	char* wintitle;
+	char* filterext;
+	bool ignoreext = false;
+	std::filesystem::path browsedir;
 	switch (ft)
 	{
+	case FT_ROM:
+		wintitle = (char*)titles[1];
+		filterext = (char*)exts[1];
+		browsedir = cartpath;
+		winmacrox = 4;
+		winmacroy = 4;
+		break;
 	case FT_CART:
 		wintitle = (char*)titles[2];
+		filterext = (char*)exts[2];
+		browsedir = cartpath;
+		winmacrox = 2;
+		winmacroy = 3;
+		break;
+	case FT_CARTSAVE:
+		wintitle = (char*)titles[3];
+		filterext = (char*)exts[3];
+		browsedir = savepath;
+		winmacrox = 6;
+		winmacroy = 5;
 		break;
 	default:
 		wintitle = (char*)titles[0];
+		filterext = (char*)exts[0];
+		ignoreext = true;
+		browsedir = std::filesystem::canonical(".");
+		winmacrox = 4;
+		winmacroy = 4;
 	}
+	int mww, mwh;
+	SDL_GetWindowSize(mainwindow, &mww, &mwh);
+	SDL_Rect winpos;
+	winpos.w = winbuffer->w;
+	winpos.h = winbuffer->h;
+	winpos.x = (winmacrox * (mww - winpos.w)) >> 3;
+	winpos.y = (winmacroy * (mwh - winpos.h)) >> 3;
+	SetHWPalette(winbuffer->format->palette);
+	SDL_UpdateWindowSurface(mainwindow);
+	SDL_BlitSurface(mwsurface, &winpos, restorescreen, NULL);
 	PaintWindow(winbuffer, 0xff, 0x39, wintitle, 0xff);
-	const char* keyshint = "Esc: Cancel";
+	const char* keyshint = "Ctrl+D: ChDir  \x97  Ctrl+E: ExtFilter on/off  \x97  Esc: Cancel";
 	int tx0 = (winpos.w - TextWidth(keyshint)) >> 1;
 	DrawText(keyshint, tx0, winpos.h - 20, 0x31, 0xff, winbuffer);
-	int displaylines = (winpos.h - 40) / 16;
-	std::vector<int> itemy0(displaylines);
-	itemy0[0] = (winpos.h - displaylines * 16) >> 1;
-	for (int i = 1, py0 = itemy0[0]; i < displaylines; ++i)
-		itemy0[i] = (py0 += 18);
-	const int itemx0 = 16;
-	DrawTextC("Loading directory listing\x85", itemx0, itemy0[0], 0x07, 0xff, winbuffer);
-	SDL_Rect animrect = winpos;
-	SDL_Rect menurect = { 0, 0, winpos.w, winpos.h };
+	int displaylines = (winpos.h - 60) / 18;
+	int filey0;
+	filey0 = (winpos.h - displaylines * 18 + 20) >> 1;
+	const int filex0 = 16;
+	const int prevx0 = winpos.w - 80;
+	DrawTextCX("Loading directory listing\x85", filex0, filey0 + 18 * ((displaylines - 1) >> 1), 0x07, 0xff, winbuffer);
+	SDL_Rect dstanimrect = winpos;
+	SDL_Rect srcanimrect = { 0, 0, winpos.w, winpos.h };
 	for (int t = 1; t <= 8; ++t)
 	{
 		SDL_SetSurfaceAlphaMod(winbuffer, t * 31);
-		animrect.w = winpos.w * t / 8;
-		menurect.w = animrect.w;
-		animrect.x = (mwsurface->w - animrect.w) >> 1;
+		dstanimrect.w = winpos.w * t / 8;
+		srcanimrect.w = dstanimrect.w;
+		dstanimrect.x = (winmacrox * (mww - dstanimrect.w)) >> 3;
 		SDL_BlitSurface(restorescreen, NULL, mwsurface, &winpos);
-		SDL_BlitSurface(winbuffer, &menurect, mwsurface, &animrect);
+		SDL_BlitSurface(winbuffer, &srcanimrect, mwsurface, &dstanimrect);
 		SDL_UpdateWindowSurface(mainwindow);
 		SDL_Delay(16);
 	}
+	bool relistfiles = true;
+	std::vector<std::string> filelist;
+	std::vector<std::filesystem::path> pathlist;
+	int filesel = 0;
+	int displaystart = 0;
 	while (true)
 	{
+		bool repaintfiles = false;
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{
@@ -1561,7 +1643,138 @@ void DoPickFile(filetype ft)
 			switch (event.type)
 			{
 			case SDL_KEYDOWN:
-				goto exitpickfile;
+				if (event.key.keysym.mod & KMOD_CTRL)
+				{
+					switch (event.key.keysym.sym)
+					{
+					case SDLK_d:
+						UIBeepUnavailable();
+						break;
+					case SDLK_e:
+						UIBeepUnavailable();
+						break;
+					}
+				}
+				else
+				{
+					int nfiles = filelist.size();
+					switch (event.key.keysym.sym)
+					{
+					case SDLK_HOME:
+						if (filesel == 0)
+						{
+							UIBeepUnavailable();
+						}
+						else
+						{
+							UIBeepMoveSel();
+							displaystart = 0;
+							filesel = 0;
+							repaintfiles = true;
+						}
+						break;
+					case SDLK_END:
+						if (filesel + 1 == nfiles)
+						{
+							UIBeepMoveSel();
+						}
+						else
+						{
+							UIBeepMoveSel();
+							displaystart = nfiles - displaylines;
+							filesel = nfiles - 1;
+							if (displaystart < 0)
+								displaystart = 0;
+							repaintfiles = true;
+						}
+						break;
+					case SDLK_PAGEUP:
+						if (displaystart == 0 || displaylines >= nfiles)
+						{
+							if (filesel == 0)
+							{
+								UIBeepUnavailable();
+							}
+							else
+							{
+								UIBeepMoveSel();
+								filesel = 0;
+								repaintfiles = true;
+							}
+						}
+						else
+						{
+							UIBeepMoveSel();
+							displaystart -= displaylines;
+							if (displaystart < 0)
+								displaystart = 0;
+							int lastvisible = displaystart + displaylines - 1;
+							if (filesel > lastvisible)
+								filesel = lastvisible;
+							repaintfiles = true;
+						}
+						break;
+					case SDLK_PAGEDOWN:
+						if (displaystart + displaylines == nfiles || displaylines >= nfiles)
+						{
+							if (filesel == nfiles - 1)
+							{
+								UIBeepUnavailable();
+							}
+							else
+							{
+								filesel = nfiles - 1;
+								repaintfiles = true;
+							}
+						}
+						else
+						{
+							UIBeepMoveSel();
+							displaystart += displaylines;
+							if (displaystart + displaylines > nfiles)
+								displaystart = nfiles - displaylines;
+							if (filesel < displaystart)
+								filesel = displaystart;
+							repaintfiles = true;
+						}
+						break;
+					case SDLK_UP:
+						if (filesel == 0)
+						{
+							UIBeepUnavailable();
+						}
+						else
+						{
+							UIBeepMoveSel();
+							--filesel;
+							if (filesel < displaystart)
+								displaystart = filesel;
+							repaintfiles = true;
+						}
+						break;
+					case SDLK_DOWN:
+						if (filesel == nfiles - 1)
+						{
+							UIBeepUnavailable();
+						}
+						else
+						{
+							UIBeepMoveSel();
+							++filesel;
+							if (filesel >= displaystart + displaylines)
+								displaystart = filesel - displaylines + 1;
+							repaintfiles = true;
+						}
+						break;
+					case SDLK_RETURN:
+						path = pathlist[filesel].string();
+						UIBeepTakeAction();
+						goto exitpickfile;
+					case SDLK_ESCAPE:
+						path.clear();
+						goto exitpickfile;
+					}
+				}
 				break;
 			case SDL_QUIT:
 				newevent.type = SDL_QUIT;
@@ -1569,24 +1782,97 @@ void DoPickFile(filetype ft)
 				goto exitpickfile;
 			}
 		}
+		if (relistfiles)
+		{
+			filelist.clear();
+			pathlist.clear();
+			for (auto& entry: std::filesystem::directory_iterator(browsedir, std::filesystem::directory_options::skip_permission_denied))
+			{
+				if (entry.is_regular_file() && (ignoreext || cilstreq(entry.path().extension().string().c_str(), filterext)))
+				{
+					filelist.push_back(entry.path().filename().string());
+					pathlist.push_back(entry.path());
+				}
+			}
+			repaintfiles = true;
+		}
+		if (repaintfiles)
+		{
+			SDL_Rect paintbox{filex0 - 9, filey0 - 1, prevx0 - filey0 + 9, 18 * displaylines + 2};
+			{
+				int x = filex0;
+				DrawText("Location: ", x, 23, 0x31, 0xff, winbuffer);
+				std::string loc = browsedir.string();
+				DrawText(loc.c_str(), x, 23, 0x00, 0xff, winbuffer);
+			}
+			SDL_FillRect(winbuffer, &paintbox, 0xff);
+			for (int i = 0, j = displaystart, ky = filey0; i < displaylines && j < filelist.size(); ++i, ++j, ky += 18)
+			{
+				if (filesel == j)
+				{
+					SDL_Rect selrect{ paintbox.x, ky - 1, paintbox.w, 18 };
+					FillRoundedRect(winbuffer, selrect, 0x31);
+					DrawTextCX(filelist[j].c_str(), filex0, ky, 0xff, 0x31, winbuffer);
+				}
+				else
+				{
+					DrawTextCX(filelist[j].c_str(), filex0, ky, 0x00, 0xff, winbuffer);
+				}
+			}
+			if (filelist.size() == 0)
+			{
+				DrawTextCX("No files here!", filex0, filey0 + 18 * ((displaylines - 1) >> 1), 0x07, 0xff, winbuffer);
+			}
+			repaintfiles = false;
+			SDL_BlitSurface(restorescreen, NULL, mwsurface, &winpos);
+			SDL_BlitSurface(winbuffer, NULL, mwsurface, &winpos);
+			SDL_UpdateWindowSurface(mainwindow);
+		}
 		SDL_Delay(16);
 	}
 exitpickfile:
 	for (int t = 7; t > 0; --t)
 	{
 		SDL_SetSurfaceAlphaMod(winbuffer, t * 31);
-		animrect.h = winpos.h * t / 8;
-		menurect.h = animrect.h;
-		menurect.y = winpos.h - animrect.h;
-		animrect.y = (mwsurface->h - animrect.h) >> 1;
+		dstanimrect.h = winpos.h * t / 8;
+		srcanimrect.h = dstanimrect.h;
+		srcanimrect.y = winpos.h - dstanimrect.h;
+		dstanimrect.y = (winmacroy * (mwh - dstanimrect.h)) >> 3;
 		SDL_BlitSurface(restorescreen, NULL, mwsurface, &winpos);
-		SDL_BlitSurface(winbuffer, &menurect, mwsurface, &animrect);
+		SDL_BlitSurface(winbuffer, &srcanimrect, mwsurface, &dstanimrect);
 		SDL_UpdateWindowSurface(mainwindow);
 		SDL_Delay(16);
 	}
 	SDL_BlitSurface(restorescreen, NULL, mwsurface, &winpos);
 	SDL_FreeSurface(restorescreen);
 	SDL_FreeSurface(winbuffer);
+}
+
+void FillRoundedRect(SDL_Surface* dst, const SDL_Rect &r, unsigned c)
+{
+	SDL_Rect b;
+	b = { r.x + 6, r.y, r.w - 12, 1 };
+	SDL_FillRect(dst, &b, c);
+	b.y = r.y + r.h - 1;
+	SDL_FillRect(dst, &b, c);
+	b = { r.x + 4, r.y + 1, r.w - 8, 1 };
+	SDL_FillRect(dst, &b, c);
+	b.y = r.y + r.h - 2;
+	SDL_FillRect(dst, &b, c);
+	b = { r.x + 3, r.y + 2, r.w - 6, 1 };
+	SDL_FillRect(dst, &b, c);
+	b.y = r.y + r.h - 3;
+	SDL_FillRect(dst, &b, c);
+	b = { r.x + 2, r.y + 3, r.w - 4, 1 };
+	SDL_FillRect(dst, &b, c);
+	b.y = r.y + r.h - 4;
+	SDL_FillRect(dst, &b, c);
+	b = { r.x + 1, r.y + 4, r.w - 2, 2 };
+	SDL_FillRect(dst, &b, c);
+	b.y = r.y + r.h - 6;
+	SDL_FillRect(dst, &b, c);
+	b = { r.x, r.y + 6, r.w, r.h - 12 };
+	SDL_FillRect(dst, &b, c);
 }
 
 int InitEmulator()
@@ -1699,15 +1985,9 @@ int InitMemory()
 
 int InitPaths()
 {
-	std::error_code ec;
-	std::string path;
-	int pathlen = path.length();
-	path = std::filesystem::canonical("."); // TODO: read from config
-	cartpath = (char*)malloc(pathlen + 1);
-	if (!cartpath)
-		return -1;
-	path.copy(cartpath, pathlen);
-	cartpath[pathlen] = 0;
+	cartpath = std::filesystem::canonical("."); // TODO: read from config
+	savepath = std::filesystem::canonical("."); // TODO: read from config
+	screencappath = std::filesystem::canonical("."); // TODO: read from config
 	return 0;
 }
 
@@ -1719,7 +1999,7 @@ int InitSound()
 	desiredsoundspec.format = AUDIO_U8;
 	desiredsoundspec.channels = 2;
 	desiredsoundspec.samples = 512;
-	desiredsoundspec.callback = GenerateAudio;
+	desiredsoundspec.callback = GenerateStereoAudio;
 	sounddev = SDL_OpenAudioDevice(NULL, false, &desiredsoundspec, &soundspec, 0);
 	if (!sounddev)
 	{
@@ -2154,7 +2434,6 @@ void InstallROM()
 				romptr += infile.gcount();
 			}
 			infile.close();
-			cartridgeinserted = true;
 		}
 	}
 }
@@ -2234,6 +2513,7 @@ bool LoadCartridge(const char* infilename)
 		}
 	}
 	infile.close();
+	cartridgeinserted = true;
 	return true;
 }
 
@@ -2415,6 +2695,15 @@ inline void PaintCell(unsigned char col, unsigned char row)
 	PaintCell(col, row, glyph, att);
 }
 
+void PickAndInsertCartridge()
+{
+	std::string cart;
+	DoPickFile(FT_CART, cart);
+	if (cart.empty())
+		return;
+	LoadCartridge(cart.c_str());
+}
+
 void RandomBitFlip()
 {
 	static std::mt19937 gen(0);
@@ -2472,6 +2761,36 @@ inline uint8_t bare_read6502(uint16_t address)
 		return dis(floatgen);
 	}
 	return sysram[address];
+}
+
+bool cilstreq(const char* a, const char* b)
+{
+	if (a == b)
+		return true;
+	while (true)
+	{
+		if (*a == 0 && *b == 0)
+			return true;
+		if (tolower(*a) != *b)
+			return false;
+		++a;
+		++b;
+	}
+}
+
+bool cistreq(const char* a, const char* b)
+{
+	if (a == b)
+		return true;
+	while (true)
+	{
+		if (*a == 0 && *b == 0)
+			return true;
+		if (tolower(*a) != tolower(*b))
+			return false;
+		++a;
+		++b;
+	}
 }
 
 extern "C" uint8_t read6502(uint16_t address)
@@ -2584,10 +2903,12 @@ int main(int argc, char** argv)
 		return rv;
 	if (int rv = InitMemory())
 		return rv;
-	DoPickFile(FT_CART);
-	if (int rv = InitEmulator())
-		return rv;
 	if (int rv = InitSound())
+		return rv;
+	menuhassound = true;
+	PickAndInsertCartridge();
+	menuhassound = false;
+	if (int rv = InitEmulator())
 		return rv;
 	int resetcounter = 0;
 	int scanline = 0;
