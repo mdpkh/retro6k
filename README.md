@@ -10,7 +10,7 @@ to do
 
 ## Programming the Retro 6k Emulator
 
-Compile [sdk/r6k-pg.tex](sdk/retro6k-pg.tex) using `pdflatex` and then consult `r6k-pg.pdf`.
+Compile [sdk/r6k-pg.tex](sdk/r6k-pg.tex) using `pdflatex` and then consult `r6k-pg.pdf`.
 
 I generate my cartridges by using [vasm](http://sun.hasenbraten.de/vasm/index.php?view=main) and its Oldstyle Syntax Module. [Windows vasm binaries](https://www.chibiakumas.com/z80/vasm.php) are available for download.
 
@@ -24,4 +24,4 @@ I intend to periodically provide releases with Windows 64-bit binaries.
 
 ---
 
-<div style="text-align: right">MDPKH</div>
+<p style="text-align: right;">MDPKH</p>
