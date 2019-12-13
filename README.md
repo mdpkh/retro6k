@@ -24,4 +24,4 @@ I intend to periodically provide releases with Windows 64-bit binaries.
 
 ---
 
-<p style="text-align: right;">MDPKH</p>
+*pretend this part is right-aligned — MDPKH*
