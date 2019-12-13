@@ -35,8 +35,7 @@ const unsigned char keytrans[512] = {
 	/*0x1E0*/ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	/*0x1F0*/ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
-typedef struct {
-	enum dletype : uint8_t {
+enum class dletype : char {
 		LT_START,
 		LT_RESET,
 		LT_READ,
@@ -48,12 +47,30 @@ typedef struct {
 		LT_STACK,
 		LT_SCANLINE,
 		LT_END
-	} entrytype;
+};
+enum class pageflags : char {
+	PF_TMASK = 0x03,
+	PF_TFLOATING = 0x00,
+	PF_TROM = 0x01,
+	PF_TRAM = 0x02,
+	PF_TNONVOL = 0x03,
+	PF_BANKSWITCHED = 0x04,
+};
+pageflags operator& (pageflags left, pageflags right) // because it's a bitfield-like enum
+{
+	return (pageflags)((char)left & (char)right);
+}
+pageflags operator| (pageflags left, pageflags right) // because it's a bitfield-like enum
+{
+	return (pageflags)((char)left | (char)right);
+}
+typedef struct {
+	dletype entrytype;
 	union {
 		struct {
 			uint16_t address;
 			uint8_t value;
-			uint8_t memtype;
+			pageflags memtype;
 		} mementry;
 		struct {
 			uint8_t ticks;
@@ -79,11 +96,11 @@ typedef struct {
 			uint16_t dest;
 			uint16_t src;
 			uint8_t value;
-			uint8_t memtype;
+			pageflags memtype;
 		} fvmcentry;
 	};
 } dlogentry;
-enum filetype : unsigned {
+enum class filetype : unsigned {
 	FT_ROM,
 	FT_CART,
 	FT_CARTSAVE
@@ -454,7 +471,7 @@ bool cistreq(const char* a, const char* b);
 void DisplayArgs(char* dest, unsigned char opc, char* args, char** end);
 void DisplayHexByte(char* dest, char val);
 void DisplayHexWord(char* dest, short val);
-void DisplayMemType(char* dest, unsigned char pf);
+void DisplayMemType(char* dest, pageflags pf);
 void DisplayOpcode(char* dest, unsigned char opc);
 void DoAbout();
 void DoDebugger();
@@ -463,7 +480,7 @@ void DoPickFile(filetype ft, std::string &path);
 void DrawLogo(int x0, int y0, SDL_Surface* destsurf);
 void DrawText(const char* text, int& x, const int y0, unsigned char fg, unsigned char bg, SDL_Surface* destsurf);
 void DrawTextCX(const char* text, const int x0, const int y0, unsigned char fg, unsigned char bg, SDL_Surface* destsurf);
-dlogentry* ExtendLog(dlogentry::dletype etype);
+dlogentry* ExtendLog(dletype etype);
 void FillRoundedRect(SDL_Surface* dst, const SDL_Rect& r, unsigned c);
 void GenerateStereoAudio(void* userdata, Uint8* stream, int len);
 void InstallROM();

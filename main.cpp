@@ -59,13 +59,7 @@ Misc Ctrl:  0x03C0-0x03FF
   Video Interrupt Condition Flags: FC
 */
 unsigned char* sysram;
-unsigned char* syspflags;
-constexpr unsigned char PF_TMASK = 0x03;
-constexpr unsigned char PF_TFLOATING = 0x00;
-constexpr unsigned char PF_TROM = 0x01;
-constexpr unsigned char PF_TRAM = 0x02;
-constexpr unsigned char PF_TNONVOL = 0x03;
-constexpr unsigned char PF_BANKSWITCHED = 0x04;
+pageflags* syspflags;
 bool cartridgeinserted = false;
 bool scanlinedirty[576];
 bool videobusy;
@@ -269,7 +263,7 @@ inline void DisplayHexWord(char* dest, short val)
 	*++dest = nybbles[val & 0xf];
 }
 
-inline void DisplayMemType(char* dest, unsigned char pf)
+inline void DisplayMemType(char* dest, pageflags pf)
 {
 	const char typewords[12] = {
 		'N',0x7f, 'C',
@@ -277,7 +271,7 @@ inline void DisplayMemType(char* dest, unsigned char pf)
 		'R', 'A', 'M',
 		'N', 'V', 'M',
 	};
-	char* src = (char*)typewords + 3ll * (pf & PF_TMASK);
+	char* src = (char*)typewords + 3ll * ((char)pf & (char)pageflags::PF_TMASK);
 	*dest = *src;
 	*++dest = *++src;
 	*++dest = *++src;
@@ -415,18 +409,18 @@ int SetHWPalette(SDL_Palette* dstpal)
 void EjectCartridge()
 {
 	for (int p = 0x20; p < 0xc0; ++p)
-		syspflags[p] = PF_TFLOATING;
+		syspflags[p] = pageflags::PF_TFLOATING;
 	cartridgeinserted = false;
 }
 
-dlogentry* ExtendLog(dlogentry::dletype etype)
+dlogentry* ExtendLog(dletype etype)
 {
 	if (debuglogend == debuglogstart)
 	{
 		++debuglogstart;
 		debuglogstart &= dlogidxmask;
 	}
-	debuglog[debuglogstart].entrytype = dlogentry::dletype::LT_START;
+	debuglog[debuglogstart].entrytype = dletype::LT_START;
 	debuglog[debuglogend].entrytype = etype;
 	dlogentry* newentry = debuglog + debuglogend;
 	++debuglogend;
@@ -967,12 +961,12 @@ void DoDebugger() {
 				switch (entry->entrytype)
 				{
 					char line[37];
-				case dlogentry::dletype::LT_START:
+				case dletype::LT_START:
 					strcpy_s(line, 12, "<log start>");
 					tx0 = (winpos.w - TextWidth(line)) >> 1;
 					DrawText(line, tx0, y, 0x72, 0xff, winbuffer);
 					break;
-				case dlogentry::dletype::LT_READ:
+				case dletype::LT_READ:
 					strcpy_s(line, 21, "Read --- $---- = $--");
 					DisplayMemType(line + 5, entry->mementry.memtype);
 					DisplayHexWord(line + 10, entry->mementry.address);
@@ -980,7 +974,7 @@ void DoDebugger() {
 					tx0 = (winpos.w - TextWidth(line)) >> 1;
 					DrawText(line, tx0, y, 0x20, 0xff, winbuffer);
 					break;
-				case dlogentry::dletype::LT_WRITE:
+				case dletype::LT_WRITE:
 					strcpy_s(line, 22, "Write --- $---- = $--");
 					DisplayMemType(line + 6, entry->mementry.memtype);
 					DisplayHexWord(line + 11, entry->mementry.address);
@@ -988,7 +982,7 @@ void DoDebugger() {
 					tx0 = (winpos.w - TextWidth(line)) >> 1;
 					DrawText(line, tx0, y, 0x24, 0xff, winbuffer);
 					break;
-				case dlogentry::dletype::LT_FVMC:
+				case dletype::LT_FVMC:
 					strcpy_s(line, 34, "(FVMC: --- $---- -> $-- -> $----)");
 					DisplayMemType(line + 7, entry->fvmcentry.memtype);
 					DisplayHexWord(line + 12, entry->fvmcentry.src);
@@ -997,7 +991,7 @@ void DoDebugger() {
 					tx0 = (winpos.w - TextWidth(line)) >> 1;
 					DrawText(line, tx0, y, 0x68, 0xff, winbuffer);
 					break;
-				case dlogentry::dletype::LT_STATE:
+				case dletype::LT_STATE:
 					strcpy_s(line, 35, "PC=$---- ------- A=$-- X=$-- Y=$--");
 					DisplayHexWord(line + 4, entry->stateentry.pc);
 					if (entry->stateentry.status & CPUFLAG_NEGATIVE)
@@ -1020,7 +1014,7 @@ void DoDebugger() {
 					tx0 = (winpos.w - TextWidth(line)) >> 1;
 					DrawText(line, tx0, y, 0x03, 0xff, winbuffer);
 					break;
-				case dlogentry::dletype::LT_STACK:
+				case dletype::LT_STACK:
 					strcpy_s(line, 37, "Stack: $-- $-- $-- $-- $-- $-- $-- \205");
 					DisplayHexByte(line + 8, entry->stackentry.stack[0]);
 					DisplayHexByte(line + 12, entry->stackentry.stack[1]);
@@ -1034,7 +1028,7 @@ void DoDebugger() {
 					tx0 = (winpos.w - TextWidth(line)) >> 1;
 					DrawText(line, tx0, y, 0x21, 0xff, winbuffer);
 					break;
-				case dlogentry::dletype::LT_INST:
+				case dletype::LT_INST:
 					strcpy_s(line, 23, "--- -------\0\0\0\0\0\0\0\0\0\0\0");
 					DisplayOpcode(line, entry->instentry.opc);
 					char* tpos;
@@ -1053,17 +1047,17 @@ void DoDebugger() {
 					tx0 = (winpos.w - TextWidth(line)) >> 1;
 					DrawText(line, tx0, y, 0x11, 0xff, winbuffer);
 					break;
-				case dlogentry::dletype::LT_PARTIALINST:
+				case dletype::LT_PARTIALINST:
 					strcpy_s(line, 26, "<ready to read next inst>");
 					tx0 = (winpos.w - TextWidth(line)) >> 1;
 					DrawText(line, tx0, y, 0x79, 0xff, winbuffer);
 					break;
-				case dlogentry::dletype::LT_RESET:
+				case dletype::LT_RESET:
 					strcpy_s(line, 12, "<CPU reset>");
 					tx0 = (winpos.w - TextWidth(line)) >> 1;
 					DrawText(line, tx0, y, 0x41, 0xff, winbuffer);
 					break;
-				case dlogentry::dletype::LT_SCANLINE:
+				case dletype::LT_SCANLINE:
 					strcpy_s(line, 21, "<begin scanline --->");
 					dr = div(entry->scanline, 10);
 					line[18] = '0' + dr.rem;
@@ -1075,7 +1069,7 @@ void DoDebugger() {
 					break;
 				default:
 					strcpy_s(line, 28, "<unknown log entry type -->");
-					DisplayHexByte(line + 24, entry->entrytype);
+					DisplayHexByte(line + 24, (char)entry->entrytype);
 					tx0 = (winpos.w - TextWidth(line)) >> 1;
 					DrawText(line, tx0, y, 0x07, 0xff, winbuffer);
 					break;
@@ -1595,21 +1589,21 @@ void DoPickFile(filetype ft, std::string &path)
 	std::filesystem::path browsedir;
 	switch (ft)
 	{
-	case FT_ROM:
+	case filetype::FT_ROM:
 		wintitle = (char*)titles[1];
 		filterext = (char*)exts[1];
 		browsedir = cartpath;
 		winmacrox = 4;
 		winmacroy = 4;
 		break;
-	case FT_CART:
+	case filetype::FT_CART:
 		wintitle = (char*)titles[2];
 		filterext = (char*)exts[2];
 		browsedir = cartpath;
 		winmacrox = 2;
 		winmacroy = 3;
 		break;
-	case FT_CARTSAVE:
+	case filetype::FT_CARTSAVE:
 		wintitle = (char*)titles[3];
 		filterext = (char*)exts[3];
 		browsedir = savepath;
@@ -1911,7 +1905,7 @@ int InitEmulator()
 		{
 			PaintCell(x, y);
 		}
-	debuglog[debuglogstart].entrytype = dlogentry::dletype::LT_START;
+	debuglog[debuglogstart].entrytype = dletype::LT_START;
 	hookexternal(LogStep);
 	keypressregister = 0;
 	{
@@ -1990,14 +1984,14 @@ int InitMainWindow()
 int InitMemory()
 {
 	sysram = new unsigned char[0x10000];
-	syspflags = new unsigned char[0x100];
+	syspflags = new pageflags[0x100];
 	if (!sysram || !syspflags)
 	{
 		SDL_Log("Could not allocate system address space");
 		return -1;
 	}
 	for (int p = 0x00; p < 0x20; ++p)
-		syspflags[p] = PF_TRAM;
+		syspflags[p] = pageflags::PF_TRAM;
 	{ // Initialize the builtin RAM with deterministic random data
 		std::mt19937 gen(1); //TODO: seed with a hash of machine identifying info
 		std::uniform_int_distribution<> dis(0x00, 0xFF);
@@ -2005,7 +1999,7 @@ int InitMemory()
 			sysram[a] = dis(gen);
 	}
 	for (int p = 0x20; p < 0x100; ++p)
-		syspflags[p] = PF_TFLOATING;
+		syspflags[p] = pageflags::PF_TFLOATING;
 	floatgen.seed(seedgen());
 	//InitVideoMem(); // no cheating!
 	InstallROM();
@@ -2450,7 +2444,7 @@ void InstallROM()
 	for (int i = 0; i < 4; ++i)
 	{
 		for (int p = 0; p < 16; ++p)
-			syspflags[0xc0 | (i << 4) | p] = PF_TROM;
+			syspflags[0xc0 | (i << 4) | p] = pageflags::PF_TROM;
 		std::ifstream infile(infilename[i], std::ios::binary);
 		if (infile.is_open())
 		{
@@ -2529,7 +2523,7 @@ bool LoadCartridge(const char* infilename)
 	infile.seekg(datastart);
 	for (unsigned char p = 0x20; p < 0xc0; ++p)
 	{
-		if (syspflags[p] & PF_TROM)
+		if ((char)syspflags[p] & (char)pageflags::PF_TROM) // ROM or NVM
 		{
 			readsize = 0x100;
 			readptr = (char*)sysram + ((long long)p << 8);
@@ -2548,7 +2542,7 @@ bool LoadCartridge(const char* infilename)
 
 void LogFVMC(uint16_t dest, uint16_t src, uint8_t value)
 {
-	dlogentry* newentry = ExtendLog(dlogentry::dletype::LT_FVMC);
+	dlogentry* newentry = ExtendLog(dletype::LT_FVMC);
 	newentry->fvmcentry.dest = dest;
 	newentry->fvmcentry.src = src;
 	newentry->fvmcentry.value = value;
@@ -2580,7 +2574,7 @@ void LogRead(uint16_t address, uint8_t value)
 			/* E */ 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 2, 2, 2, 2, /* E */
 			/* F */ 1, 1, 0, 1, 1, 1, 1, 1, 0, 2, 0, 2, 2, 2, 2, 2  /* F */
 		};
-		if (partialinst->entrytype != dlogentry::dletype::LT_PARTIALINST)
+		if (partialinst->entrytype != dletype::LT_PARTIALINST)
 			goto logmementry;
 		partialinst->instentry.opc = value;
 		debuglogexpectargs = nargsbyopcode[value];
@@ -2588,40 +2582,40 @@ void LogRead(uint16_t address, uint8_t value)
 	}
 	else if (debuglogexpectargs)
 	{
-		if (partialinst->entrytype != dlogentry::dletype::LT_PARTIALINST)
+		if (partialinst->entrytype != dletype::LT_PARTIALINST)
 			goto logmementry;
 		partialinst->instentry.arg[partialinst->instentry.nargs] = value;
 		++(partialinst->instentry.nargs);
 		--debuglogexpectargs;
 		if (!debuglogexpectargs)
 		{
-			partialinst->entrytype = dlogentry::dletype::LT_INST;
+			partialinst->entrytype = dletype::LT_INST;
 			partialinst = nullptr;
 		}
 	}
 	else
 	{
 	logmementry:
-		dlogentry* newentry = ExtendLog(dlogentry::dletype::LT_READ);
+		dlogentry* newentry = ExtendLog(dletype::LT_READ);
 		newentry->mementry.address = address;
 		newentry->mementry.value = value;
-		newentry->mementry.memtype = syspflags[address >> 8] & PF_TMASK;
+		newentry->mementry.memtype = syspflags[address >> 8] & pageflags::PF_TMASK;
 	}
 }
 
 void LogReset()
 {
-	ExtendLog(dlogentry::dletype::LT_RESET);
+	ExtendLog(dletype::LT_RESET);
 }
 
 void LogScanline(int scanline)
 {
-	ExtendLog(dlogentry::dletype::LT_SCANLINE)->scanline = scanline;
+	ExtendLog(dletype::LT_SCANLINE)->scanline = scanline;
 }
 
 void LogStack(unsigned char sp)
 {
-	dlogentry* newentry = ExtendLog(dlogentry::dletype::LT_STACK);
+	dlogentry* newentry = ExtendLog(dletype::LT_STACK);
 	for (unsigned i = 0, j = (sp + 1) | 0x100; i < 7 && j < 0x0200; ++i, ++j)
 	{
 		newentry->stackentry.stack[i] = sysram[j];
@@ -2636,9 +2630,9 @@ extern "C" void LogStep()
 	extern uint16_t pc;
 	extern uint8_t sp, a, x, y, status;
 	static dlogentry* laststateentry = nullptr, * lastinstentry = nullptr;
-	if (partialinst && partialinst->entrytype == dlogentry::dletype::LT_PARTIALINST)
-		partialinst->entrytype = dlogentry::dletype::LT_INST;
-	dlogentry* newentry = ExtendLog(dlogentry::dletype::LT_STATE);
+	if (partialinst && partialinst->entrytype == dletype::LT_PARTIALINST)
+		partialinst->entrytype = dletype::LT_INST;
+	dlogentry* newentry = ExtendLog(dletype::LT_STATE);
 	newentry->stateentry.ticks = clockticks6502;
 	newentry->stateentry.pc = pc;
 	newentry->stateentry.sp = sp;
@@ -2651,19 +2645,19 @@ extern "C" void LogStep()
 	if (laststateentry && laststateentry->stateentry.sp != newentry->stateentry.sp)
 		LogStack(sp);
 	laststateentry = newentry;
-	lastinstentry = partialinst = ExtendLog(dlogentry::dletype::LT_PARTIALINST);
+	lastinstentry = partialinst = ExtendLog(dletype::LT_PARTIALINST);
 	debuglogexpectargs = -1;
 }
 
 void LogWrite(uint16_t address, uint8_t value)
 {
 	dlogentry* last = debuglog + ((debuglogend - 1) & dlogidxmask);
-	if (last->entrytype == dlogentry::dletype::LT_PARTIALINST)
-		last->entrytype = dlogentry::dletype::LT_INST;
-	dlogentry* newentry = ExtendLog(dlogentry::dletype::LT_WRITE);
+	if (last->entrytype == dletype::LT_PARTIALINST)
+		last->entrytype = dletype::LT_INST;
+	dlogentry* newentry = ExtendLog(dletype::LT_WRITE);
 	newentry->mementry.address = address;
 	newentry->mementry.value = value;
-	newentry->mementry.memtype = syspflags[address >> 8] & PF_TMASK;
+	newentry->mementry.memtype = syspflags[address >> 8] & pageflags::PF_TMASK;
 }
 
 void PaintCell(unsigned char col, unsigned char row, unsigned char glyph, unsigned char* att)
@@ -2727,7 +2721,7 @@ inline void PaintCell(unsigned char col, unsigned char row)
 void PickAndInsertCartridge()
 {
 	std::string cart;
-	DoPickFile(FT_CART, cart);
+	DoPickFile(filetype::FT_CART, cart);
 	if (cart.empty())
 		return;
 	LoadCartridge(cart.c_str());
@@ -2784,7 +2778,7 @@ inline uint8_t bare_read6502(uint16_t address)
 			return videostate;
 		}
 	}
-	if ((syspflags[address >> 8] & PF_TMASK) == PF_TFLOATING)
+	if ((syspflags[address >> 8] & pageflags::PF_TMASK) == pageflags::PF_TFLOATING)
 	{
 		static std::uniform_int_distribution<> dis(0x00, 0xFF);
 		return dis(floatgen);
@@ -2845,7 +2839,7 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 	{
 		return; // writing to video ram blocked
 	}
-	if (!(syspflags[address >> 8] & PF_TRAM))
+	if (!((char)syspflags[address >> 8] & (char)pageflags::PF_TRAM)) //neither RAM nor NVM
 	{
 		return; // this page is not writeable
 	}
