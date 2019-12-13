@@ -23,22 +23,24 @@
 **/*.synctex.gz
 **/*.toc
 **/*.pdf
-!sdk/char??.pdf
-!sdk/fvmc.pdf
+!/sdk/char??.pdf
+!/sdk/fvmc.pdf
 
 #assembler output in SDK folder
-sdk/*.R6kCart
-sdk/*.rom
-sdk/*.txt
+/sdk/*.R6kCart
+/sdk/*.rom
+/sdk/*.txt
 
 #misc things to keep to myself
-sdk/chicago.png
-sdk/scs.svg
-sdk/extractcharsvg.py
-sdk/cropcharsvg.py
-sdk/makecharpdf.py
-sdk/vasm6502*.exe
-sdk/vasm.bat
-sdk/vasmhr.bat
-sdk/packhifont.py
-sdk/colorcycle.c
+/sdk/chicago.png
+/sdk/scs.svg
+/sdk/extractcharsvg.py
+/sdk/cropcharsvg.py
+/sdk/makecharpdf.py
+/sdk/vasm6502*.exe
+/sdk/vasm.bat
+/sdk/vasmhr.bat
+/sdk/packhifont.py
+/sdk/colorcycle.c
+/ver.cpp
+/updatever.py

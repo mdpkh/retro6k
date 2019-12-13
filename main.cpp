@@ -7,6 +7,7 @@
 
 #include <SDL.h>
 
+#include "custombuild.h"
 #include "fake6502.h"
 #include "main.h"
 
@@ -676,26 +677,54 @@ void DoAbout() {
 	SDL_UpdateWindowSurface(mainwindow);
 	SDL_BlitSurface(mwsurface, &winpos, restorescreen, NULL);
 	PaintWindow(winbuffer, 0xff, 0x4d, "About Retro 6k", 0xff);
-	const char* abouttext[6] = {
-		"Retro 6k designed by Maggie\220David",
-		"P.\220K. Haynes in 2019\22620.",
-		"",
-		"Emulator v1.1990 \2512019\22620 Maggie\220David P.\220K.",
-		"Haynes. Includes public domain 6502 emulator",
-		"core written by Mike Chambers in 2011."
-	};
-	int tx0 = 0;
-	for (int i = 0; i < 6; ++i)
-	{
-		int lw = TextWidth(abouttext[i]);
-		if (lw > tx0)
-			tx0 = lw;
-	}
-	tx0 = (winpos.w - tx0) >> 1;
+	int tx0;
 	int y0 = (winpos.h + 20 - 18 * 6) >> 1;
-	for (int i = 0, x = tx0, y = y0; i < 6; ++i, x = tx0, y += 18)
 	{
-		DrawText(abouttext[i], x, y, 0x00, 0xff, winbuffer);
+		// hey, if you're not me, don't change this #ifdef/#else/#endif block
+		// and don't define OFFICIAL_BUILD. ---MDPKH
+#ifdef OFFICIAL_BUILD
+		char* abouttext[6] = {
+			(char*)"Retro 6k designed by Maggie\220David",         //points to cstring in program data
+			(char*)"P.\220K. Haynes in 2019\22620.",               //points to cstring in program data
+			(char*)"",                                             //points to cstring in program data
+			nullptr,                                               //will point to cstring in stack
+			(char*)"Haynes. Includes public domain 6502 emulator", //points to cstring in program data
+			(char*)"core written by Mike Chambers in 2011."        //points to cstring in program data
+		};
+		const char* vertempl = "Emulator v------- \2512019\22620 Maggie\220David P.\220K."; //program data
+		char verline[46];                                                                   //stack
+		strcpy_s((char*)&verline, 46, vertempl); //copy cstring from program data into stack
+		extern const char* verstring; //points to cstring in program data in a separately-compiled obj file
+		verline[10] = verstring[0];   //copy 7 bytes from separate program data to middle of cstring in stack
+		verline[11] = verstring[1];   //verstring is assumed to point to at least 7 non-null bytes (see ver.cpp)
+		verline[12] = verstring[2];
+		verline[13] = verstring[3];
+		verline[14] = verstring[4];
+		verline[15] = verstring[5];
+		verline[16] = verstring[6];
+		abouttext[3] = verline;       //now the abouttext array is complete
+#else
+		char* abouttext[6] = {
+			(char*)"Retro 6k designed by Maggie\220David",         
+			(char*)"P.\220K. Haynes in 2019\22620.",               
+			(char*)"",                                             
+			(char*)CUSTOM_BUILD_CREDIT,                                               
+			(char*)"Includes public domain 6502 emulator", 
+			(char*)"core written by Mike Chambers in 2011."        
+		};
+#endif
+		int mlw = 283;
+		for (int i = 0; i < 6; ++i)
+		{
+			int lw = TextWidth(abouttext[i]);
+			if (lw > mlw)
+				mlw = lw;
+		}
+		tx0 = (winpos.w - mlw) >> 1;
+		for (int i = 0, x = tx0, y = y0; i < 6; ++i, x = tx0, y += 18)
+		{
+			DrawText(abouttext[i], x, y, 0x00, 0xff, winbuffer);
+		}
 	}
 	DrawLogo(winpos.w - tx0 - 30, y0 + 3, winbuffer);
 	SDL_Rect animrect = winpos;
