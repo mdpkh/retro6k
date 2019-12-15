@@ -51,9 +51,9 @@ Sys Status: 0x0280-0x02FF
 	80: Aspect ratio: 00 4:3; 80 16:9 (set by user switch)
 
   *** OUTPUT DEVICES ***
-Sound Out:  0x0300-0x037F 
-Device Out: 0x0380-0x03BF 
-Misc Ctrl:  0x03C0-0x03FF 
+Device Out: 0x0300-0x037F 
+Sound Out:  0x0380-0x03CF 
+Misc Ctrl:  0x03D0-0x03FF 
   Fast Video Memory Copy Mode / Dest Page: F8
   Fast Video Memory Src Page: F9
   Video Interrupt Condition Flags: FC
