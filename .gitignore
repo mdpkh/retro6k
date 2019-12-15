@@ -31,6 +31,12 @@
 /sdk/*.rom
 /sdk/*.txt
 
+#versioning files
+/lastpush
+/prebuild.py
+/bumpemuver.py
+/bumpfwver.py
+
 #misc things to keep to myself
 /sdk/chicago.png
 /sdk/scs.svg
