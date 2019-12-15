@@ -41,8 +41,8 @@ The Retro 6k Fantasy Computer has 7.5KB of built-in RAM (including 6KB used for 
 0100-01FF & RAM & Stack \\
 0200-027F & --- & User input (see section \ref{sec:userinput}, page \pageref{sec:userinput}) \\
 0280-02FF & --- & System status (see section \ref{sec:otherinput}, page \pageref{sec:otherinput}) \\
-0300-037F & --- & Device output  (see section \ref{sec:devoutput}, page \pageref{sec:devoutput}) \\
-0380-03BF & --- & Sound output  (see section \ref{sec:soundoutput}, page \pageref{sec:soundoutput}) \\
+0300-037F & --- & Sound output  (see section \ref{sec:soundoutput}, page \pageref{sec:soundoutput}) \\
+0380-03BF & --- & Peripheral device output  (see section \ref{sec:devoutput}, page \pageref{sec:devoutput}) \\
 03C0-03FF & --- & Misc.\ system control  (see section \ref{sec:sysoutput}, page \pageref{sec:sysoutput}) \\
 0400-07FF & RAM & General memory \\
 0800-1FFF & RAM & Video memory (see section \ref{sec:videomem}, page \pageref{sec:videomem}) \\
@@ -350,7 +350,7 @@ Immediately following the magic number, at \texttt{200E\&200F}, is where the CPU
 
 A file describing a Retro 6k cartridge should have a name ending with \texttt{.R6kCart}. The first eight bytes is a magic number, the literal byte sequence \texttt{47 A9 02 6A BB 47 F3 A7}. Following that is the offset (counting from the beginning of the file) to the Page Flags array as a 4-byte little-endian number, then the offset to the beginning of the ROM (or NVM) data contained within the cartridge.
 
-Beginning at offset \texttt{0010} is a sequence of extension data. The extension format has not been determined at this time, except that the byte sequence \texttt{00 00 00 00}, where an extension is expected to begin, indicates that there are no (more) extensions. Extensions will allow for the emulation of cartridges that have more than just memory chips connected directly to the system address \& data buses. Such additional features may include bank switching, or a clock that tracks time when the cartridge is unpowered.
+Beginning at offset \texttt{0010} is a sequence of extension data. The extension format has not been determined at this time, except that the byte sequence \texttt{00 00 00 00}, where an extension is expected to begin, indicates that there are no (more) extensions. Extensions will allow for the emulation of cartridges that have more than just memory chips connected directly to the system address \& data buses. Such additional features may include bank switching, a clock that tracks time when the cartridge is unpowered, a label image, and more..
 
 The Page Flags array is 160 bytes which describe what kind of memory, if any, serves each of the 160 pages (\texttt{20-BF}) of cartridge address space. The lowest two bits, taken together, have the following meaning: 0, no memory at this address; 1, read-only memory; 2, random-access memory; 3, non-volatile memory. Bit 2, if set, indicates that this page of memory is subject to bank switching. The upper five bits are not used at this time.
 
@@ -395,11 +395,11 @@ This routine will be written some time after Byte To Decimal is fixed.
 
 \subsection{Accessories}
 
-The address range \texttt{0200-023F} is reserved for input from general peripheral accessories.
+The address range \texttt{0200-3F} is reserved for input from general peripheral accessories.
 
 \subsection{Game Pads}
 
-The Retro 6k supports four gamepads, each with eight buttons. Input from these game pads can be read from addresses \texttt{0240-0243}.
+The Retro 6k supports four gamepads, each with eight buttons. Input from these game pads can be read from addresses \texttt{0240-3}.
 
 \subsection{Keyboard Input}
 \label{ss:keyboard}
@@ -421,7 +421,7 @@ Some software may benefit from allowing the user to type any of the 256 availabl
 
 \subsection{Pointing Device}
 
-Addresses \texttt{0246\&0247} contain the current X and Y coordinates of a pointing device, or possibly two different one-dimensional ``analog'' inputs such as Pong ``paddles''.
+Addresses \texttt{0246-7} contain the current X and Y coordinates of a pointing device, or possibly two different one-dimensional ``analog'' inputs such as Pong ``paddles''.
 
 \section{System Status Addresses}
 \label{sec:otherinput}
@@ -434,12 +434,91 @@ Reading address \texttt{02FC} yields the current video status flags. Bits 0 and 
 \section{Device Output Addresses}
 \label{sec:devoutput}
 
-The address range \texttt{0300-037F} is reserved for output to general peripheral accessories.
+The address range \texttt{0300-7F} is reserved for output to general peripheral accessories.
 
 \section{Sound Output}
 \label{sec:soundoutput}
 
-The address range \texttt{0380-03BF} is reserved for sound output. The details of the sound output interface have not yet been determined.
+\subsection{Immediate Sound Control}
+
+The address range \texttt{0380-C} maps to the registers which control sound output from moment to moment: \nopagebreak[4]
+
+\begin{center}\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}cl}
+\multicolumn{4}{c}{Address} & Register purpose \\
+\textrm{Voice 0} & \textrm{Voice 1} & \textrm{Voice 2} & \textrm{Voice 3} \\
+\hline
+\raisebox{0pt}[13.5pt]{0380-1} & 0382-3 & 0384-5 & 0386-7 & Frequency \\
+0388 & 0389 & 038A & 038B & Volume \\
+\multicolumn{4}{c}{\texttt{038C} (all voices)} & Voice types
+\end{tabular}\end{center}
+
+For volume registers, the high nybble indicates the volume in the left stereo sound channel, while the low nybble indicates the volume in the right stereo sound channel. For the voice types register, bits 1--0 indicate the voice type for Voice 0, bits 3--2 indicate the voice type for Voice 1, and so on. The two-bit value $\texttt{00}_b$ indicates a square wave voice. The two-bit value $\texttt{01}_b$ indicates a noise voice. The meanings of two-bit values $\texttt{10}_b$ and $\texttt{11}_b$ are undefined at this time.
+
+\subsection{Queued Sound Control}
+
+The address range \texttt{038D-CF} maps to the registers which control queued sound output. The register at address \texttt{038D} indicates which queue schedule controllers (of which there are two) control which voices. Writing to address \texttt{038E} clears specific schedule-related registers. \nopagebreak[4]
+
+\begin{center}\begin{tabular}{>{\ttfamily}c>{\ttfamily}cl}
+\textrm{Addr} & \textrm{Bit} & Meaning if set \\
+\hline
+\raisebox{0pt}[1.125em]{038D} & 7 & Schedule controller 1 operates on Voice 3 \\
+ & 6 & Schedule controller 1 operates on Voice 2 \\
+ & 5 & Schedule controller 1 operates on Voice 1 \\
+\raisebox{-.633em}[0pt][0pt]{$\vdots$} & 4 & Schedule controller 1 operates on Voice 0 \\
+ & 3 & Schedule controller 0 operates on Voice 3 \\
+ & 2 & Schedule controller 0 operates on Voice 2 \\
+ & 1 & Schedule controller 0 operates on Voice 1 \\
+038D & 0 & Schedule controller 0 operates on Voice 0 \\
+\hline
+\raisebox{0pt}[1.125em]{038E} & 7 & Clear Voice 3 Volume \& Frequency entries \\
+ & 6 & Clear Voice 2 Volume \& Frequency entries \\
+ & 5 & Clear Voice 1 Volume \& Frequency entries \\
+\raisebox{-.633em}[0pt][0pt]{$\vdots$} & 4 & Clear Voice 0 Volume \& Frequency entries \\
+ & 3 & Clear Schedule 1 Duration entries \\
+ & 2 & Clear Schedule 0 Duration entries \\
+ & 1 & Clear Schedule 1 Current Duration counter \\
+038E & 0 & Clear Schedule 0 Current Duration counter \\ 
+\end{tabular}\end{center}
+
+The register at address \texttt{038F} selects the page of the schedule to write to, where a schedule page is 4 entries. There are 4 schedule pages, meaning each queue schedule controller can hold up to 16 entries.
+
+Writing to addresses \texttt{0390-F} sets the duration entry shift registers: \nopagebreak[4]
+
+\begin{center}\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c}
+\textrm{Entry} & \multicolumn{2}{c}{Address} \\
+\textrm{(within page)} & \textrm{Schedule controller 0} & \textrm{Schedule controller 1} \\
+\hline
+\raisebox{0pt}[1.125em]{0} & 0390-1 & 0398-9 \\
+1 & 0392-3 & 039A-B \\
+2 & 0394-5 & 039C-D \\
+3 & 0396-7 & 039E-F
+\end{tabular}\end{center}
+
+Writing to addresses \texttt{03A0-BF} sets the frequency entry shift registers: 
+\nopagebreak[4]
+
+\begin{center}\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c}
+\textrm{Entry} & \multicolumn{4}{c}{Address} \\
+\textrm{(within page)} & \textrm{Voice 0} & \textrm{Voice 1} & \textrm{Voice 2} & \textrm{Voice 3} \\
+\hline
+\raisebox{0pt}[1.125em]{0} & 03A0-1 & 03A8-9 & 03B0-1 & 03B8-9 \\
+1 & 03A2-3 & 03AA-B & 03B2-3 & 03BA-B \\
+2 & 03A4-5 & 03AC-D & 03B4-5 & 03BC-D \\
+3 & 03A6-7 & 03AE-F & 03B6-7 & 03BE-F
+\end{tabular}\end{center}
+
+Writing to addresses \texttt{03C0-F} sets the volume entry shift registers: 
+\nopagebreak[4]
+
+\begin{center}\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c}
+\textrm{Entry} & \multicolumn{4}{c}{Address} \\
+\textrm{(within page)} & \textrm{Voice 0} & \textrm{Voice 1} & \textrm{Voice 2} & \textrm{Voice 3} \\
+\hline
+\raisebox{0pt}[1.125em]{0} & 03C0 & 03C4 & 03C8 & 03CC \\
+1 & 03C1 & 03C5 & 03C9 & 03CD \\
+2 & 03C2 & 03C6 & 03CA & 03CE \\
+3 & 03C3 & 03C7 & 03CB & 03CF
+\end{tabular}\end{center}
 
 \section{System Control Addresses}
 \label{sec:sysoutput}

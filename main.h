@@ -105,6 +105,10 @@ enum class filetype : unsigned {
 	FT_CART,
 	FT_CARTSAVE
 };
+typedef struct {
+	unsigned char vol;
+	unsigned short freq;
+} soundqueueentry;
 const struct {
 	unsigned char w;
 	unsigned short bmp[16];

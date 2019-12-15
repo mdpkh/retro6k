@@ -51,8 +51,8 @@ Sys Status: 0x0280-0x02FF
 	80: Aspect ratio: 00 4:3; 80 16:9 (set by user switch)
 
   *** OUTPUT DEVICES ***
-Device Out: 0x0300-0x037F 
-Sound Out:  0x0380-0x03BF 
+Sound Out:  0x0300-0x037F 
+Device Out: 0x0380-0x03BF 
 Misc Ctrl:  0x03C0-0x03FF 
   Fast Video Memory Copy Mode / Dest Page: F8
   Fast Video Memory Src Page: F9
@@ -67,6 +67,11 @@ unsigned char videostate;
 unsigned char keypressregister;
 unsigned short soundfreqregister[4];
 unsigned char soundvolregister[4];
+unsigned char soundwaveregister;
+unsigned char soundtimingflags;
+unsigned char soundqueueregisteroffset;
+unsigned short soundqueuedur[2][16];
+soundqueueentry soundqueue[4][16];
 unsigned short menubeepdur;
 unsigned short menubeepfreq;
 bool menuhassound = false;
@@ -2905,6 +2910,246 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 	{
 		switch (address & 0xff)
 		{
+		case 0x80:
+			soundfreqregister[0] = soundfreqregister[0] & 0xff00 | value;
+			break;
+		case 0x81:
+			soundfreqregister[0] = soundfreqregister[0] & 0xff | (value << 8);
+			break;
+		case 0x82:
+			soundfreqregister[1] = soundfreqregister[1] & 0xff00 | value;
+			break;
+		case 0x83:
+			soundfreqregister[1] = soundfreqregister[1] & 0xff | (value << 8);
+			break;
+		case 0x84:
+			soundfreqregister[2] = soundfreqregister[2] & 0xff00 | value;
+			break;
+		case 0x85:
+			soundfreqregister[2] = soundfreqregister[2] & 0xff | (value << 8);
+			break;
+		case 0x86:
+			soundfreqregister[3] = soundfreqregister[3] & 0xff00 | value;
+			break;
+		case 0x87:
+			soundfreqregister[3] = soundfreqregister[3] & 0xff | (value << 8);
+			break;
+		case 0x88:
+			soundvolregister[0] = value;
+			break;
+		case 0x89:
+			soundvolregister[1] = value;
+			break;
+		case 0x8a:
+			soundvolregister[2] = value;
+			break;
+		case 0x8b:
+			soundvolregister[3] = value;
+			break;
+		case 0x8c:
+			soundwaveregister = value;
+			break;
+		case 0x8d:
+			soundtimingflags = value;
+			break;
+		case 0x8e:
+			// reset various registers based on value
+			break;
+		case 0x8f:
+			soundqueueregisteroffset = (value & 0x3) << 2;
+			break;
+		case 0x90:
+			soundqueuedur[0][soundqueueregisteroffset] = soundqueuedur[0][soundqueueregisteroffset] & 0xff00 | value;
+			break;
+		case 0x91:
+			soundqueuedur[0][soundqueueregisteroffset] = soundqueuedur[0][soundqueueregisteroffset] & 0xff | (value << 8);
+			break;
+		case 0x92:
+			soundqueuedur[0][soundqueueregisteroffset | 1] = soundqueuedur[0][soundqueueregisteroffset | 1] & 0xff00 | value;
+			break;
+		case 0x93:
+			soundqueuedur[0][soundqueueregisteroffset | 1] = soundqueuedur[0][soundqueueregisteroffset | 1] & 0xff | (value << 8);
+			break;
+		case 0x94:
+			soundqueuedur[0][soundqueueregisteroffset | 2] = soundqueuedur[0][soundqueueregisteroffset | 2] & 0xff00 | value;
+			break;
+		case 0x95:
+			soundqueuedur[0][soundqueueregisteroffset | 2] = soundqueuedur[0][soundqueueregisteroffset | 2] & 0xff | (value << 8);
+			break;
+		case 0x96:
+			soundqueuedur[0][soundqueueregisteroffset | 3] = soundqueuedur[0][soundqueueregisteroffset | 3] & 0xff00 | value;
+			break;
+		case 0x97:
+			soundqueuedur[0][soundqueueregisteroffset | 3] = soundqueuedur[0][soundqueueregisteroffset | 3] & 0xff | (value << 8);
+			break;
+		case 0x98:
+			soundqueuedur[1][soundqueueregisteroffset] = soundqueuedur[1][soundqueueregisteroffset] & 0xff00 | value;
+			break;
+		case 0x99:
+			soundqueuedur[1][soundqueueregisteroffset] = soundqueuedur[1][soundqueueregisteroffset] & 0xff | (value << 8);
+			break;
+		case 0x9a:
+			soundqueuedur[1][soundqueueregisteroffset | 1] = soundqueuedur[1][soundqueueregisteroffset | 1] & 0xff00 | value;
+			break;
+		case 0x9b:
+			soundqueuedur[1][soundqueueregisteroffset | 1] = soundqueuedur[1][soundqueueregisteroffset | 1] & 0xff | (value << 8);
+			break;
+		case 0x9c:
+			soundqueuedur[1][soundqueueregisteroffset | 2] = soundqueuedur[1][soundqueueregisteroffset | 2] & 0xff00 | value;
+			break;
+		case 0x9d:
+			soundqueuedur[1][soundqueueregisteroffset | 2] = soundqueuedur[1][soundqueueregisteroffset | 2] & 0xff | (value << 8);
+			break;
+		case 0x9e:
+			soundqueuedur[1][soundqueueregisteroffset | 3] = soundqueuedur[1][soundqueueregisteroffset | 3] & 0xff00 | value;
+			break;
+		case 0x9f:
+			soundqueuedur[1][soundqueueregisteroffset | 3] = soundqueuedur[1][soundqueueregisteroffset | 3] & 0xff | (value << 8);
+			break;
+		case 0xa0:
+			soundqueue[0][soundqueueregisteroffset].freq = soundqueue[0][soundqueueregisteroffset].freq & 0xff00 | value;
+			break;
+		case 0xa1:
+			soundqueue[0][soundqueueregisteroffset].freq = soundqueue[0][soundqueueregisteroffset].freq & 0xff | (value << 8);
+			break;
+		case 0xa2:
+			soundqueue[0][soundqueueregisteroffset | 1].freq = soundqueue[0][soundqueueregisteroffset | 1].freq & 0xff00 | value;
+			break;
+		case 0xa3:
+			soundqueue[0][soundqueueregisteroffset | 1].freq = soundqueue[0][soundqueueregisteroffset | 1].freq & 0xff | (value << 8);
+			break;
+		case 0xa4:
+			soundqueue[0][soundqueueregisteroffset | 2].freq = soundqueue[0][soundqueueregisteroffset | 2].freq & 0xff00 | value;
+			break;
+		case 0xa5:
+			soundqueue[0][soundqueueregisteroffset | 2].freq = soundqueue[0][soundqueueregisteroffset | 2].freq & 0xff | (value << 8);
+			break;
+		case 0xa6:
+			soundqueue[0][soundqueueregisteroffset | 3].freq = soundqueue[0][soundqueueregisteroffset | 3].freq & 0xff00 | value;
+			break;
+		case 0xa7:
+			soundqueue[0][soundqueueregisteroffset | 3].freq = soundqueue[0][soundqueueregisteroffset | 3].freq & 0xff | (value << 8);
+			break;
+		case 0xa8:
+			soundqueue[1][soundqueueregisteroffset].freq = soundqueue[1][soundqueueregisteroffset].freq & 0xff00 | value;
+			break;
+		case 0xa9:
+			soundqueue[1][soundqueueregisteroffset].freq = soundqueue[1][soundqueueregisteroffset].freq & 0xff | (value << 8);
+			break;
+		case 0xaa:
+			soundqueue[1][soundqueueregisteroffset | 1].freq = soundqueue[1][soundqueueregisteroffset | 1].freq & 0xff00 | value;
+			break;
+		case 0xab:
+			soundqueue[1][soundqueueregisteroffset | 1].freq = soundqueue[1][soundqueueregisteroffset | 1].freq & 0xff | (value << 8);
+			break;
+		case 0xac:
+			soundqueue[1][soundqueueregisteroffset | 2].freq = soundqueue[1][soundqueueregisteroffset | 2].freq & 0xff00 | value;
+			break;
+		case 0xad:
+			soundqueue[1][soundqueueregisteroffset | 2].freq = soundqueue[1][soundqueueregisteroffset | 2].freq & 0xff | (value << 8);
+			break;
+		case 0xae:
+			soundqueue[1][soundqueueregisteroffset | 3].freq = soundqueue[1][soundqueueregisteroffset | 3].freq & 0xff00 | value;
+			break;
+		case 0xaf:
+			soundqueue[1][soundqueueregisteroffset | 3].freq = soundqueue[1][soundqueueregisteroffset | 3].freq & 0xff | (value << 8);
+			break;
+		case 0xb0:
+			soundqueue[2][soundqueueregisteroffset].freq = soundqueue[2][soundqueueregisteroffset].freq & 0xff00 | value;
+			break;
+		case 0xb1:
+			soundqueue[2][soundqueueregisteroffset].freq = soundqueue[2][soundqueueregisteroffset].freq & 0xff | (value << 8);
+			break;
+		case 0xb2:
+			soundqueue[2][soundqueueregisteroffset | 1].freq = soundqueue[2][soundqueueregisteroffset | 1].freq & 0xff00 | value;
+			break;
+		case 0xb3:
+			soundqueue[2][soundqueueregisteroffset | 1].freq = soundqueue[2][soundqueueregisteroffset | 1].freq & 0xff | (value << 8);
+			break;
+		case 0xb4:
+			soundqueue[2][soundqueueregisteroffset | 2].freq = soundqueue[2][soundqueueregisteroffset | 2].freq & 0xff00 | value;
+			break;
+		case 0xb5:
+			soundqueue[2][soundqueueregisteroffset | 2].freq = soundqueue[2][soundqueueregisteroffset | 2].freq & 0xff | (value << 8);
+			break;
+		case 0xb6:
+			soundqueue[2][soundqueueregisteroffset | 3].freq = soundqueue[2][soundqueueregisteroffset | 3].freq & 0xff00 | value;
+			break;
+		case 0xb7:
+			soundqueue[2][soundqueueregisteroffset | 3].freq = soundqueue[2][soundqueueregisteroffset | 3].freq & 0xff | (value << 8);
+			break;
+		case 0xb8:
+			soundqueue[3][soundqueueregisteroffset].freq = soundqueue[3][soundqueueregisteroffset].freq & 0xff00 | value;
+			break;
+		case 0xb9:
+			soundqueue[3][soundqueueregisteroffset].freq = soundqueue[3][soundqueueregisteroffset].freq & 0xff | (value << 8);
+			break;
+		case 0xba:
+			soundqueue[3][soundqueueregisteroffset | 1].freq = soundqueue[3][soundqueueregisteroffset | 1].freq & 0xff00 | value;
+			break;
+		case 0xbb:
+			soundqueue[3][soundqueueregisteroffset | 1].freq = soundqueue[3][soundqueueregisteroffset | 1].freq & 0xff | (value << 8);
+			break;
+		case 0xbc:
+			soundqueue[3][soundqueueregisteroffset | 2].freq = soundqueue[3][soundqueueregisteroffset | 2].freq & 0xff00 | value;
+			break;
+		case 0xbd:
+			soundqueue[3][soundqueueregisteroffset | 2].freq = soundqueue[3][soundqueueregisteroffset | 2].freq & 0xff | (value << 8);
+			break;
+		case 0xbe:
+			soundqueue[3][soundqueueregisteroffset | 3].freq = soundqueue[3][soundqueueregisteroffset | 3].freq & 0xff00 | value;
+			break;
+		case 0xbf:
+			soundqueue[3][soundqueueregisteroffset | 3].freq = soundqueue[3][soundqueueregisteroffset | 3].freq & 0xff | (value << 8);
+			break;
+		case 0xc0:
+			soundqueue[0][soundqueueregisteroffset].vol = value;
+			break;
+		case 0xc1:
+			soundqueue[0][soundqueueregisteroffset | 1].vol = value;
+			break;
+		case 0xc2:
+			soundqueue[0][soundqueueregisteroffset | 2].vol = value;
+			break;
+		case 0xc3:
+			soundqueue[0][soundqueueregisteroffset | 3].vol = value;
+			break;
+		case 0xc4:
+			soundqueue[1][soundqueueregisteroffset].vol = value;
+			break;
+		case 0xc5:
+			soundqueue[1][soundqueueregisteroffset | 1].vol = value;
+			break;
+		case 0xc6:
+			soundqueue[1][soundqueueregisteroffset | 2].vol = value;
+			break;
+		case 0xc7:
+			soundqueue[1][soundqueueregisteroffset | 3].vol = value;
+			break;
+		case 0xc8:
+			soundqueue[2][soundqueueregisteroffset].vol = value;
+			break;
+		case 0xc9:
+			soundqueue[2][soundqueueregisteroffset | 1].vol = value;
+			break;
+		case 0xca:
+			soundqueue[2][soundqueueregisteroffset | 2].vol = value;
+			break;
+		case 0xcb:
+			soundqueue[2][soundqueueregisteroffset | 3].vol = value;
+			break;
+		case 0xcc:
+			soundqueue[3][soundqueueregisteroffset].vol = value;
+			break;
+		case 0xcd:
+			soundqueue[3][soundqueueregisteroffset | 1].vol = value;
+			break;
+		case 0xce:
+			soundqueue[3][soundqueueregisteroffset | 2].vol = value;
+			break;
+		case 0xcf:
+			soundqueue[3][soundqueueregisteroffset | 3].vol = value;
+			break;
 		case 0xf8:
 			fvmcdest = value << 8;
 			break;
