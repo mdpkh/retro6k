@@ -2915,7 +2915,7 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 			int y = (address & 0x3e0) >> 5;
 			PaintCell(x, y);
 		}
-		else if (address > 0x0FE0) // change a palette entry, repaint affected cells
+		else if (address >= 0x0FE0) // change a palette entry, repaint affected cells
 		{
 			unsigned char a = address - 0x0FE0;
 			unsigned char* checkptr[5] = {
