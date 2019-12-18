@@ -36,6 +36,8 @@
 /prebuild.py
 /bumpemuver.py
 /bumpfwver.py
+/*.pyc
+/__pycache__
 
 #misc things to keep to myself
 /sdk/chicago.png

@@ -456,9 +456,11 @@ For volume registers, the high nybble indicates the volume in the left stereo so
 
 \subsection{Queued Sound Control}
 
-The address range \texttt{038D-CF} maps to the registers which control queued sound output. The register at address \texttt{038D} indicates which queue schedule controllers (of which there are two) control which voices. Writing to address \texttt{038E} clears specific schedule-related registers. \nopagebreak[4]
+The address range \texttt{038D-CF} maps to the registers which control queued sound output. The register at address \texttt{038D} indicates which queue schedule controllers (of which there are two) control which voices. Writing to address \texttt{038E} clears specific schedule-related registers:
 
-\begin{center}\begin{tabular}{>{\ttfamily}c>{\ttfamily}cl}
+\nopagebreak
+
+\begin{center}\nopagebreak\begin{tabular}{>{\ttfamily}c>{\ttfamily}cl}
 \textrm{Addr} & \textrm{Bit} & Meaning if set \\
 \hline
 \raisebox{0pt}[1.125em]{038D} & 7 & Schedule controller 1 operates on Voice 3 \\
@@ -482,9 +484,11 @@ The address range \texttt{038D-CF} maps to the registers which control queued so
 
 The register at address \texttt{038F} selects the page of the schedule to write to, where a schedule page is 4 entries. There are 4 schedule pages, meaning each queue schedule controller can hold up to 16 entries.
 
-Writing to addresses \texttt{0390-F} sets the duration entry shift registers: \nopagebreak[4]
+\pagebreak[1]
 
-\begin{center}\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c}
+Writing to addresses \texttt{0390-F} sets the duration entry shift registers: \nopagebreak
+
+\begin{center}\nopagebreak\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c}
 \textrm{Entry} & \multicolumn{2}{c}{Address} \\
 \textrm{(within page)} & \textrm{Schedule controller 0} & \textrm{Schedule controller 1} \\
 \hline
@@ -494,10 +498,16 @@ Writing to addresses \texttt{0390-F} sets the duration entry shift registers: \n
 3 & 0396-7 & 039E-F
 \end{tabular}\end{center}
 
-Writing to addresses \texttt{03A0-BF} sets the frequency entry shift registers: 
-\nopagebreak[4]
+\nopagebreak
 
-\begin{center}\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c}
+Setting these registers specifies the duration of each note to play. Additionally, writing to addresses \texttt{0390-7} resets the note counter register in schedule controller 0, and likewise writing to addresses \texttt{0398-F} resets the note counter register in schedule controller 1.
+
+\pagebreak[1]
+
+Writing to addresses \texttt{03A0-BF} sets the frequency entry shift registers: 
+\nopagebreak
+
+\begin{center}\nopagebreak\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c}
 \textrm{Entry} & \multicolumn{4}{c}{Address} \\
 \textrm{(within page)} & \textrm{Voice 0} & \textrm{Voice 1} & \textrm{Voice 2} & \textrm{Voice 3} \\
 \hline
@@ -508,7 +518,7 @@ Writing to addresses \texttt{03A0-BF} sets the frequency entry shift registers:
 \end{tabular}\end{center}
 
 Writing to addresses \texttt{03C0-F} sets the volume entry shift registers: 
-\nopagebreak[4]
+\nopagebreak
 
 \begin{center}\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c}
 \textrm{Entry} & \multicolumn{4}{c}{Address} \\

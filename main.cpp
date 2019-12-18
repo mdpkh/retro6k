@@ -68,10 +68,11 @@ unsigned char keypressregister;
 unsigned short soundfreqregister[4];
 unsigned char soundvolregister[4];
 unsigned char soundwaveregister;
-unsigned char soundtimingflags;
+unsigned char soundscvmapregister;
 unsigned char soundqueueregisteroffset;
 unsigned short soundqueuedur[2][16];
 soundqueueentry soundqueue[4][16];
+int soundscncounter[2];
 unsigned short menubeepdur;
 unsigned short menubeepfreq;
 bool menuhassound = false;
@@ -2771,6 +2772,7 @@ Uint32 SetBool(Uint32 interval, void* boolvar)
 
 inline uint8_t bare_read6502(uint16_t address)
 {
+	static std::uniform_int_distribution<> dis(0x00, 0xFF);
 	if ((address & 0xff00) == 0x0200)
 	{
 		switch (address & 0xff)
@@ -2782,11 +2784,13 @@ inline uint8_t bare_read6502(uint16_t address)
 			return t;
 		case 0xfc: // video flags
 			return videostate;
+		default:
+			return dis(floatgen);
 		}
 	}
-	if ((syspflags[address >> 8] & pageflags::PF_TMASK) == pageflags::PF_TFLOATING)
+	if ((syspflags[address >> 8] & pageflags::PF_TMASK) == pageflags::PF_TFLOATING
+		|| (address & 0xff00) == 0x0300)
 	{
-		static std::uniform_int_distribution<> dis(0x00, 0xFF);
 		return dis(floatgen);
 	}
 	return sysram[address];
@@ -2951,10 +2955,31 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 			soundwaveregister = value;
 			break;
 		case 0x8d:
-			soundtimingflags = value;
+			soundscvmapregister = value;
 			break;
 		case 0x8e:
-			// reset various registers based on value
+			if (value & 0x80)
+				for (int i = 0; i < 16; ++i)
+					soundqueue[3][i] = { 0, 0 };
+			if (value & 0x40)
+				for (int i = 0; i < 16; ++i)
+					soundqueue[2][i] = { 0, 0 };
+			if (value & 0x20)
+				for (int i = 0; i < 16; ++i)
+					soundqueue[1][i] = { 0, 0 };
+			if (value & 0x10)
+				for (int i = 0; i < 16; ++i)
+					soundqueue[0][i] = { 0, 0 };
+			if (value & 0x08)
+				for (int i = 0; i < 16; ++i)
+					soundqueuedur[1][i] = 0;
+			if (value & 0x04)
+				for (int i = 0; i < 16; ++i)
+					soundqueuedur[0][i] = 0;
+			if (value & 0x02)
+				soundscncounter[1] = 0;
+			if (value & 0x01)
+				soundscncounter[0] = 0;
 			break;
 		case 0x8f:
 			soundqueueregisteroffset = (value & 0x3) << 2;
