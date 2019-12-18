@@ -555,7 +555,7 @@ $$M_B = \texttt{0800}_h \vee  R \ll 5 \vee C$$
 The color assignments for each character cell are contained in memory at addresses \texttt{0A40-0FDF}. The arrangement here is a bit more tricky. As each character cell can be assigned one of 32 palette colors to each of 4 color slots. To simplify video hardware logic, each color assignment's 5 bits are distributed among 5 different ``planes'' of video memory. Each byte of this area of video memory contains a single bit of the color assignment to each of the 4 slots of 2 vertically-adjacent character cells. An upshot to this scheme is alternating colors by row on the screen is very easy.
 
 $$M_B = \texttt{0A40}_h + \texttt{120}_h \times P + (R \wedge \texttt{1E}_h) \ll 4 \vee C$$
-$$M_b = (R \wedge \texttt{1}_h) \ll 2 \vee S$$
+$$M_b = (\lnot{R} \wedge \texttt{1}_h) \ll 2 \vee S$$
 
 The palette determines the mapping from 5-bit cell color assignments to 8-bit hardware color capabilities, and is located at addresses \texttt{0FE0-0FFF}. Each byte is one color selection:
 
