@@ -72,7 +72,8 @@ unsigned char soundscvmapregister;
 unsigned char soundqueueregisteroffset;
 unsigned short soundqueuedur[2][16];
 soundqueueentry soundqueue[4][16];
-int soundscncounter[2];
+int soundcndcounter[2];
+unsigned char soundncounter[2];
 unsigned short menubeepdur;
 unsigned short menubeepfreq;
 bool menuhassound = false;
@@ -435,10 +436,48 @@ dlogentry* ExtendLog(dletype etype)
 	return newentry;
 }
 
+void StepSoundSchedules()
+{
+	bool shiftregister[4]{ false, false, false, false };
+	bool scheduleisempty[2]{ false, false };
+	for (int s = 0; s < 2; ++s)
+	{
+		if (!soundcndcounter[s])
+		{
+			for (int v = 0; v < 4; ++v)
+			{
+				if (soundscvmapregister & (1 << (4 * s + v)))
+				{
+					soundvolregister[v] = soundqueue[v][0].vol;
+					soundfreqregister[v] = soundqueue[v][0].freq;
+					soundcndcounter[s] = soundqueuedur[s][0];
+					shiftregister[v] = true;
+				}
+			}
+			for (int i = 0; i < 15; ++i)
+				soundqueuedur[s][i] = soundqueuedur[s][i + 1];
+			soundqueuedur[s][15] = 0xffff;
+			++soundncounter[s];
+			if (!soundncounter[s])
+				scheduleisempty[s] = true;
+		}
+		--soundcndcounter[s];
+	}
+	for (int v = 0; v < 4; ++v)
+	{
+		for (int i = 0; i < 15; ++i)
+			soundqueue[v][i] = soundqueue[v][i + 1];
+		soundqueue[v][15] = { 0, 0 };
+	}
+	if (scheduleisempty[0] || scheduleisempty[1])
+		; // TODO: trigger interrupt if appropriate flag (?) is set
+}
+
 void GenerateStereoAudio(void* userdata, Uint8* stream, int len) //callback to fill audio buffer
 {
 	if (!menuhassound)
 	{
+		static signed char tickcounter{ 49 }; // 900 ticks per 1s at 44.1k sample rate
 		static unsigned short phase[4]{ 0, 0, 0, 0 };
 		static short lev[16];
 		// clipped normal-ish distribution with RMS 8; when multiplied by volume and divided by 4, RMS maxes out at 30 (equal to max vol square wave RMS) while value is clipped at +/-37
@@ -474,6 +513,12 @@ void GenerateStereoAudio(void* userdata, Uint8* stream, int len) //callback to f
 		int t = soundspec.freq >> 1;
 		for (; len > 0; len -= 2)
 		{
+			--tickcounter;
+			if (tickcounter < 0)
+			{
+				tickcounter = 49;
+				StepSoundSchedules();
+			}
 			phase[0] += soundfreqregister[0];
 			phase[1] += soundfreqregister[1];
 			phase[2] += soundfreqregister[2];
@@ -3021,60 +3066,76 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 				for (int i = 0; i < 16; ++i)
 					soundqueuedur[0][i] = 0;
 			if (value & 0x02)
-				soundscncounter[1] = 0;
+				soundcndcounter[1] = 0;
 			if (value & 0x01)
-				soundscncounter[0] = 0;
+				soundcndcounter[0] = 0;
 			break;
 		case 0x8f:
 			soundqueueregisteroffset = (value & 0x3) << 2;
 			break;
 		case 0x90:
 			soundqueuedur[0][soundqueueregisteroffset] = soundqueuedur[0][soundqueueregisteroffset] & 0xff00 | value;
+			soundncounter[0] = ~soundqueueregisteroffset;
 			break;
 		case 0x91:
 			soundqueuedur[0][soundqueueregisteroffset] = soundqueuedur[0][soundqueueregisteroffset] & 0xff | (value << 8);
+			soundncounter[0] = ~soundqueueregisteroffset;
 			break;
 		case 0x92:
 			soundqueuedur[0][soundqueueregisteroffset | 1] = soundqueuedur[0][soundqueueregisteroffset | 1] & 0xff00 | value;
+			soundncounter[0] = ~(soundqueueregisteroffset | 1);
 			break;
 		case 0x93:
 			soundqueuedur[0][soundqueueregisteroffset | 1] = soundqueuedur[0][soundqueueregisteroffset | 1] & 0xff | (value << 8);
+			soundncounter[0] = ~(soundqueueregisteroffset | 1);
 			break;
 		case 0x94:
 			soundqueuedur[0][soundqueueregisteroffset | 2] = soundqueuedur[0][soundqueueregisteroffset | 2] & 0xff00 | value;
+			soundncounter[0] = ~(soundqueueregisteroffset | 2);
 			break;
 		case 0x95:
 			soundqueuedur[0][soundqueueregisteroffset | 2] = soundqueuedur[0][soundqueueregisteroffset | 2] & 0xff | (value << 8);
+			soundncounter[0] = ~(soundqueueregisteroffset | 2);
 			break;
 		case 0x96:
 			soundqueuedur[0][soundqueueregisteroffset | 3] = soundqueuedur[0][soundqueueregisteroffset | 3] & 0xff00 | value;
+			soundncounter[0] = ~(soundqueueregisteroffset | 3);
 			break;
 		case 0x97:
 			soundqueuedur[0][soundqueueregisteroffset | 3] = soundqueuedur[0][soundqueueregisteroffset | 3] & 0xff | (value << 8);
+			soundncounter[0] = ~(soundqueueregisteroffset | 3);
 			break;
 		case 0x98:
 			soundqueuedur[1][soundqueueregisteroffset] = soundqueuedur[1][soundqueueregisteroffset] & 0xff00 | value;
+			soundncounter[1] = ~soundqueueregisteroffset;
 			break;
 		case 0x99:
 			soundqueuedur[1][soundqueueregisteroffset] = soundqueuedur[1][soundqueueregisteroffset] & 0xff | (value << 8);
+			soundncounter[1] = ~soundqueueregisteroffset;
 			break;
 		case 0x9a:
 			soundqueuedur[1][soundqueueregisteroffset | 1] = soundqueuedur[1][soundqueueregisteroffset | 1] & 0xff00 | value;
+			soundncounter[1] = ~(soundqueueregisteroffset | 1);
 			break;
 		case 0x9b:
 			soundqueuedur[1][soundqueueregisteroffset | 1] = soundqueuedur[1][soundqueueregisteroffset | 1] & 0xff | (value << 8);
+			soundncounter[1] = ~(soundqueueregisteroffset | 1);
 			break;
 		case 0x9c:
 			soundqueuedur[1][soundqueueregisteroffset | 2] = soundqueuedur[1][soundqueueregisteroffset | 2] & 0xff00 | value;
+			soundncounter[1] = ~(soundqueueregisteroffset | 2);
 			break;
 		case 0x9d:
 			soundqueuedur[1][soundqueueregisteroffset | 2] = soundqueuedur[1][soundqueueregisteroffset | 2] & 0xff | (value << 8);
+			soundncounter[1] = ~(soundqueueregisteroffset | 2);
 			break;
 		case 0x9e:
 			soundqueuedur[1][soundqueueregisteroffset | 3] = soundqueuedur[1][soundqueueregisteroffset | 3] & 0xff00 | value;
+			soundncounter[1] = ~(soundqueueregisteroffset | 3);
 			break;
 		case 0x9f:
 			soundqueuedur[1][soundqueueregisteroffset | 3] = soundqueuedur[1][soundqueueregisteroffset | 3] & 0xff | (value << 8);
+			soundncounter[1] = ~(soundqueueregisteroffset | 3);
 			break;
 		case 0xa0:
 			soundqueue[0][soundqueueregisteroffset].freq = soundqueue[0][soundqueueregisteroffset].freq & 0xff00 | value;

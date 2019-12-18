@@ -48,6 +48,8 @@
 /sdk/vasm6502*.exe
 /sdk/vasm.bat
 /sdk/vasmhr.bat
+/sdk/install.bat
+/sdk/ati.bat
 /sdk/packhifont.py
 /sdk/colorcycle.c
 /ver.cpp

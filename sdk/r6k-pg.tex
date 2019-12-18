@@ -500,7 +500,7 @@ Writing to addresses \texttt{0390-F} sets the duration entry shift registers: \n
 
 \nopagebreak
 
-Setting these registers specifies the duration of each note to play. Additionally, writing to addresses \texttt{0390-7} resets the note counter register in schedule controller 0, and likewise writing to addresses \texttt{0398-F} resets the note counter register in schedule controller 1.
+Setting these registers specifies the duration of each note to play. Additionally, writing to addresses \texttt{0390-7} resets the note counter register in schedule controller 0, and likewise writing to addresses \texttt{0398-F} resets the note counter register in schedule controller 1. These counter registers are set to the complement of the index of the schedule entry that has been set, and are incremented when entries are shifted out, so they roll over to zero when the queue has been emptied. (Note, if both both schedule controllers operate on the same voice, that voice's volume and frequency shift registers will be emptied before either schedule controller's note counter reaches zero.)
 
 \pagebreak[1]
 

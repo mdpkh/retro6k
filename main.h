@@ -509,6 +509,7 @@ void RenderScanline(int scanline, SDL_Surface* framebuffer, SDL_Surface* winsurf
 void RoundWinCorners(SDL_Surface* destsurf, unsigned int key, unsigned int bg, unsigned int fg);
 Uint32 SetBool(Uint32 interval, void* boolvar);
 int SetHWPalette(SDL_Palette* dstpal);
+void StepSoundSchedules();
 int TextWidth(const char* text);
 void UIBeepMoveSel();
 void UIBeepTakeAction();
