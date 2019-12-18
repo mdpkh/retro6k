@@ -29,14 +29,15 @@ entry:
   LDA #$00
   STA $00
   ; initialize volume levels
-  LDA #$F3
+  LDA #$E2
+  STA $18
   STA $0388
   STA $0389
   STA $038A
   STA $038B
   ; initialize voice types
-  LDA #$01
-  STA $083C
+  LDA #$40
+  STA $038C
 loopstart:
   CLC
   ; get pitch counter, add 256, store in 10-11 and 12-13
@@ -103,8 +104,9 @@ waitloop:
   INC $00
   BNE loopstart
   ; if pitch has rolled over, swap stereo channels
-  LDA #$CC
-  EOR $0388
+  LDA $18
+  EOR #$CC
+  STA $18
   STA $0388
   STA $0389
   STA $038A

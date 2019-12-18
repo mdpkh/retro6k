@@ -36,17 +36,17 @@ const unsigned char keytrans[512] = {
 	/*0x1F0*/ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 enum class dletype : char {
-		LT_START,
-		LT_RESET,
-		LT_READ,
-		LT_WRITE,
-		LT_FVMC,
-		LT_STATE,
-		LT_PARTIALINST,
-		LT_INST,
-		LT_STACK,
-		LT_SCANLINE,
-		LT_END
+	LT_START,
+	LT_RESET,
+	LT_READ,
+	LT_WRITE,
+	LT_FVMC,
+	LT_STATE,
+	LT_PARTIALINST,
+	LT_INST,
+	LT_STACK,
+	LT_SCANLINE,
+	LT_END
 };
 enum class pageflags : char {
 	PF_TMASK = 0x03,
@@ -55,6 +55,10 @@ enum class pageflags : char {
 	PF_TRAM = 0x02,
 	PF_TNONVOL = 0x03,
 	PF_BANKSWITCHED = 0x04,
+};
+enum class voicetype {
+	VT_SQUARE = 0x0,
+	VT_NOISE = 0x1,
 };
 pageflags operator& (pageflags left, pageflags right) // because it's a bitfield-like enum
 {

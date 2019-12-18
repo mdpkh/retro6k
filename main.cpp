@@ -67,7 +67,7 @@ unsigned char videostate;
 unsigned char keypressregister;
 unsigned short soundfreqregister[4];
 unsigned char soundvolregister[4];
-unsigned char soundwaveregister;
+unsigned char soundvoicetyperegister;
 unsigned char soundscvmapregister;
 unsigned char soundqueueregisteroffset;
 unsigned short soundqueuedur[2][16];
@@ -85,6 +85,7 @@ int debuglogexpectargs = 0;
 dlogentry* partialinst = nullptr;
 std::random_device seedgen;
 std::mt19937 floatgen;
+std::mt19937 noisegen;
 std::filesystem::path cartpath;
 std::filesystem::path savepath;
 std::filesystem::path screencappath;
@@ -439,27 +440,29 @@ void GenerateStereoAudio(void* userdata, Uint8* stream, int len) //callback to f
 	if (!menuhassound)
 	{
 		static unsigned short phase[4]{ 0, 0, 0, 0 };
-		short lev[16]{
-			-(soundvolregister[0] & (short)0xf0) >> 3,
-			(soundvolregister[0] & (short)0xf0) >> 3,
-			-(soundvolregister[0] & (short)0xf) << 1,
-			(soundvolregister[0] & (short)0xf) << 1,
-			-(soundvolregister[1] & (short)0xf0) >> 3,
-			(soundvolregister[1] & (short)0xf0) >> 3,
-			-(soundvolregister[1] & (short)0xf) << 1,
-			(soundvolregister[1] & (short)0xf) << 1,
-			-(soundvolregister[2] & (short)0xf0) >> 3,
-			(soundvolregister[2] & (short)0xf0) >> 3,
-			-(soundvolregister[2] & (short)0xf) << 1,
-			(soundvolregister[2] & (short)0xf) << 1,
-			-(soundvolregister[3] & (short)0xf0) >> 3,
-			(soundvolregister[3] & (short)0xf0) >> 3,
-			-(soundvolregister[3] & (short)0xf) << 1,
-			(soundvolregister[3] & (short)0xf) << 1,
-		};
-		int t = soundspec.freq >> 1;
-		for (int v = 0; v < 4; v++)
+		static short lev[16];
+		// clipped normal-ish distribution with RMS 8; when multiplied by volume and divided by 4, RMS maxes out at 30 (equal to max vol square wave RMS) while value is clipped at +/-37
+		static std::discrete_distribution<short> dis{ 240127971, 49520773, 52161640, 54569628, 56671960, 58394828, 59666729, 60422379, 60606996, 60180662, 53532056, 60180662, 60606996, 60422379, 59666729, 58394828, 56671960, 54569628, 52161640, 49520773, 240127971 };
+		for (int v = 0; v < 4; ++v)
 		{
+			switch ((voicetype)((soundvoicetyperegister >> (v << 1)) & 0x3))
+			{
+			case voicetype::VT_SQUARE:
+				lev[(v << 2)    ] = -(soundvolregister[v] & (short)0xf0) >> 3;
+				lev[(v << 2) | 1] = (soundvolregister[v] & (short)0xf0) >> 3;
+				lev[(v << 2) | 2] = -(soundvolregister[v] & (short)0xf) << 1;
+				lev[(v << 2) | 3] = (soundvolregister[v] & (short)0xf) << 1;
+				break;
+			case voicetype::VT_NOISE:
+				// retain existing levels
+				break;
+			default:
+				// undefined
+				lev[(v << 2)    ] = 0;
+				lev[(v << 2) | 1] = 0;
+				lev[(v << 2) | 2] = 0;
+				lev[(v << 2) | 3] = 0;
+			}
 			if (!soundfreqregister[v])
 			{
 				lev[v << 2    ] = 0;
@@ -468,6 +471,7 @@ void GenerateStereoAudio(void* userdata, Uint8* stream, int len) //callback to f
 				lev[v << 2 | 3] = 0;
 			}
 		}
+		int t = soundspec.freq >> 1;
 		for (; len > 0; len -= 2)
 		{
 			phase[0] += soundfreqregister[0];
@@ -475,13 +479,53 @@ void GenerateStereoAudio(void* userdata, Uint8* stream, int len) //callback to f
 			phase[2] += soundfreqregister[2];
 			phase[3] += soundfreqregister[3];
 			if (phase[0] > soundspec.freq)
+			{
 				phase[0] -= soundspec.freq;
+				if ((voicetype)(soundvoicetyperegister & 0x3) == voicetype::VT_NOISE)
+				{ // on falling edge of square wave, sample and hold new random value
+					short r = dis(noisegen) - 10;
+					lev[0] = (r * ((soundvolregister[0] & (short)0xf0) >> 4) + 1) >> 2;
+					lev[1] = lev[0];
+					lev[2] = (r * (soundvolregister[0] & (short)0xf) + 1) >> 2;
+					lev[3] = lev[2];
+				}
+			}
 			if (phase[1] > soundspec.freq)
+			{
 				phase[1] -= soundspec.freq;
+				if ((voicetype)((soundvoicetyperegister >> 2) & 0x3) == voicetype::VT_NOISE)
+				{ // on falling edge of square wave, sample and hold new random value
+					short r = dis(noisegen) - 10;
+					lev[4] = (r * ((soundvolregister[1] & (short)0xf0) >> 4) + 1) >> 2;
+					lev[5] = lev[0];
+					lev[6] = (r * (soundvolregister[1] & (short)0xf) + 1) >> 2;
+					lev[7] = lev[2];
+				}
+			}
 			if (phase[2] > soundspec.freq)
+			{
 				phase[2] -= soundspec.freq;
+				if ((voicetype)((soundvoicetyperegister >> 4) & 0x3) == voicetype::VT_NOISE)
+				{ // on falling edge of square wave, sample and hold new random value
+					short r = dis(noisegen) - 10;
+					lev[8] = (r * ((soundvolregister[2] & (short)0xf0) >> 4) + 1) >> 2;
+					lev[9] = lev[0];
+					lev[10] = (r * (soundvolregister[2] & (short)0xf) + 1) >> 2;
+					lev[11] = lev[2];
+				}
+			}
 			if (phase[3] > soundspec.freq)
+			{
 				phase[3] -= soundspec.freq;
+				if ((voicetype)((soundvoicetyperegister >> 6) & 0x3) == voicetype::VT_NOISE)
+				{ // on falling edge of square wave, sample and hold new random value
+					short r = dis(noisegen) - 10;
+					lev[12] = (r * ((soundvolregister[3] & (short)0xf0) >> 4) + 1) >> 2;
+					lev[13] = lev[0];
+					lev[14] = (r * (soundvolregister[3] & (short)0xf) + 1) >> 2;
+					lev[15] = lev[2];
+				}
+			}
 			*stream = soundspec.silence
 				+ lev[     (int)(phase[0] >= t)]
 				- lev[4  | (int)(phase[1] >= t)]
@@ -2952,7 +2996,7 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 			soundvolregister[3] = value;
 			break;
 		case 0x8c:
-			soundwaveregister = value;
+			soundvoicetyperegister = value;
 			break;
 		case 0x8d:
 			soundscvmapregister = value;
