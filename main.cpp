@@ -3229,6 +3229,10 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 		case 0xfc:
 			// TODO: set video flags
 			break;
+		case 0xff:
+			if (value)
+				DoMenu(3);
+			break;
 		}
 	}
 }
