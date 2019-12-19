@@ -613,6 +613,10 @@ Writing to addresses \texttt{03C0-F} sets the volume entry shift registers:
 \section{System Control Addresses}
 \label{sec:sysoutput}
 
+\subsection{Sound Schedule Interrupt Flags}
+
+To cause the program to be interrupted when a sound queue is empty, set some bits in the Sound Schedule Interrupt Flags register. The address and details of this register have not yet been determined.
+
 \subsection{Fast Video Memory Copy}
 
 Writing to addresses \texttt{03F8\&03F9} enables, configures, or disables Fast Video Memory Copy. See section \ref{sec:fvmc}, page \pageref{sec:fvmc}.
@@ -620,6 +624,10 @@ Writing to addresses \texttt{03F8\&03F9} enables, configures, or disables Fast V
 \subsection{Video Interrupt Flags}
 
 To cause the program to be interrupted on various video triggers, such as the beginning of the vertical retrace, set the Video Interrupt Flags by writing to address \texttt{03FC}. This feature is not yet implemented, and the details of the flags to set have not yet been determined.
+
+\subsection{Debug Break (Emulator Only)}
+
+To pause program execution and display the Debug Log in the emulator, write a nonzero value to address \texttt{03FF}. This behavior may be disabled by the user\footnote{User preferences such as disabling debug breaks are not yet implemented, as of emulator version \oldstylenums{1992}d.} and is not available on a physical Retro 6k computer.
 
 \section{Video Memory}
 \label{sec:videomem}
