@@ -518,9 +518,16 @@ The address range \texttt{0380-C} maps to the registers which control sound outp
 \raisebox{0pt}[13.5pt]{0380-1} & 0382-3 & 0384-5 & 0386-7 & Frequency \\
 0388 & 0389 & 038A & 038B & Volume \\
 \multicolumn{4}{c}{\texttt{038C} (all voices)} & Voice types
-\end{tabular}\end{center}
+\end{tabular}\nopagebreak\end{center}
+\nopagebreak
 
-For volume registers, the high nybble indicates the volume in the left stereo sound channel, while the low nybble indicates the volume in the right stereo sound channel. For the voice types register, bits 1--0 indicate the voice type for Voice 0, bits 3--2 indicate the voice type for Voice 1, and so on. The two-bit value $\texttt{00}_b$ indicates a square wave voice. The two-bit value $\texttt{01}_b$ indicates a noise voice. The meanings of two-bit values $\texttt{10}_b$ and $\texttt{11}_b$ are undefined at this time.
+The frequency of sounds is expressed in Hertz, in little-endian byte order. While the 16-bit frequency registers in theory allow specifying frequencies greater than 65.5\,kHz, the 44.1\,kHz discrete sampling nature of the audio hardware limits effective output to 22.05\,kHz, and any tones near that limiting frequency may be perceived with beats or other distortion. Furthermore, the bandwidth of audio output may be reduced for modulation within a television signal or by other limitations of the equipment connected. In any case, most humans will be irritated by sustained sound frequencies above 15\,kHz, if they can hear them at all.
+
+\pagebreak[1]
+
+For volume registers, the high nybble indicates the volume in the left stereo sound channel, while the low nybble indicates the volume in the right stereo sound channel. A \texttt{0} nybble indicates silence, while an \texttt{F} nybble indicates maximum volume.
+
+For the voice types register, bits 1--0 indicate the voice type for Voice 0, bits 3--2 indicate the voice type for Voice 1, and so on. The two-bit value $\texttt{00}_b$ indicates a square wave voice. The two-bit value $\texttt{01}_b$ indicates a noise voice. The meanings of two-bit values $\texttt{10}_b$ and $\texttt{11}_b$ are undefined at this time.
 
 \subsection{Queued Sound Control}
 
@@ -559,7 +566,7 @@ The register at address \texttt{038F} selects the page of the schedule to write 
 
 \pagebreak[1]
 
-Writing to addresses \texttt{0390-F} sets the duration entry shift registers: \nopagebreak
+The duration of schedule entries is expressed in ``ticks'', where there are 900 ticks per second. Writing to addresses \texttt{0390-F} sets the duration entry shift registers: \nopagebreak
 
 \begin{center}\nopagebreak\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c}
 \textrm{Entry} & \multicolumn{2}{c}{Address} \\
