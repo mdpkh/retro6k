@@ -548,7 +548,12 @@ The address range \texttt{038D-CF} maps to the registers which control queued so
  & 2 & Clear Schedule 0 Duration entries \\
  & 1 & Clear Schedule 1 Current Duration counter \\
 038E & 0 & Clear Schedule 0 Current Duration counter \\ 
-\end{tabular}\end{center}
+\end{tabular}\nopagebreak\end{center}
+\nopagebreak
+
+Setting bits \texttt{2} and/or \texttt{3} high ``clears'' the schedule duration entries by setting them to the maximum length. Also, setting these bit(s) sets the corresponding current note duration counter(s) to the maximum value. This is intended to prevent schedule entries from being shifted out while software is trying to write them.
+
+\pagebreak[1]
 
 The register at address \texttt{038F} selects the page of the schedule to write to, where a schedule page is 4 entries. There are 4 schedule pages, meaning each queue schedule controller can hold up to 16 entries.
 

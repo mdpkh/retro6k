@@ -3061,10 +3061,16 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 					soundqueue[0][i] = { 0, 0 };
 			if (value & 0x08)
 				for (int i = 0; i < 16; ++i)
-					soundqueuedur[1][i] = 0;
+				{
+					soundqueuedur[1][i] = 0xffff;
+					soundcndcounter[1] = 0xffff;
+				}
 			if (value & 0x04)
 				for (int i = 0; i < 16; ++i)
-					soundqueuedur[0][i] = 0;
+				{
+					soundqueuedur[0][i] = 0xffff;
+					soundcndcounter[0] = 0xffff;
+				}
 			if (value & 0x02)
 				soundcndcounter[1] = 0;
 			if (value & 0x01)
