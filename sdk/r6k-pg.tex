@@ -2,6 +2,7 @@
 \usepackage{graphicx}
 \usepackage[hidelinks,pdfusetitle]{hyperref}
 \usepackage{longtable}
+\usepackage{xfrac}
 \usepackage[paperwidth=7.5in,paperheight=10.0in,top=.5in,bottom=.5in,left=.25in,right=.25in]{geometry}
 \newcommand\scsg[1]{\raisebox{-1.25pt}[8.75pt][1.25pt]{\includegraphics[height=10pt]{char#1}}}
 \interfootnotelinepenalty=10000
@@ -10,7 +11,10 @@
 \author{Maggie\,David P.\,K. Haynes}
 \pagestyle{empty}
 \vspace*{\stretch{2}}
-{\centering\sffamily\bfseries\Huge{}Retro 6k\\Programmer's Guide\par}
+{\centering\sffamily\bfseries\Huge{}Retro 6k\\Fantasy Computer\\Entertainment System
+
+\vspace{\stretch{.25}}
+Programmer's Guide\par}
 \vspace*{\stretch{1}}
 {\centering\sffamily\bfseries\large\theauthor\par}
 \vspace*{\stretch{3}}
@@ -27,9 +31,73 @@ harder for people like me?\par
 
 \vspace*{\stretch{3}}
 \cleartorecto
-\tableofcontents
+\tableofcontents*
 \cleartorecto
 \pagestyle{headings}
+
+\section{Conventions Used In This Document}
+\subsection{Byte Values, Addresses, Address Ranges, and Other Computery Numbers}
+
+Usually, byte values are written in hexadecimal with two digits, in monospaced type: \texttt{0F}. Addresses are written similarly but with four digits: \texttt{05AF}. A range of addresses is written with four digits indicating the start of the range, and the end of the range (interpreted inclusively) beginning with the most significant differing digit: \texttt{3680-BF}. Selected bits of a byte value may be represented in binary with a subscript letter b: $\texttt{10}_b$; or in hexadecimal as a full byte value with the irrelevant bits as zero and no leading zero: \texttt{7}. In math formul\ae, hexadecimal numbers are written in monospaced type with a subscript letter h: $\texttt{5A}_h$; some numbers in formul\ae may be written in binary for clarity, in monospaced type with a subscript letter b: $\texttt{110}_b$. Unicode codepoints are written in hexadecimal with as many digits as necessary and no leading zeroes, in monospaced type: \texttt{1F9D2}.
+
+\subsection{Symbols Used in Math Formul\ae}
+
+\begin{center}\begin{tabular}{rl}
+Sym & Meaning \\
+\hline
+\raisebox{0pt}[1.125em]{$\lnot{}$} & Bitwise Not\hspace{\stretch{1}}(highest precedence) \\
+$\ll$ & Shift Left \\
+$\gg$ & Shift Right \\
+$\wedge$ & Bitwise And\hspace{\stretch{2}}\raisebox{0pt}[0pt][0pt]{$\vdots$}\hspace*{\stretch{1}}\\
+$\vee$ & Bitwise Or \\
+$\times$ & Multiply \\
+$+$ & Add (with carry)\hspace{\stretch{1}}(lowest precedence) \\
+$M_B$ & Address Byte \\
+$M_b$ & Bit position \\
+$B$ & Blue (component of color) \\
+$C$ & Column (on screen) \\
+$G$ & Green (component of color) \\
+$I$ & Intensity (component of color) \\
+$J$ & Attribute (palette index) \\
+$K$ & Color (absolute) \\
+$P$ & Plane (specified bit of attribute) \\
+$R$ & Row (on screen), Red (component of color) \\
+$S$ & Color slot (of a character cell) \\
+$X$ & Pixel column (within glyph) \\
+$Y$ & Pixel row (within glyph) \\
+\end{tabular}\end{center}
+
+\chapter{Retro 6k Features \& Capabilities}
+\section{Processor}
+
+The Retro 6k Fantasy Computer Entertainment System CPU is a 6502 microprocessor running at 4\,MHz. This is the same microprocessor that powers popular home computers and game consoles such as the Atari 2600, Apple II, Nintendo Entertainment System, Commodore 64, and BBC Micro. The 6502 is an ``8-bit'' processor, able to read or write 8 bits of data (one byte) at a time, accessing memory with 16-bit addresses.
+
+The 6502 has only one 8-bit Accumulator register, but it also offers rapid random access to the first 256 bytes of memory and rapid last-in-first-out access to the next 256 bytes of memory, as well as X and Y Index registers which can also be used to temporarily hold data in a manner similar to the Accumulator.
+
+\section{Graphics}
+
+The Retro 6k display consists of $32 \textrm{ columns} \times 18 \textrm{ rows}$ of character cells. Each character cell is $8 \times 8 \textrm{ pixels}$ in size, and displays a single graphic character in up to 4 colors. Up to 32 colors can be used across the entire screen at any given time, selected from the 256 fixed colors the hardware is capable of generating. Although individual pixels are not directly addressable, the graphic characters may be redefined. Each graphic character may be considered a miniature canvas, and by using many graphic characters only once each, they can form an effective canvas of up to $128 \times 128 \textrm{ pixels}$. With clever reuse of graphic characters, possibly with different color assignments, the whole screen can be filled with robust $256 \times 144 \textrm{ pixel}$ graphics.
+
+Video output from the Retro 6k can be delivered as an NTSC television signal, PAL television signal, or VGA standard analog connection, depending on the hardware variant. A standard 4:3 aspect ratio television set or computer monitor may be used, or alternatively, a 16:9 widescreen aspect ratio set or monitor may be used if desired. A small switch on the Retro 6k hardware should be set to correspond to the aspect ratio of the connected display, so that games and other software for the Retro 6k can adjust their graphical output accordingly.
+
+Some game cartridges may cause the Retro 6k to produce a series of fine black horizontal lines across the picture. This is intentional, and allows the game to more freely interface with the Retro 6k video adapter. 
+
+\section{Sound}
+
+The Retro 6k has four voices. Each can produce an independently-specified frequency of square wave tone or noise, at independently-specified left and right speaker volume levels. Sound is generated at the Compact Disc standard sampling rate of 44.1\,kHz, asynchronously from the CPU clock by a dedicated circuit. This means the software is not burdened with the task of generating audio pulses with exact timing. Software can either set volumes and frequencies for immediate, continuous tone generation until otherwise instructed, or queue up to 16 ``notes'' to play in sequence in each of two independent scheduling channels. Stereo sound can be carried to a television via standard RCA connections, or along with the picture via a coaxial cable with the use of an RF television signal modulator. Alternatively, the sound can be routed to speakers or headphones using RCA connections, or the $\sfrac{1}{4}$\,in.\ or 3.5\,mm headphone jack.
+
+\section{User Input}
+
+The Retro 6k has a built-in keyboard, capable of producing 256 different characters. The computer also supports game pads for up to four players, and a pointing device or a pair of single-axis controllers.\footnote{As of emulator version \oldstylenums{1992}c, only keyboard input is supported.}
+
+\section{Peripheral Accessories}
+
+Peripheral accessory devices may be attached to the Retro 6k using the peripheral expansion ports.\footnote{No accessories have been designed yet, so there are no accessories to emulate.}
+
+\section{User Custom Content}
+
+The Retro 6k has two expansion slots for installing custom content such as music or fonts. Depending on the hardware variant, these can take the form of slots for cartridge packages, smaller than the main game/software cartridges, and/or of sockets for ROM chips in DIP packages. Software developers are encouraged to give the user the option to load applicable content from these expansion slots. The factory-installed ``Bank E'' ROM chip may also be replaced by the user, thereby replacing the system-default character font.
+
 \chapter{Low-Level Programming for the Retro 6k}
 \section{Address Space}
 
@@ -64,9 +132,9 @@ The Retro 6k display allows for up to four colors to be used in each character c
 \begin{center}\begin{longtable}{@{}>{\ttfamily}r>{\ttfamily}rcll@{}}
 \multicolumn{4}{@{}l}{Stock Character Encoding codepoint} \\
 \cline{2-4}
-& \multicolumn{3}{|l}{\raisebox{0pt}[13.5pt]{Unicode codepoint}} \\
+& \multicolumn{3}{|l}{\raisebox{0pt}[1.125em]{Unicode codepoint}} \\
 \cline{3-4}
-& \multicolumn{1}{|l}{} & \multicolumn{2}{|l}{\raisebox{0pt}[13.5pt]{Character image \& description}} & Keyboard Entry \\
+& \multicolumn{1}{|l}{} & \multicolumn{2}{|l}{\raisebox{0pt}[1.125em]{Character image \& description}} & Keyboard Entry \\
 \endfirsthead
 \textrm{SCE} & \textrm{Uni} & \multicolumn{2}{l}{Character} & Keyboard Entry \\
 \endhead
@@ -342,9 +410,9 @@ FF & 221E & \scsg{ff} & Infinity & \textsf{Alt+Del}, \textsf{Alt+Ctrl+Shift+}\te
 
 \section{Cartridge Header}
 
-The first ten bytes\,---\,that is, \texttt{2000-2009}\,---\,of cartridge memory is used to identify the cartridge. It can contain any byte values, but it's recommended to be a human-readable string, padded with spaces if necessary, in the Stock Character Encoding. Immediately following that, at addresses \texttt{200A-200D}, must be the cartridge ``magic number'', which is a literal byte sequence \texttt{47 A9 0C 1E}. If these byte values are not found at this address, the Retro 6k will not run the cartridge code.
+The first ten bytes\,---\,that is, \texttt{2000-9}\,---\,of cartridge memory is used to identify the cartridge. It can contain any byte values, but it's recommended to be a human-readable string, padded with spaces if necessary, in the Stock Character Encoding. Immediately following that, at addresses \texttt{200A-D}, must be the cartridge ``magic number'', which is a literal byte sequence \texttt{47 A9 0C 1E}. If these byte values are not found at this address, the Retro 6k will not run the cartridge code.
 
-Immediately following the magic number, at \texttt{200E\&200F}, is where the CPU looks for the cartridge main program entry address. The 6502 CPU loads and stores addresses in little-endian format. The code to handle interrupts is assumed to begin at \texttt{2010}. If a cartridge does not use interrupts, this address should contain an \texttt{RTI} instruction. The main program entry point may be immediately after this, or it may be anywhere else in cartridge memory.
+Immediately following the magic number, at \texttt{200E-F}, is where the CPU looks for the cartridge main program entry address. The 6502 CPU loads and stores addresses in little-endian format. The code to handle interrupts is assumed to begin at \texttt{2010}. If a cartridge does not use interrupts, this address should contain an \texttt{RTI} instruction. The main program entry point may be immediately after this, or it may be anywhere else in cartridge memory.
 
 \section{Cartridge Container File Format (For Emulation)}
 
@@ -368,7 +436,7 @@ To be included here later. See \url{https://www.masswerk.at/6502/6502_instructio
 
 This routine converts the value in the Accumulator to decimal for display in SCE. If the V flag is set, the value is interpreted as a negative number.
 
-Side effects: Result is stored in \texttt{008C-008F} (text order). Count of digits is stored as a negative number in the X register. Accumulator is not preserved.
+Side effects: Result is stored in \texttt{008C-F} (text order). Count of digits is stored as a negative number in the X register. Accumulator is not preserved.
 
 \subsection{Byte To Hex}
 
@@ -376,7 +444,7 @@ Side effects: Result is stored in \texttt{008C-008F} (text order). Count of digi
 
 This routine converts the value stored in the Accumulator to uppercase hexadecimal for display in SCE.
 
-Side effects: Result is stored in \texttt{0086\&0087} (text order). Count of digits is stored as a negative number in the X register.
+Side effects: Result is stored in \texttt{0086-7} (text order). Count of digits is stored as a negative number in the X register.
 
 \subsection{Wait V-Scan}
 
@@ -544,8 +612,6 @@ To cause the program to be interrupted on various video triggers, such as the be
 \section{Video Memory}
 \label{sec:videomem}
 
-The Retro 6k display consists of $32 \textrm{ columns} \times 18 \textrm{ rows}$ of character cells. Each character cell is $8 \times 8 \textrm{ pixels}$ in size, and displays a single graphic character in up to 4 colors. Up to 32 colors can be used across the entire screen at any given time, selected from the 256 fixed colors the hardware is capable of generating. Although individual pixels are not directly addressable, the graphic characters may be redefined. Each graphic character may be considered a miniature canvas, and by using many graphic characters only once each, they can form an effective canvas of up to $128 \times 128 \textrm{ pixels}$. With clever reuse of graphic characters, possibly with different color assignments, the whole screen can be filled with robust graphics.
-
 Memory in the range \texttt{0800-1FFF} is used by the video output adapter to generate a video signal, and is locked much of the time. This memory can only be written to or read from by the CPU at moments during the output video timing corresponding to horizontal or vertical retrace, or ``skipped scanlines'' if requested by the cartridge. Software can read from address \texttt{02FC} to determine if the video memory is available. (See the Video Status subsection in Section \ref{ss:videostatusbyte} on page \pageref{ss:videostatusbyte} for details.)
 
 Video memory at addresses \texttt{0800-0A3F} determines which graphic character appears in each cell on the screen. There is a simple correspondence between bytes in memory and cells on the screen:
@@ -559,7 +625,7 @@ $$M_b = (\lnot{R} \wedge \texttt{1}_h) \ll 2 \vee S$$
 
 The palette determines the mapping from 5-bit cell color assignments to 8-bit hardware color capabilities, and is located at addresses \texttt{0FE0-0FFF}. Each byte is one color selection:
 
-$$M_b = \texttt{0FE0}_h \vee J$$
+$$M_B = \texttt{0FE0}_h \vee J$$
 
 An 8-bit color definition can be broken down by bit, as $K = I_LR_LG_LB_LI_HR_HG_HB_H$. The bits $I_HI_L$ add value to all three color channels, but even used together are less strong in any single channel than a single low bit in that channel. Put another way, color \texttt{88}, with both intensity bits set, is still darker than color \texttt{70}, with only each low bit of red, green, and blue set. The hardware converts an 8-bit color specification into a 4-bit-per-channel RGB output (which is then converted to analog signals) by composing bits from the color specification like this:
 
@@ -585,9 +651,14 @@ The FVMC destination page is set by writing to \texttt{03F8}. Writing a zero to 
 
 \section{Interrupts}
 
-Interrupts can be triggered by the video display hardware, as specified by the Video Interrupt Flags, by logic in the cartridge, or by other means not yet determined. In response to an interrupt event, program execution proceeds from address \texttt{2010}.
+Interrupts can be triggered by the video display hardware, as specified by the Video Interrupt Flags, by logic in the cartridge, or by other means not yet determined.\footnote{As of emulator version \oldstylenums{1992}c, interrupts are not triggered in any circumstance.} In response to an interrupt event, program execution proceeds from address \texttt{2010}.
 
 \chapter{Programming in High-Level Languages}
+\section{Cross-Compiling}
+
+Compilers exist on modern computer systems that generate assembly code for 6502 microprocessors. These ought to be suitable, perhaps with some custom libraries and/or headers, for targeting the Retro 6k Fantasy Computer Entertainment System.
+
+\section{Interpreter Cartridges}
 
 No programming language interpreter cartridges exist at this time. For now, let's consider this a challenge for the reader.
 
