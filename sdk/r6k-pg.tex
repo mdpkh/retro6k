@@ -88,7 +88,7 @@ The Retro 6k has four voices. Each can produce an independently-specified freque
 
 \section{User Input}
 
-The Retro 6k has a built-in keyboard, capable of producing 256 different characters. The computer also supports game pads for up to four players, and a pointing device or a pair of single-axis controllers.\footnote{As of emulator version \oldstylenums{1992}c, only keyboard input is supported.}
+The Retro 6k has a built-in keyboard, capable of producing 256 different characters. The computer also supports game pads for up to four players, and a pointing device or a pair of single-axis controllers.\footnote{As of emulator version \oldstylenums{0.1992}d, only keyboard input is supported.}
 
 \section{Peripheral Accessories}
 
@@ -627,7 +627,7 @@ To cause the program to be interrupted on various video triggers, such as the be
 
 \subsection{Debug Break (Emulator Only)}
 
-To pause program execution and display the Debug Log in the emulator, write a nonzero value to address \texttt{03FF}. This behavior may be disabled by the user\footnote{User preferences such as disabling debug breaks are not yet implemented, as of emulator version \oldstylenums{1992}d.} and is not available on a physical Retro 6k computer.
+To pause program execution and display the Debug Log in the emulator, write a nonzero value to address \texttt{03FF}. This behavior may be disabled by the user\footnote{User preferences such as disabling debug breaks are not yet implemented, as of emulator version \oldstylenums{0.1992}d.} and is not available on a physical Retro 6k computer.
 
 \section{Video Memory}
 \label{sec:videomem}
@@ -671,7 +671,7 @@ The FVMC destination page is set by writing to \texttt{03F8}. Writing a zero to 
 
 \section{Interrupts}
 
-Interrupts can be triggered by the video display hardware, as specified by the Video Interrupt Flags, by logic in the cartridge, or by other means not yet determined.\footnote{As of emulator version \oldstylenums{1992}c, interrupts are not triggered in any circumstance.} In response to an interrupt event, program execution proceeds from address \texttt{2010}.
+Interrupts can be triggered by the video display hardware, as specified by the Video Interrupt Flags, by logic in the cartridge, or by other means not yet determined.\footnote{As of emulator version \oldstylenums{0.1992}d, interrupts are not triggered in any circumstance.} In response to an interrupt event, program execution proceeds from address \texttt{2010}.
 
 \chapter{Programming in High-Level Languages}
 \section{Cross-Compiling}
