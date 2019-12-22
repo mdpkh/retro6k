@@ -10,9 +10,9 @@
 /x64/**
 /retro6k.vcxproj*
 
-#convenience bat files
-/retro6k.bat
-/retro6kdebug.bat
+#convenience shortcuts
+/Retro 6k debug.lnk
+/Retro 6k release.lnk
 
 #LaTeX/MikTex output
 **/*.aux
