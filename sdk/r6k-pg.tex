@@ -32,17 +32,18 @@ harder for people like me?\par
 \vspace*{\stretch{3}}
 \cleartorecto
 \tableofcontents*
-\cleartorecto
+\clearpage
 \pagestyle{headings}
 
-\section{Conventions Used In This Document}
+\vspace*{3in}
+\section*{Conventions Used In This Document}
 \subsection{Byte Values, Addresses, Address Ranges, and Other Computery Numbers}
 
 Usually, byte values are written in hexadecimal with two digits, in monospaced type: \texttt{0F}. Addresses are written similarly but with four digits: \texttt{05AF}. A range of addresses is written with four digits indicating the start of the range, and the end of the range (interpreted inclusively) beginning with the most significant differing digit: \texttt{3680-BF}. Selected bits of a byte value may be represented in binary with a subscript letter b: $\texttt{10}_b$; or in hexadecimal as a full byte value with the irrelevant bits as zero and no leading zero: \texttt{7}. In math formul\ae, hexadecimal numbers are written in monospaced type with a subscript letter h: $\texttt{5A}_h$; some numbers in formul\ae may be written in binary for clarity, in monospaced type with a subscript letter b: $\texttt{110}_b$. Unicode codepoints are written in hexadecimal with as many digits as necessary and no leading zeroes, in monospaced type: \texttt{1F9D2}.
 
 \subsection{Symbols Used in Math Formul\ae}
 
-\begin{center}\begin{tabular}{rl}
+\begin{center}\begin{tabular}{cl}
 Sym & Meaning \\
 \hline
 \raisebox{0pt}[1.125em]{$\lnot{}$} & Bitwise Not\hspace{\stretch{1}}(highest precedence) \\
@@ -66,6 +67,21 @@ $S$ & Color slot (of a character cell) \\
 $X$ & Pixel column (within glyph) \\
 $Y$ & Pixel row (within glyph) \\
 \end{tabular}\end{center}
+
+\subsection{6502 Status Flags}
+
+\begin{center}\begin{tabular}{cl}
+Sym & Flag name \\
+\hline
+\raisebox{0pt}[1.125em]{B} & Break \\
+C & Carry (compliment Borrow) \\
+D & Decimal \\
+I & Interrupt disable \\
+N & Negative \\
+V & Overflow \\
+Z & Zero \\
+\end{tabular}\end{center}
+
 
 \chapter{Retro 6k Features \& Capabilities}
 \section{Processor}
@@ -430,11 +446,21 @@ To be included here later. See \url{https://www.masswerk.at/6502/6502_instructio
 
 \section{Subroutines Provided By Firmware}
 
+
+
 \subsection{Byte To Decimal}
 
-\texttt{JSR \$F230}\hfill\texttt{20 30 F2}
+\begin{center}\begin{tabular}{r>{\ttfamily}l>{\ttfamily}ccr@{\,--\,}rl}
+& \textrm{Label} & \textrm{Address} & Flag & \multicolumn{2}{c}{\phantom{--}Range} & Use case \\
+(1) & BYTE2DECP & ---- & & 0&255 & Unsigned value \\
+(2) & BYTE2DECN & ---- & & --256&--1 & Count up to zero \\
+(3) & BYTE2DECUA & ---- & C & 0&511 & Unsigned addition result \\
+(4) & BYTE2DECUS & ---- & C & --256&255 & Unsigned subtraction result \\
+(5) & BYTE2DECS & ---- & V & --256&255 & Signed add or sub result \\
+(6) & BYTE2DECBP & ---- & & 256&511 \\
+\end{tabular}\end{center}
 
-This routine converts the value in the Accumulator to decimal for display in SCE. If the V flag is set, the value is interpreted as a negative number.
+This routine converts the value in the Accumulator to decimal for display in SCE. The output range and interpretation of flags is different depending on the variant of the subroutine. In \texttt{BYTE2DECUA}, the output is 0\,--\,255 if the Carry flag is clear, or 256\,--\,511 if the flag is set. In \texttt{BYTE2DECUS}, the output is --256\,--\,--1 if the Carry flag is clear, or 0\,--\,255 if the flag is set. This recognizes the 6502's use of the Carry flag as the compliment of a Borrow flag. In \texttt{BYTE2DECS}, the output is --128\,--\,127 if the Overflow flag is clear, or --256\,--\,--129 or 128\,--\,255\footnote{\texttt{BYTE2DECS} chooses the sign based on the exclusive-or of the Overflow and Negative flags.} if the Overflow flag is set.
 
 Side effects: Result is stored in \texttt{008C-F} (text order). Count of digits is stored as a negative number in the X register. Accumulator is not preserved.
 

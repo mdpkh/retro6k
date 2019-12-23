@@ -254,13 +254,20 @@ bytetohexb3:
   LDX #$FF ; set X to -1 (1 digit)
   RTS
 
-bytetodecb8:
+; Subroutine: Convert value in Accumulator to decimal. Several entry points.
+; Side effects: result stored in zp$8C,$8D,$8E,$8F, neg digit count stored in X, accumulator clobbered
+BYTE2DECN:
+  ; treat value as twos-complement negative number
   EOR #$FF ; find negative number
   CLC
   ADC #$01
   BCS bytetodecb10 ; negative zero? write literal "-256" instead
   STA $8F ; store negative number in zeropage
   LDA #$60 ; load minus sign for sign column
+  STA $8C ; output sign column
+  SED
+  LDA #$00 ; initialize units and tens digits in accumulator
+  STA $8D ; initialize hundreds digit in output position
   JMP bytetodecj9
 bytetodecb10:
   STA $8C ; output - (sign column)
@@ -273,17 +280,39 @@ bytetodecb10:
   LDA #$00 ; restore Accumulator
   LDX #$FD ; set X to -3 (3 digits)
   RTS
-bytetodec:
-; Subroutine: Convert value in Accumulator to decimal. If V flag set, display as negative number.
-; Side effects: result stored in zp$8C,$8D,$8E,$8F, neg digit count stored in X, accumulator clobbered
-  BVS bytetodecb8 ; set up for negative number
+BYTE2DECUS:
+  ; Treat value as result of unsigned subtraction. Branch on carry flag...
+  BCC BYTE2DECN
+  JMP BYTE2DECP
+BYTE2DECS:
+  ; Treat value as result of signed subtraction. Branch on overflow and negative flags...
+  BVS bytetodecb8
+  BMI BYTE2DECN
+  JMP BYTE2DECP
+bytetodecb8:
+  BPL BYTE2DECN
+  JMP BYTE2DECP
+BYTE2DECUA:
+  ; Treat value as result of unsigned addition (or 9-bit unsigned value). Branch on carry flag...
+  BCC BYTE2DECP
+BYTE2DECBP:
+  ; Treat value as unsigned, add 256 (range 256-511)
   STA $8F ; place input in zeropage (temporarily using units digit output byte)
   LDA #$20 ; load space for sign column
-bytetodecj9: ; come from negative number setup
   STA $8C ; output sign column
-  SED
+  LDA #$02
+  STA $8D ; initialize hundreds digit in output position
+  LDA #$56 ; initialize units and tens digits in accumulator
+  JMP bytetodecj9
+BYTE2DECP:
+  ; Treat value as unsigned in range 0-255
+  STA $8F ; place input in zeropage (temporarily using units digit output byte)
+  LDA #$20 ; load space for sign column
+  STA $8C ; output sign column
   LDA #$00 ; initialize units and tens digits in accumulator
   STA $8D ; initialize hundreds digit in output position
+bytetodecj9:
+  SED ; begin adding data bits
   LSR $8F ; shift input
   BCC bytetodecb0
   CLC
@@ -313,6 +342,9 @@ bytetodecb4:
   BCC bytetodecb5
   CLC
   ADC #$32 ; add bit value
+  BCC bytetodecb5
+  CLC
+  INC $8D ; increment hundreds digit if this bit caused a carry (possible in Big Positive number format)
 bytetodecb5:
   LSR $8F ; shift input
   BCC bytetodecb6
@@ -410,12 +442,6 @@ datasyscolors:
   .byte $20,$A1,$A4,$2D,$22,$A3,$A6,$2F
   .byte $F0,$79,$7C,$FD,$F2,$7B,$7E,$FF
   
-; Utility subroutine addresses
-  .org $FF80
-  .word waitvscan ; ($FF80)
-  .word bytetohex ; ($FF82)
-  .word bytetodec ; ($FF84)
-
 ; 6502 program counter initialization vectors
   .org $FFFA
   .word nmicode ; NMI vector, in firmware
