@@ -452,12 +452,12 @@ To be included here later. See \url{https://www.masswerk.at/6502/6502_instructio
 
 \begin{center}\begin{tabular}{r>{\ttfamily}l>{\ttfamily}ccr@{\,--\,}rl}
 & \textrm{Label} & \textrm{Address} & Flag & \multicolumn{2}{c}{\phantom{--}Range} & Use case \\
-(1) & BYTE2DECP & ---- & & 0&255 & Unsigned value \\
-(2) & BYTE2DECN & ---- & & --256&--1 & Count up to zero \\
-(3) & BYTE2DECUA & ---- & C & 0&511 & Unsigned addition result \\
-(4) & BYTE2DECUS & ---- & C & --256&255 & Unsigned subtraction result \\
-(5) & BYTE2DECS & ---- & V & --256&255 & Signed add or sub result \\
-(6) & BYTE2DECBP & ---- & & 256&511 \\
+(1) & BYTE2DECP & F259 & & 0&255 & Unsigned value \\
+(2) & BYTE2DECN & F20F & & --256&--1 & Count up to zero \\
+(3) & BYTE2DECUA & F248 & C & 0&511 & Unsigned addition result \\
+(4) & BYTE2DECUS & F237 & C & --256&255 & Unsigned subtraction result \\
+(5) & BYTE2DECS & F23C & V & --256&255 & Signed add or sub result \\
+(6) & BYTE2DECBP & F24A & & 256&511 \\
 \end{tabular}\end{center}
 
 This routine converts the value in the Accumulator to decimal for display in SCE. The output range and interpretation of flags is different depending on the variant of the subroutine. In \texttt{BYTE2DECUA}, the output is 0\,--\,255 if the Carry flag is clear, or 256\,--\,511 if the flag is set. In \texttt{BYTE2DECUS}, the output is --256\,--\,--1 if the Carry flag is clear, or 0\,--\,255 if the flag is set. This recognizes the 6502's use of the Carry flag as the compliment of a Borrow flag. In \texttt{BYTE2DECS}, the output is --128\,--\,127 if the Overflow flag is clear, or --256\,--\,--129 or 128\,--\,255\footnote{\texttt{BYTE2DECS} chooses the sign based on the exclusive-or of the Overflow and Negative flags.} if the Overflow flag is set.
