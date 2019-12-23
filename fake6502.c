@@ -318,32 +318,49 @@ static void putvalue(uint16_t saveval) {
 
 
 //instruction handler functions
+// ADC handler modified by MDPKH; intended to match original 6502 behavior only
 static void adc() {
     penaltyop = 1;
     value = getvalue();
-    result = (uint16_t)a + value + (uint16_t)(status & FLAG_CARRY);
+#ifdef NES_CPU
+    result = (uint16_t)a + value + (uint16_t)(status & FLAG_CARRY); // ORIGINAL BY MC
    
     carrycalc(result);
     zerocalc(result);
     overflowcalc(result, a, value);
     signcalc(result);
-    
-    #ifndef NES_CPU
+#else
     if (status & FLAG_DECIMAL) {
-        clearcarry();
+        // set or clear zero flag based on binary-mode result
+        zerocalc((uint16_t)a + value + (uint16_t)(status & FLAG_CARRY));
         
-        if ((result & 0x0F) > 0x09) { // changed: a -> result by MDPKH
-            result += 0x06;           // changed: a -> result by MDPKH
+        result = ((uint16_t)a & 0x0f) + ((uint16_t)value & 0x0f) + ((uint16_t)status & FLAG_CARRY); // MODIFIED BY MDPKH
+
+        clearcarry();
+        if (result > 0x09) {
+            result = (result + 0x06) & 0x0f | 0x10;
         }
-        if ((result & 0xF0) > 0x90) { // changed: a -> result by MDPKH
-            result += 0x60;           // changed: a -> result by MDPKH
+        result += ((uint16_t)a & 0xf0) + ((uint16_t)value & 0xf0); // MODIFIED BY MDPKH, PART 2 OF CALCULATION
+        
+        overflowcalc(result, a, value);
+        signcalc(result);
+        
+        if (result > 0x9f) {
+            result += 0x60;
             setcarry();
         }
+        carrycalc(result);
         
-        clockticks6502++;
+        // clockticks6502++; // 65C02 only!
+    } else {
+        result = (uint16_t)a + value + (uint16_t)(status & FLAG_CARRY); // ORIGINAL BY MC
+        
+        carrycalc(result);
+        zerocalc(result);
+        overflowcalc(result, a, value);
+        signcalc(result);
     }
-    #endif
-   
+#endif
     saveaccum(result);
 }
 
@@ -691,32 +708,50 @@ static void rts() {
     pc = value + 1;
 }
 
+// SBC handler modified by MDPKH; intended to match original 6502 behavior only
 static void sbc() {
     penaltyop = 1;
+#ifdef NES_CPU
     value = getvalue() ^ 0x00FF;
-    result = (uint16_t)a + value + (uint16_t)(status & FLAG_CARRY);
-   
+    result = (uint16_t)a + value + (uint16_t)(status & FLAG_CARRY); // ORIGINAL BY MC
+
     carrycalc(result);
     zerocalc(result);
     overflowcalc(result, a, value);
     signcalc(result);
 
-    #ifndef NES_CPU
+#else
     if (status & FLAG_DECIMAL) {
-        clearcarry();
-        
-        result -= 0x66;               // changed: a -> result by MDPKH
-        if ((result & 0x0F) > 0x09) { // changed: a -> result by MDPKH
-            result += 0x06;           // changed: a -> result by MDPKH
+        value = getvalue();
+        // Set flags based on result of binary ADC with ones complement of operand
+        uint16_t cvalue = value ^ 0x00ff;
+        uint16_t bresult = (uint16_t)a + cvalue + (uint16_t)(status & FLAG_CARRY);
+        // but incorporate carry flag into decimal-mode ADC result calculation before changing carry flag
+        result = ((uint16_t)a & 0x0f) - ((uint16_t)value & 0x0f) + ((uint16_t)status & FLAG_CARRY) - 0x01; // MODIFIED BY MDPKH
+        carrycalc(bresult);
+        zerocalc(bresult);
+        overflowcalc(bresult, a, cvalue);
+        signcalc(bresult);
+
+        if (result & 0x8000) {
+            result = (result - 0x06) & 0x0f | 0xfff0;
         }
-        if ((result & 0xF0) > 0x90) { // changed: a -> result by MDPKH
-            result += 0x60;           // changed: a -> result by MDPKH
-            setcarry();
+        result += ((uint16_t)a & 0xf0) - ((uint16_t)value & 0xf0); // MODIFIED BY MDPKH, PART 2 OF CALCULATION
+        if (result & 0x8000) {
+            result -= 0x60;
         }
-        
-        clockticks6502++;
+
+        // clockticks6502++; // 65C02 only!
+    } else {
+        value = getvalue() ^ 0x00FF;
+        result = (uint16_t)a + value + (uint16_t)(status & FLAG_CARRY); // ORIGINAL BY MC
+
+        carrycalc(result);
+        zerocalc(result);
+        overflowcalc(result, a, value);
+        signcalc(result);
     }
-    #endif
+#endif
    
     saveaccum(result);
 }

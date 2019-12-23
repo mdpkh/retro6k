@@ -8,4 +8,4 @@
 | "Custom emulator with 5.1 sound v2 by Kevin O'Dutta."              |
 | Use Windows-1252 character set.                                    |
 \********************************************************************/
-#define CUSTOM_BUILD_CREDIT "Unofficial build of version 0.1992d."
+#define CUSTOM_BUILD_CREDIT "Unofficial build of version 0.1993a."
