@@ -1,7 +1,7 @@
 VIDEOSTATE = $02FC
 FVMCDEST = $03F8
 FVMCSRC = $03F9
-BYTETODEC = $F230
+BYTETODEC = $F259
 WAITVSCAN = $F1D7
   .org $1F4C ; this may need to be adjusted to allow room for header
 header:
