@@ -24,15 +24,9 @@ cartromstart:
   .word entry ; cartridge code entry point
 interruptroutine: ; this label must equal $2010
   RTI
-BYTE2DECP  = $F259
-BYTE2DECN  = $F20F
-BYTE2DECUA = $F248
-BYTE2DECUS = $F237
-BYTE2DECS  = $F23C
-BYTE2DECBP = $F24A
 FVMCDEST   = $03F8
 FVMCSRC    = $03F9
-WAITVSCAN  = $F1D7
+  .include subroutines.s
 entry:
   LDA #$20
   STA $0400
@@ -167,7 +161,7 @@ entry:
   LDY #$E2 ; system font source page start
   LDA #$12 ; video RAM font page start
 copyfontpageloop:
-  JSR WAITVSCAN ; wait for vertical retrace (preserve A & Y registers please)
+  JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
   ; enable fast video memory copy
   CLC
   STA FVMCDEST
@@ -191,7 +185,7 @@ copyfontbyteloop:
   ADC #$01 ; increment destination page
   CMP #$18 ; compare against stop page number
   BNE copyfontpageloop
-  JSR WAITVSCAN ; wait for vertical retrace
+  JSR WAITVSCANX ; wait for vertical retrace
   ; initialize screen display
   LDX #$00
 initscreenloop:
@@ -234,7 +228,7 @@ initscreenloop:
   CMP #$00
   BNE initscreenloop
   TXA
-  JSR WAITVSCAN
+  JSR WAITVSCANX
   CMP #$40
   BNE initscreenloop
   ;--------------------------------------------------------------------
@@ -1435,7 +1429,7 @@ initscreenloop:
   ;--------------------------------------------------------------------
   LDY #$04 ; general memory page
   LDA #$08 ; character page
-  JSR WAITVSCAN ; wait for vertical retrace (preserve A & Y registers please)
+  JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
   ; enable fast video memory copy
   CLC
   STA FVMCDEST
@@ -1698,7 +1692,7 @@ initscreenloop:
   STA $FF
   LDY #$05 ; general memory page
   LDA #$09 ; character page
-  JSR WAITVSCAN ; wait for vertical retrace (preserve A & Y registers please)
+  JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
   CLC
   STA FVMCDEST
   STY FVMCSRC

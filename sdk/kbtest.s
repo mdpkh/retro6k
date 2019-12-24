@@ -1,8 +1,7 @@
 VIDEOSTATE = $02FC
 FVMCDEST = $03F8
 FVMCSRC = $03F9
-BYTETODEC = $F259
-WAITVSCAN = $F1D7
+  .include subroutines.s
   .org $1F4C ; this may need to be adjusted to allow room for header
 header:
   .text "\x47\xA9\x02\x6A\xBB\x47\xF3\xA7" ; cartridge file format 1986c
@@ -33,7 +32,7 @@ entry:
   LDY #$E0 ; system font source page start
   LDA #$10 ; video RAM font page start
 copyfontpageloop:
-  JSR WAITVSCAN ; wait for vertical retrace (preserve A & Y registers please)
+  JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
   ; enable fast video memory copy
   CLC
   STA FVMCDEST
@@ -58,7 +57,7 @@ copyfontbyteloop:
   CMP #$20 ; compare against stop page number
   BNE copyfontpageloop
   ; initialize colors on output area of screen
-  JSR WAITVSCAN
+  JSR WAITVSCANX
   LDA #$73 ; top left corner
   STA $0A8D
   STA $0BAD
@@ -149,11 +148,10 @@ resetkey:
   LDA #$20
 newkey:
   TAY ; save a copy of keypress value
-  CLV ; treat it as a positive value in subroutine
-  JSR BYTETODEC ; convert to decimal
+  JSR BYTE2DECP ; convert to decimal
   TYA ; restore keypress value into Accumulator
   LDY #$10 ; init video frame countup to -240
-  JSR WAITVSCAN
+  JSR WAITVSCANX
   LDX $08AF
   STX $08AE
   LDX $08B0
@@ -171,7 +169,7 @@ mainloop:
   LDA $0244 ; read and clear keypress register
   CMP #$00
   BNE newkey
-  JSR WAITVSCAN
+  JSR WAITVSCANX
   INY
   BEQ resetkey
   JMP mainloop

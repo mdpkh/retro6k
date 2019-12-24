@@ -39,7 +39,7 @@ harder for people like me?\par
 \section*{Conventions Used In This Document}
 \subsection{Byte Values, Addresses, Address Ranges, and Other Computery Numbers}
 
-Usually, byte values are written in hexadecimal with two digits, in monospaced type: \texttt{0F}. Addresses are written similarly but with four digits: \texttt{05AF}. A range of addresses is written with four digits indicating the start of the range, and the end of the range (interpreted inclusively) beginning with the most significant differing digit: \texttt{3680-BF}. Selected bits of a byte value may be represented in binary with a subscript letter b: $\texttt{10}_b$; or in hexadecimal as a full byte value with the irrelevant bits as zero and no leading zero: \texttt{7}. In math formul\ae, hexadecimal numbers are written in monospaced type with a subscript letter h: $\texttt{5A}_h$; some numbers in formul\ae may be written in binary for clarity, in monospaced type with a subscript letter b: $\texttt{110}_b$. Unicode codepoints are written in hexadecimal with as many digits as necessary and no leading zeroes, in monospaced type: \texttt{1F9D2}.
+Usually, byte values are written in hexadecimal with two digits, in monospaced type: \texttt{0F}. Addresses are written similarly but with four digits: \texttt{05AF}. A range of addresses is written with four digits indicating the start of the range, and the end of the range (interpreted inclusively) beginning with the most significant differing digit: \texttt{3680-BF}. Selected bits of a byte value may be represented in binary with a subscript letter b: $\texttt{10}_b$; or in hexadecimal as a full byte value with the irrelevant bits as zero and no leading zero: \texttt{7}. In math formul\ae, hexadecimal numbers are written in monospaced type with a subscript letter h: $\texttt{5A}_h$; some numbers in formul\ae may be written in binary for clarity, in monospaced type with a subscript letter b: $\texttt{110}_b$. Unicode codepoints are written in hexadecimal with as many digits as necessary and no leading zeroes, in monospaced type: \texttt{1F9D2}. In assembly source listings, hexadecimal numbers are prefixed by a dollar sign: \texttt{\$0FE1}.
 
 \subsection{Symbols Used in Math Formul\ae}
 
@@ -452,37 +452,57 @@ To be included here later. See \url{https://www.masswerk.at/6502/6502_instructio
 
 \begin{center}\begin{tabular}{r>{\ttfamily}l>{\ttfamily}ccr@{\,--\,}rl}
 & \textrm{Label} & \textrm{Address} & Flag & \multicolumn{2}{c}{\phantom{--}Range} & Use case \\
-(1) & BYTE2DECP & F259 & & 0&255 & Unsigned value \\
-(2) & BYTE2DECN & F20F & & --256&--1 & Count up to zero \\
-(3) & BYTE2DECUA & F248 & C & 0&511 & Unsigned addition result \\
-(4) & BYTE2DECUS & F237 & C & --256&255 & Unsigned subtraction result \\
-(5) & BYTE2DECS & F23C & V & --256&255 & Signed add or sub result \\
-(6) & BYTE2DECBP & F24A & & 256&511 \\
+(1) & BYTE2DECP & F453 & & 0&255 & Unsigned value \\
+(2) & BYTE2DECN & F418 & & --256&--1 & Count up to zero \\
+(3) & BYTE2DECUA & F451 & C & 0&511 & Unsigned addition result \\
+(4) & BYTE2DECUS & F440 & C & --256&255 & Unsigned subtraction result \\
+(5) & BYTE2DECS & F445 & V & --256&255 & Signed add or sub result \\
+(6) & BYTE2DECBP & F453 & & 256&511 \\
 \end{tabular}\end{center}
 
-This routine converts the value in the Accumulator to decimal for display in SCE. The output range and interpretation of flags is different depending on the variant of the subroutine. In \texttt{BYTE2DECUA}, the output is 0\,--\,255 if the Carry flag is clear, or 256\,--\,511 if the flag is set. In \texttt{BYTE2DECUS}, the output is --256\,--\,--1 if the Carry flag is clear, or 0\,--\,255 if the flag is set. This recognizes the 6502's use of the Carry flag as the compliment of a Borrow flag. In \texttt{BYTE2DECS}, the output is --128\,--\,127 if the Overflow flag is clear, or --256\,--\,--129 or 128\,--\,255\footnote{\texttt{BYTE2DECS} chooses the sign based on the exclusive-or of the Overflow and Negative flags.} if the Overflow flag is set.
+This routine converts the value in the Accumulator to decimal for display in SCE. The output range and interpretation of flags is different depending on the variant of the subroutine. In \texttt{BYTE2DECUA} (3), the output is 0\,--\,255 if the Carry flag is clear, or 256\,--\,511 if the flag is set. In \texttt{BYTE2DECUS} (4), the output is --256\,--\,--1 if the Carry flag is clear, or 0\,--\,255 if the flag is set. This recognizes the 6502's use of the Carry flag as the compliment of a Borrow flag. In \texttt{BYTE2DECS} (5), the output is --128\,--\,127 if the Overflow flag is clear, or --256\,--\,--129 or 128\,--\,255\footnote{\texttt{BYTE2DECS} chooses the sign based on the exclusive-or of the Overflow and Negative flags.} if the Overflow flag is set.
 
 Side effects: Result is stored in \texttt{008C-F} (text order). Count of digits is stored as a negative number in the X register. Accumulator is not preserved.
 
 \subsection{Byte To Hex}
 
-\texttt{JSR \$F1E3}\hfill\texttt{20 E3 F1}
+\begin{center}\begin{tabular}{>{\ttfamily}l>{\ttfamily}r}
+\textrm{Label} & \textrm{Address} \\
+BYTETOHEX & F3EC \\
+\end{tabular}\end{center}
 
-This routine converts the value stored in the Accumulator to uppercase hexadecimal for display in SCE.
+This routine converts the value stored in the Accumulator to uppercase hexadecimal for display in SCE. To convert a word (16 bits) to hex, call this subroutine on two bytes separately.
 
 Side effects: Result is stored in \texttt{0086-7} (text order). Count of digits is stored as a negative number in the X register.
 
+\subsection{Divide}
+
+This routine will be included in a future version of the firmware.
+
+\subsection{Set Cell Colors}
+
+This routine or family of routines will be included in a future version of the firmware.
+
+\subsection{Multiply}
+
+This routine will be included in a future version of the firmware.
+
 \subsection{Wait V-Scan}
 
-\texttt{JSR \$F1D7}\hfill\texttt{20 D7 F1}
+\begin{center}\begin{tabular}{r>{\ttfamily}l>{\ttfamily}cr}
+& \textrm{Label} & \textrm{Address} & Reg \\
+(1) & WAITVSCANA & F3CA & Acc \\
+(2) & WAITVSCANX & F3D4 & X \\
+(3) & WAITVSCANY & F3E0 & Y \\
+\end{tabular}\end{center}
 
 This routine waits for the start of the vertical blanking interval, then returns. 
 
-Side effects: The X register is overwritten by this subroutine.
+Side effects: The X register (2), Y register (3), or Accumulator (1), is overwritten by this subroutine.
 
 \subsection{Word To Decimal}
 
-This routine will be written some time after Byte To Decimal is fixed.
+This routine will be included in a future version of the firmware.
 
 \section{User \& Device Input Addresses}
 \label{sec:userinput}

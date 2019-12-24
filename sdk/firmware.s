@@ -15,7 +15,7 @@ entry: ; system power-on or reset
   CLD
   LDA #$00
   STA $03F8
-  JSR waitvscan
+  JSR WAITVSCANX
   ; display cartridge identification in bottom of screen
   LDA #$20
   STA $0A0A
@@ -116,17 +116,17 @@ cartidcolloop:
   ; if we got this far, jump to cartridge start vector
   JMP ($200E)
 nocart: ; no cartridge inserted
-  ; copy system font
+  ; copy system font (low half)
   LDY #$E0 ; system font source page start
   LDA #$10 ; video RAM font page start
-copyfontpageloop:
-  JSR waitvscan ; wait for vertical retrace (preserve A & Y registers please)
+copyfontpageloop1:
+  JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
   ; enable fast video memory copy
   CLC
   STA FVMCDEST
   STY FVMCSRC
   LDX #$00
-copyfontbyteloop:
+copyfontbyteloop1:
   STA $00,X ; actual address and value written is overridden by fast video memory copy circuit
   INX
   STA $00,X
@@ -135,92 +135,244 @@ copyfontbyteloop:
   INX
   STA $00,X
   INX
-  BNE copyfontbyteloop
+  BNE copyfontbyteloop1
   ; disable fast video memory copy
   ; X should be zero
   STX FVMCDEST
   INY ; increment source page
   CLC
   ADC #$01 ; increment destination page
-  CMP #$20 ; compare against stop page number
-  BNE copyfontpageloop
-  JSR waitvscan ; wait for vertical retrace
+  CMP #$18 ; compare against stop page number
+  BNE copyfontpageloop1
+  ; copy start screen graphics and custom chars
+  LDY #$FA ; system font source page start
+  LDA #$18 ; video RAM font page start
+copyfontpageloop2:
+  JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
+  ; enable fast video memory copy
+  CLC
+  STA FVMCDEST
+  STY FVMCSRC
+  LDX #$00
+copyfontbyteloop2:
+  STA $00,X ; actual address and value written is overridden by fast video memory copy circuit
+  INX
+  STA $00,X
+  INX
+  STA $00,X
+  INX
+  STA $00,X
+  INX
+  BNE copyfontbyteloop2
+  ; disable fast video memory copy
+  ; X should be zero
+  STX FVMCDEST
+  INY ; increment source page
+  CLC
+  ADC #$01 ; increment destination page
+  CMP #$1C ; compare against stop page number
+  BNE copyfontpageloop2
+  JSR WAITVSCANA ; wait for vertical retrace
   ; initialize screen display
   LDX #$00
 initscreenloop:
-  LDA datasystext0,X ; screen lines 0&1: system startup text
+  LDA datasystext0,X ; screen line 0: system startup text
   STA $0800,X
-  LDA datasystext1,X ; screen lines 2&3: system startup text
+  LDA datasystext1,X ; screen line 1: system startup text
+  STA $0820,X
+  LDA datasystext2,X ; screen line 2: system startup text
   STA $0840,X
-  LDA datasystext2,X ; screen lines 4&5: system startup text
+  LDA datasystext3,X ; screen line 3: system startup text
+  STA $0860,X
+  LDA datasystext1,X ; screen line 4: system startup text
   STA $0880,X
-  LDA datasystext3,X ; screen lines 6&7: system startup text
+  LDA datasystext5,X ; screen line 5: system startup text
+  STA $08A0,X
+  LDA datasystext6,X ; screen line 6: system startup text
   STA $08C0,X
-  LDA #$20 ; screen lines 8-15: blank
+  LDA datasystext7,X ; screen line 7: system startup text
+  STA $08E0,X
+  LDA datasystext8,X ; screen line 8: system startup text
   STA $0900,X
+  LDA #$20 ; screen lines 9-12: blank
+  STA $0920,X
   STA $0940,X
+  STA $0960,X
   STA $0980,X
+  LDA datasystext4,X ; screen line 13: logo placeholder
+  STA $09A0,X
+  LDA #$20 ; screen lines 14-17: blank
   STA $09C0,X
-  LDA #$96 ; screen lines 16&17: shade blocks
+  STA $09E0,X
   STA $0A00,X
-  LDA #$CF ; screen lines 0-15 attribute bit 0: 0/1 0/1 1/1 1/1
+  STA $0A20,X
+  LDA #$CF ; screen lines 0-17 attribute bit 0: 0/1 0/1 1/1 1/1
   STA $0A40,X
+  STA $0A60,X
   STA $0A80,X
+  STA $0AA0,X
   STA $0AC0,X
+  STA $0AE0,X
   STA $0B00,X
-  LDA #$CC ; screen lines 16&17 attribute bit 0, sl 0&1 ab 1: 0/0 0/0 1/1 1/1
+  STA $0B20,X
   STA $0B40,X
-  ; screen lines 2-17 attribute bit 1: 0/0 0/0 1/1 1/1
+  LDA #$CC ; screen lines 2-17 attribute bit 1: 0/0 0/0 1/1 1/1
+  STA $0B60,X
   STA $0B80,X
+  STA $0BA0,X
   STA $0BC0,X
+  STA $0BE0,X
   STA $0C00,X
+  STA $0C20,X
   STA $0C40,X
-  ; screen lines 0-15 attribute bit 2: 0/0 0/0 1/1 1/1
+  STA $0C60,X
+  ; screen lines 0-17 attribute bit 2: 0/0 0/0 1/1 1/1
   STA $0C80,X
+  STA $0CA0,X
   STA $0CC0,X
+  STA $0CE0,X
   STA $0D00,X
+  STA $0D20,X
   STA $0D40,X
-  ; screen lines 16&17 attribute bit 2, sl 0-5 ab 3: 0/0 0/0 1/1 1/1
+  STA $0D60,X
+  ; screen lines 0-5 attribute bit 3: 0/0 0/0 1/1 1/1
   STA $0D80,X
+  STA $0DA0,X
   STA $0DC0,X
-  LDA #$00 ; screen lines 6-17 attribute bit 3: 0/0 0/0 0/0 0/0
+  STA $0DE0,X
+  LDA #$C0 ; screen lines 6&7 attribute bit 3: 0/0 0/0 1/0 1/0
   STA $0E00,X
+  LDA #$00 ; screen lines 8-17 attribute bit 3: 0/0 0/0 0/0 0/0
+  STA $0E20,X
   STA $0E40,X
+  STA $0E60,X
   STA $0E80,X
-  LDA #$CC ; screen lines 0-3 attribute bit 4: 0/0 0/0 1/1 1/1
+  STA $0EA0,X
+  LDA #$CC ; screen lines 0-5 attribute bit 4: 0/0 0/0 1/1 1/1
   STA $0EC0,X
-  LDA #$C0 ; screen lines 4-7 attribute bit 4: 0/0 0/0 1/0 1/0
+  STA $0EE0,X
   STA $0F00,X
-  LDA #$00 ; screen lines 8-15 attribute bit 4: 0/0 0/0 0/0 0/0
+  LDA #$0C ; screen lines 6&7 attribute bit 4: 0/0 0/0 0/1 0/1
+  STA $0F20,X
+  LDA #$00 ; screen lines 8-17 attribute bit 4: 0/0 0/0 0/0 0/0
   STA $0F40,X
+  STA $0F60,X
   STA $0F80,X
-  LDA datasyscolors,X ; sl 16&17 ab 4, palette colors
+  STA $0FA0,X
   STA $0FC0,X
+  LDA datasyscolors,X ; palette colors
+  STA $0FE0,X
   INX
   TXA
-  AND #$07
+  AND #$03
   CMP #$00
   BNE initscreenloop
+  JSR WAITVSCANA
   TXA
-  JSR waitvscan
-  CMP #$40
+  CMP #$20
   BNE initscreenloop
+  ; copy a few extra characters from Bank E font to video memory
+  LDA #$10 ; destination page: screen font row 0
+  STA FVMCDEST
+  LDA #$EB ; source page: Bank E font row B
+  STA FVMCSRC
+  STA $C0 ; copy column C: copyright sign to position $0C
+  STA $C1
+  STA $C2
+  STA $C3
+  STA $C4
+  STA $C5
+  STA $C6
+  STA $C7
+  STA $C8
+  STA $C9
+  STA $CA
+  STA $CB
+  STA $CC
+  STA $CD
+  STA $CE
+  STA $CF
+  LDA #$EA ; source page: Bank E font row A
+  STA FVMCSRC
+  STA $E0 ; copy column E: diamond outline to position $0E
+  STA $E1
+  STA $E2
+  STA $E3
+  STA $E4
+  STA $E5
+  STA $E6
+  STA $E7
+  STA $E8
+  STA $E9
+  STA $EA
+  STA $EB
+  STA $EC
+  STA $ED
+  STA $EE
+  STA $EF
+  LDA #$EE ; source page: Bank E font row E
+  STA FVMCSRC
+  LDA #$16 ; destination page: screen font row 6
+  STA FVMCDEST
+  STA $00 ; copy column 0: en dash to position $60
+  STA $01
+  STA $02
+  STA $03
+  STA $04
+  STA $05
+  STA $06
+  STA $07
+  STA $08
+  STA $09
+  STA $0A
+  STA $0B
+  STA $0C
+  STA $0D
+  STA $0E
+  STA $0F
+  LDA #$00 ; disable FVMC
+  STA FVMCDEST
+  STA FVMCSRC
+  JSR WAITVSCANA
+  
 halt:
   JMP halt
 
-waitvscan:
+  .org $F3CA
+WAITVSCANA:
 ; Subroutine: Wait for start of vertical blanking interval.
-; Side effects: X register is clobbered.
-  TAX
-waitvscanloop:
+; Side effects: Accumulator is clobbered.
+waitvscanaloop:
   LDA VIDEOSTATE
   AND #$30
   CMP #$20
-  BNE waitvscanloop
+  BNE waitvscanaloop
+  RTS
+WAITVSCANX:
+; Subroutine: Wait for start of vertical blanking interval.
+; Side effects: X register is clobbered.
+  TAX
+waitvscanxloop:
+  LDA VIDEOSTATE
+  AND #$30
+  CMP #$20
+  BNE waitvscanxloop
   TXA
   RTS
+WAITVSCANY:
+; Subroutine: Wait for start of vertical blanking interval.
+; Side effects: Y register is clobbered.
+  TAY
+waitvscanyloop:
+  LDA VIDEOSTATE
+  AND #$30
+  CMP #$20
+  BNE waitvscanyloop
+  TYA
+  RTS
 
-bytetohex:
+  .org $F3EC
+BYTETOHEX:
 ; Subroutine: Convert value in Accumulator to uppercase hexadecimal.
 ; Side effects: result stored in zp$86,$87, neg digit count stored in X
   TAX
@@ -254,6 +406,7 @@ bytetohexb3:
   LDX #$FF ; set X to -1 (1 digit)
   RTS
 
+  .org $F418
 ; Subroutine: Convert value in Accumulator to decimal. Several entry points.
 ; Side effects: result stored in zp$8C,$8D,$8E,$8F, neg digit count stored in X, accumulator clobbered
 BYTE2DECN:
@@ -412,35 +565,37 @@ bytetodecb13:
   LDX #$FD ; set X to -3 (3 digits)
   RTS
 
-nmicode: ; empty, because NMI not presently used
-  RTI
 
-  .align 8
+  .org $F500
+datagfx:
+  .incbin firmwaregfx.bin,$0,$0900
 datasystext0:
-  .text "\056 \256  \256  \056  \256  \256  \256  \256  \056  \256  \256 \056"
-  .text "                                "
+  .text "\056 \276\277 \200\201 \056  \016  \016  \016  \016  \056 \276\277 \200\201 \056"
 datasystext1:
-  .text "\256  Retro 6K Fantasy Computer\021  \256"
   .text "                                "
 datasystext2:
-  .text "\056 \256  \256  \056  \256  \256  \256  \256  \056  \256  \256 \056"
-  .text "   Please insert a cartridge>   "
+  .text "\217   Retro 6k Fantasy Computer  \217"
 datasystext3:
-  .text "     Firmware version 1985b     "
-  .text " \2742019 Maggie David P>K> Haynes "
-defaultpalpage:
-  .text "This block  of text  is filler> "
-  .text "There  are one  hundred  ninety`"
-  .text "two  bytes of  filler  here  so "
-  .text "that the system default palette "
-  .text "will occupy positions  E0-FF of "
-  .text "a code page<  facilitating FVMC>"
+  .text "\260     Entertainment System\021    \260"
+datasystext4:
+  .text "         \031 Logo  here \020         "
+datasystext5:
+  .text "\056 \276\277 \200\201 \056  \016  \016  \016  \016  \056 \276\277 \200\201 \056"
+datasystext6:
+  .text "   Please insert a cartridge>   "
+datasystext7:
+  .text "     F\267\270\271ware version 1985c     "
+datasystext8:
+  .text "\0142019\14020 Maggie David \206\207\210 Haynes"
 datasyscolors:
-  .text " Barack Obama says trans rights!"
   .byte $00,$81,$84,$0D,$02,$83,$86,$0F
   .byte $D0,$59,$5C,$DD,$D2,$5B,$5E,$DF
   .byte $20,$A1,$A4,$2D,$22,$A3,$A6,$2F
   .byte $F0,$79,$7C,$FD,$F2,$7B,$7E,$FF
+
+  .org $FFF9
+nmicode: ; empty, because NMI not presently used
+  RTI
   
 ; 6502 program counter initialization vectors
   .org $FFFA
