@@ -16,7 +16,7 @@ I generate my cartridges by using [vasm](http://sun.hasenbraten.de/vasm/index.ph
 
 ## Compiling the Retro 6k Emulator from Source
 
-You'll need SDL2 headers and libraries, and if you're using MS Visual Studio, there are tutorials out there for setting up an SDL project. The source code uses C++17 standard library features, so make sure your development environment is up to date.
+Install the SDL2 binaries and development libraries for your system if you don't already have them. In Debian, that's the packages `libsdl2-2.0-0`, `libsdl2-dev`, and their dependencies. You'll need GCC/G++ version 8 or higher. Run the script `buildr6k` in the source root. If you move the compiled program elsewhere, copy or move the `.rom` and `.R6kCart` files with it.
 
 ## Binary Releases
 

@@ -104,6 +104,7 @@
 
 //#include <stdio.h> //unneeded? (MDPKH)
 #include <stdint.h>
+#include <stddef.h> //so gcc doesn't complain about NULL (MDPKH)
 
 //6502 defines
 #define UNDOCUMENTED //when this is defined, undocumented opcodes are handled.

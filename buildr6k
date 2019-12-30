@@ -1,0 +1,3 @@
+#!/bin/bash
+
+gcc -c fake6502.c -o fake6502.o && g++ -lSDL2 -lSDL2main -std=c++17 main.cpp -lstdc++fs fake6502.o -o r6k && echo "Build successful. Launch Retro 6k with ./r6k"

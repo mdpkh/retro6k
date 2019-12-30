@@ -5,11 +5,12 @@
 #include <random>
 #include <string>
 
-#include <SDL.h>
+#include <SDL2/SDL.h>
 
 #include "custombuild.h"
 #include "fake6502.h"
 #include "main.h"
+#include "strcpys.h"
 
 /*** SYSTEM GENERAL MEMORY: ***
 8-bit RAM:  0x0000-0x00FF (can be accessed faster than memory locations with higher addresses)
@@ -2002,7 +2003,7 @@ int InitEmulator()
 			PaintCell(x, y);
 		}
 	debuglog[debuglogstart].entrytype = dletype::LT_START;
-	hookexternal(LogStep);
+	hookexternal((void*)LogStep);
 	keypressregister = 0;
 	{
 		unsigned int uebase = SDL_RegisterEvents(1);
