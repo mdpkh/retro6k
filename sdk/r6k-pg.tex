@@ -430,23 +430,11 @@ The first ten bytes\,---\,that is, \texttt{2000-9}\,---\,of cartridge memory is 
 
 Immediately following the magic number, at \texttt{200E-F}, is where the CPU looks for the cartridge main program entry address. The 6502 CPU loads and stores addresses in little-endian format. The code to handle interrupts is assumed to begin at \texttt{2010}. If a cartridge does not use interrupts, this address should contain an \texttt{RTI} instruction. The main program entry point may be immediately after this, or it may be anywhere else in cartridge memory.
 
-\section{Cartridge Container File Format (For Emulation)}
-
-A file describing a Retro 6k cartridge should have a name ending with \texttt{.R6kCart}. The first eight bytes is a magic number, the literal byte sequence \texttt{47 A9 02 6A BB 47 F3 A7}. Following that is the offset (counting from the beginning of the file) to the Page Flags array as a 4-byte little-endian number, then the offset to the beginning of the ROM (or NVM) data contained within the cartridge.
-
-Beginning at offset \texttt{0010} is a sequence of extension data. The extension format has not been determined at this time, except that the byte sequence \texttt{00 00 00 00}, where an extension is expected to begin, indicates that there are no (more) extensions. Extensions will allow for the emulation of cartridges that have more than just memory chips connected directly to the system address \& data buses. Such additional features may include bank switching, a clock that tracks time when the cartridge is unpowered, a label image, and more..
-
-The Page Flags array is 160 bytes which describe what kind of memory, if any, serves each of the 160 pages (\texttt{20-BF}) of cartridge address space. The lowest two bits, taken together, have the following meaning: 0, no memory at this address; 1, read-only memory; 2, random-access memory; 3, non-volatile memory. Bit 2, if set, indicates that this page of memory is subject to bank switching. The upper five bits are not used at this time.
-
-Cartridge ROM and NVM data is stored in the file contiguously. Pages that are not marked as ROM or NVM in the Page Flags array are skipped. The contents of NVM pages, as presented in a cartridge file, represent the state of the cartridge before its first use; the Retro 6k emulator will not modify a cartridge file. Instead, data stored in emulated non-volatile cartridge memory is written to a separate file. Multiple such NVM files may be associated with a single cartridge file, representing multiple physical cartridges containing copies of the same software.
-
 \section{6502 Instruction Set}
 
 To be included here later. See \url{https://www.masswerk.at/6502/6502_instruction_set.html}.
 
 \section{Subroutines Provided By Firmware}
-
-
 
 \subsection{Byte To Decimal}
 
@@ -727,6 +715,17 @@ Compilers exist on modern computer systems that generate assembly code for 6502 
 \section{Interpreter Cartridges}
 
 No programming language interpreter cartridges exist at this time. For now, let's consider this a challenge for the reader.
+
+\chapter{Packaging Cartridges for Emulation}
+\section{Cartridge Container File Format}
+
+A file describing a Retro 6k cartridge should have a name ending with \texttt{.R6kCart}. The first eight bytes is a magic number, the literal byte sequence \texttt{47 A9 02 6A BB 47 F3 A7}. Following that is the offset (counting from the beginning of the file) to the Page Flags array as a 4-byte little-endian number, then the offset to the beginning of the ROM (or NVM) data contained within the cartridge.
+
+Beginning at offset \texttt{0010} is a sequence of extension data. The extension format has not been determined at this time, except that the byte sequence \texttt{00 00 00 00}, where an extension is expected to begin, indicates that there are no (more) extensions. Extensions will allow for the emulation of cartridges that have more than just memory chips connected directly to the system address \& data buses. Such additional features may include bank switching, a clock that tracks time when the cartridge is unpowered, a label image, and more..
+
+The Page Flags array is 160 bytes which describe what kind of memory, if any, serves each of the 160 pages (\texttt{20-BF}) of cartridge address space. The lowest two bits, taken together, have the following meaning: 0, no memory at this address; 1, read-only memory; 2, random-access memory; 3, non-volatile memory. Bit 2, if set, indicates that this page of memory is subject to bank switching. The upper five bits are not used at this time.
+
+Cartridge ROM and NVM data is stored in the file contiguously. Pages that are not marked as ROM or NVM in the Page Flags array are skipped. The contents of NVM pages, as presented in a cartridge file, represent the state of the cartridge before its first use; the Retro 6k emulator will not modify a cartridge file. Instead, data stored in emulated non-volatile cartridge memory is written to a separate file. Multiple such NVM files may be associated with a single cartridge file, representing multiple physical cartridges containing copies of the same software.
 
 \cleartoverso
 \pagestyle{empty}
