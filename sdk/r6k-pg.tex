@@ -1,5 +1,6 @@
 \documentclass[12pt]{{memoir}}
 \usepackage{graphicx}
+\usepackage[overlay]{textpos}
 \usepackage[hidelinks,pdfusetitle]{hyperref}
 \usepackage{longtable}
 \usepackage{xfrac}
@@ -105,6 +106,16 @@ The Retro 6k has four voices. Each can produce an independently-specified freque
 \section{User Input}
 
 The Retro 6k has a built-in keyboard, capable of producing 256 different characters. The computer also supports game pads for up to four players, and a pointing device or a pair of single-axis controllers.\footnote{As of emulator version \oldstylenums{0.1992}d, only keyboard input is supported.}
+
+\subsection{Reference Gamepad Layout}
+
+\setlength\TPHorizModule{.125in}
+\setlength\TPVertModule{.125in}
+\begin{center}
+\begin{textblock}{8}(18.5,9)\textsf{(Menu)}\end{textblock}
+\begin{textblock}{8}(29.5,12.5)\textsf{(Start)}\end{textblock}
+\includegraphics{gamepad}
+\end{center}
 
 \section{Peripheral Accessories}
 
@@ -501,7 +512,23 @@ The address range \texttt{0200-3F} is reserved for input from general peripheral
 
 \subsection{Game Pads}
 
-The Retro 6k supports four gamepads, each with eight buttons. Input from these game pads can be read from addresses \texttt{0240-3}.
+The Retro 6k supports four gamepads, each with ten buttons. Input from these game pads can be read from addresses \texttt{0240-3}. Each byte read represents the bitwise OR of codes representing all buttons currently pressed on a single gamepad.
+
+\nopagebreak\begin{center}\nopagebreak\begin{tabular}{>{\ttfamily}r>{\sffamily}l}
+\textrm{Code} & \textrm{Button} \\
+01 & 1 \\
+02 & 2 \\
+04 & X \\
+08 & Y \\
+10 & Right \\
+20 & Left \\
+40 & Up \\
+80 & Down \\
+30 & Start \\
+C0 & Menu \\
+\end{tabular}\nopagebreak\end{center}\nopagebreak
+
+Note, only one of \textsf{Right}, \textsf{Left}, \& \textsf{Start}, and only one of \textsf{Up}, \textsf{Down}, \& \textsf{Menu}, can be detected at any instant.
 
 \subsection{Keyboard Input}
 \label{ss:keyboard}

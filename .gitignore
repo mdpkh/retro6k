@@ -25,6 +25,8 @@
 **/*.pdf
 !/sdk/char??.pdf
 !/sdk/fvmc.pdf
+!/sdk/gamepad.pdf
+!/sdk/keyboard.pdf
 
 #assembler output in SDK folder
 /sdk/*.R6kCart
