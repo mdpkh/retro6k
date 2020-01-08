@@ -23,6 +23,7 @@
 **/*.synctex.gz
 **/*.toc
 **/*.pdf
+!/sdk/logolineart.pdf
 !/sdk/char??.pdf
 !/sdk/fvmc.pdf
 !/sdk/gamepad.pdf
