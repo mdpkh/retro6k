@@ -6,6 +6,8 @@
 \usepackage{xfrac}
 \usepackage[paperwidth=7.5in,paperheight=10.0in,top=.5in,bottom=.5in,left=.25in,right=.25in]{geometry}
 \newcommand\scsg[1]{\raisebox{-1.25pt}[8.75pt][1.25pt]{\includegraphics[height=10pt]{char#1}}}
+\newcommand\keycaps[1]{\raisebox{0in}[.2734375in][.1015625in]{\tiny\textsf{#1}}}
+\newcommand\keycapt[1]{\raisebox{0in}[.28125in][.09375in]{\texttt{#1}}}
 \interfootnotelinepenalty=10000
 \begin{document}
 \title{Retro 6k Programmer's Guide}
@@ -107,12 +109,108 @@ The Retro 6k has four voices. Each can produce an independently-specified freque
 
 The Retro 6k has a built-in keyboard, capable of producing 256 different characters. The computer also supports game pads for up to four players, and a pointing device or a pair of single-axis controllers.\footnote{As of emulator version \oldstylenums{0.1992}d, only keyboard input is supported.}
 
+\subsection{Built-In Keyboard Layout}
+
+\setlength\TPHorizModule{.03125in}
+\setlength\TPVertModule{.1875in}
+\nopagebreak\begin{center}\nopagebreak
+\begin{textblock}{12}(0,0)\keycaps{Esc}\end{textblock}
+\begin{textblock}{12}(20,0)\keycaps{F1}\end{textblock}
+\begin{textblock}{12}(32,0)\keycaps{F2}\end{textblock}
+\begin{textblock}{12}(44,0)\keycaps{F3}\end{textblock}
+\begin{textblock}{12}(56,0)\keycaps{F4}\end{textblock}
+\begin{textblock}{12}(76,0)\keycaps{F5}\end{textblock}
+\begin{textblock}{12}(88,0)\keycaps{F6}\end{textblock}
+\begin{textblock}{12}(100,0)\keycaps{F7}\end{textblock}
+\begin{textblock}{12}(112,0)\keycaps{F8}\end{textblock}
+\begin{textblock}{12}(132,0)\keycaps{F9}\end{textblock}
+\begin{textblock}{12}(144,0)\keycaps{F10}\end{textblock}
+\begin{textblock}{12}(156,0)\keycaps{F11}\end{textblock}
+\begin{textblock}{12}(168,0)\keycaps{F12}\end{textblock}
+\begin{textblock}{12}(188,0)\keycapt{7}\end{textblock}
+\begin{textblock}{12}(200,0)\keycapt{8}\end{textblock}
+\begin{textblock}{12}(212,0)\keycapt{9}\end{textblock}
+\begin{textblock}{12}(188,2)\keycapt{4}\end{textblock}
+\begin{textblock}{12}(200,2)\keycapt{5}\end{textblock}
+\begin{textblock}{12}(212,2)\keycapt{6}\end{textblock}
+\begin{textblock}{12}(188,4)\keycapt{1}\end{textblock}
+\begin{textblock}{12}(200,4)\keycapt{2}\end{textblock}
+\begin{textblock}{12}(212,4)\keycapt{3}\end{textblock}
+\begin{textblock}{24}(188,6)\keycapt{0}\end{textblock}
+\begin{textblock}{12}(212,6)\keycapt{.}\end{textblock}
+\begin{textblock}{12}(0,3)\keycapt{\`{}}\end{textblock}
+\begin{textblock}{12}(12,3)\keycapt{1}\end{textblock}
+\begin{textblock}{12}(24,3)\keycapt{2}\end{textblock}
+\begin{textblock}{12}(36,3)\keycapt{3}\end{textblock}
+\begin{textblock}{12}(48,3)\keycapt{4}\end{textblock}
+\begin{textblock}{12}(60,3)\keycapt{5}\end{textblock}
+\begin{textblock}{12}(72,3)\keycapt{6}\end{textblock}
+\begin{textblock}{12}(84,3)\keycapt{7}\end{textblock}
+\begin{textblock}{12}(96,3)\keycapt{8}\end{textblock}
+\begin{textblock}{12}(108,3)\keycapt{9}\end{textblock}
+\begin{textblock}{12}(120,3)\keycapt{0}\end{textblock}
+\begin{textblock}{12}(132,3)\keycapt{-}\end{textblock}
+\begin{textblock}{12}(144,3)\keycapt{=}\end{textblock}
+\begin{textblock}{12}(156,3)\keycaps{Bksp}\end{textblock}
+\begin{textblock}{12}(168,3)\keycaps{Del}\end{textblock}
+\begin{textblock}{18}(0,5)\keycaps{Tab}\end{textblock}
+\begin{textblock}{12}(18,5)\keycapt{Q}\end{textblock}
+\begin{textblock}{12}(30,5)\keycapt{W}\end{textblock}
+\begin{textblock}{12}(42,5)\keycapt{E}\end{textblock}
+\begin{textblock}{12}(54,5)\keycapt{R}\end{textblock}
+\begin{textblock}{12}(66,5)\keycapt{T}\end{textblock}
+\begin{textblock}{12}(78,5)\keycapt{Y}\end{textblock}
+\begin{textblock}{12}(90,5)\keycapt{U}\end{textblock}
+\begin{textblock}{12}(102,5)\keycapt{I}\end{textblock}
+\begin{textblock}{12}(114,5)\keycapt{O}\end{textblock}
+\begin{textblock}{12}(126,5)\keycapt{P}\end{textblock}
+\begin{textblock}{12}(138,5)\keycapt{[}\end{textblock}
+\begin{textblock}{12}(150,5)\keycapt{]}\end{textblock}
+\begin{textblock}{18}(162,5)\keycapt{\char`\\}\end{textblock}
+\begin{textblock}{18}(0,7)\keycaps{ShLock}\end{textblock}
+\begin{textblock}{12}(21,7)\keycapt{A}\end{textblock}
+\begin{textblock}{12}(33,7)\keycapt{S}\end{textblock}
+\begin{textblock}{12}(45,7)\keycapt{D}\end{textblock}
+\begin{textblock}{12}(57,7)\keycapt{F}\end{textblock}
+\begin{textblock}{12}(69,7)\keycapt{G}\end{textblock}
+\begin{textblock}{12}(81,7)\keycapt{H}\end{textblock}
+\begin{textblock}{12}(93,7)\keycapt{J}\end{textblock}
+\begin{textblock}{12}(105,7)\keycapt{K}\end{textblock}
+\begin{textblock}{12}(117,7)\keycapt{L}\end{textblock}
+\begin{textblock}{12}(129,7)\keycapt{;}\end{textblock}
+\begin{textblock}{12}(141,7)\keycapt{'}\end{textblock}
+\begin{textblock}{27}(153,7)\keycaps{Enter}\end{textblock}
+\begin{textblock}{27}(0,9)\keycaps{Shift}\end{textblock}
+\begin{textblock}{12}(27,9)\keycapt{Z}\end{textblock}
+\begin{textblock}{12}(39,9)\keycapt{X}\end{textblock}
+\begin{textblock}{12}(51,9)\keycapt{C}\end{textblock}
+\begin{textblock}{12}(63,9)\keycapt{V}\end{textblock}
+\begin{textblock}{12}(75,9)\keycapt{B}\end{textblock}
+\begin{textblock}{12}(87,9)\keycapt{N}\end{textblock}
+\begin{textblock}{12}(99,9)\keycapt{M}\end{textblock}
+\begin{textblock}{12}(111,9)\keycapt{,}\end{textblock}
+\begin{textblock}{12}(123,9)\keycapt{.}\end{textblock}
+\begin{textblock}{12}(135,9)\keycapt{/}\end{textblock}
+\begin{textblock}{33}(147,9)\keycaps{Shift}\end{textblock}
+\begin{textblock}{15}(0,11.5)\keycaps{Ctrl}\end{textblock}
+\begin{textblock}{15}(15,11.5)\keycaps{Alt}\end{textblock}
+\begin{textblock}{120}(30,11.5)\keycaps{Space}\end{textblock}
+\begin{textblock}{15}(150,11.5)\keycaps{Alt}\end{textblock}
+\begin{textblock}{15}(165,11.5)\keycaps{Ctrl}\end{textblock}
+\begin{textblock}{12}(200,10)\keycaps{Up}\end{textblock}
+\begin{textblock}{12}(188,12)\keycaps{Left}\end{textblock}
+\begin{textblock}{12}(200,12)\keycaps{Dn}\end{textblock}
+\begin{textblock}{12}(212,12)\keycaps{Rt}\end{textblock}
+\includegraphics[width=7in]{keyboard}
+\end{center}
+
+\pagebreak[4]
 \subsection{Reference Gamepad Layout}
 
 \setlength\TPHorizModule{.125in}
 \setlength\TPVertModule{.125in}
-\begin{center}
-\begin{textblock}{8}(18.5,9)\textsf{(Menu)}\end{textblock}
+\nopagebreak\begin{center}\nopagebreak
+\begin{textblock}{8}(18.5,8.75)\textsf{(Menu)}\end{textblock}
 \begin{textblock}{8}(29.5,12.5)\textsf{(Start)}\end{textblock}
 \includegraphics{gamepad}
 \end{center}
@@ -535,15 +633,16 @@ Note, only one of \textsf{Right}, \textsf{Left}, \& \textsf{Start}, and only one
 
 The primary means of taking keyboard input is to read from address \texttt{0244}. This address maps to a register that holds the SCE code of the character generated by the most recent keypress, taking modifier keys into account. This register is reset after a read operation, so the same keypress won't be read more than once. There is no buffering, so programs expecting keyboard input should poll this register faster than a user can be expected to type, otherwise inputs will be dropped.
 
-If software needs to determine which combination of actual keys were pressed, or detect the combinations \textsf{Shift+Space} or \textsf{Ctrl+}\texttt{-} which compose a null character, or detect modifier keys used alone, address \texttt{0245} should be read twice. This is the low-level keyboard interface. This address maps to a shift register, and indicates first which non-modifier key (if any) was pressed at last keystroke, then which modifier keys were used, if any.
+If software needs to determine which combination of actual keys were pressed, or detect the combinations \textsf{Shift+Space} or \textsf{Ctrl+}\texttt{-} which compose a null character, or detect modifier keys used alone, address \texttt{0245} should be read twice. This is the low-level keyboard interface. This address maps to a shift register, and indicates first which non-modifier key (if any) was pressed at last keystroke, then which modifier keys were used, if any.\footnote{As of emulator version \oldstylenums{0.2001}a, the low-level keyboard interface has not yet been implemented.}
 
 When a non-modifier key is pressed without any modifiers in use, the primary keyboard register is immediately loaded with the key's SCE code; the low-level shift register is immediately loaded with the first byte set to the key's SCE code, and the second byte set to zero. When a modifier key is pressed, the primary register is immediately cleared; the shift register is immediately loaded with the first byte set to zero, and the second byte set to indicate which modifier key(s) are currently being pressed. When a non-modifier key is pressed while one or more modifier keys are already being pressed, the primary register is immediately loaded with the combination's resulting SCE code; the shift register is loaded with the first byte set to indicate the non-modifier key that's just been pressed, and the second byte set to indicate which modifier key(s) are currently being pressed. When a modifier key is released, if the first byte of the shift register is zero, then the second byte of the shift register is set to indicate the modifier key that's just been released, additionally with bit 7 set to indicate the press and release of a modifier key with no non-modifier key has occurred. (Bit 7 of the second shift register byte can also mean that a modifier key which was pressed during the previous read of the shift register has been released.)
 
 \begin{center}\begin{tabular}{ccc}
-Modifier key & Flag bit & SCE XOR effect \\
+Modifier & Flag bit & SCE XOR effect \\
 \textsf{Shift} & 0 & \texttt{20} \\
 \textsf{Ctrl} & 1 & \texttt{60} \\
 \textsf{Alt} & 2 & \texttt{80} \\
+(Numpad) & 7 & \texttt{00} \\
 \end{tabular}\end{center}
 
 Some software may benefit from allowing the user to type any of the 256 available graphical characters. However, SCE codes \texttt{01}, \texttt{07}, \texttt{08}, \texttt{09}, \texttt{0A}, \texttt{0D}, \texttt{0F}, and \texttt{7F} should normally be interpreted as special keys that should not result in a specific character appearing on the screen. Furthermore, SCE codes \texttt{21-2C} represent the function keys, which may indicate software-specific actions to be taken. The recommended remedy is to treat the \textsf{Esc} key as an indication that the next key pressed should be interpreted as a graphic character entry instead of its usual non-graphic meaning. The sequence \textsf{Esc}, \texttt{0} may be interpreted as entry of graphic character \texttt{00}.
