@@ -2,12 +2,85 @@
 \usepackage{graphicx}
 \usepackage[overlay]{textpos}
 \usepackage[hidelinks,pdfusetitle]{hyperref}
+\usepackage{amsmath}
 \usepackage{longtable}
+\usepackage{pbox}
 \usepackage{xfrac}
 \usepackage[paperwidth=7.5in,paperheight=10.0in,top=.5in,bottom=.5in,left=.25in,right=.25in]{geometry}
 \newcommand\scsg[1]{\raisebox{-1.25pt}[8.75pt][1.25pt]{\includegraphics[height=10pt]{char#1}}}
+
 \newcommand\keycaps[1]{\raisebox{0in}[.2734375in][.1015625in]{\tiny\textsf{#1}}}
+
 \newcommand\keycapt[1]{\raisebox{0in}[.28125in][.09375in]{\texttt{#1}}}
+
+\newcommand\Hline{%
+\hline\raisebox{0pt}[1.125em]{}}
+
+\newcommand\opdoc[5]{%
+\filbreak\subsubsection{\texttt{\large#1} \textmd{\textit{#2}}}
+\par#3\par
+\begin{center}
+#4#5
+\end{center}}
+
+\newcommand\flageffects[8]{%
+\begin{tabular}[t]{cccccc}
+\ifx&#1&%
+  \empty
+\else
+  \multicolumn{6}{c}{\hspace*{-1em}#1\hspace*{-1em}} \\
+  \Hline
+\fi
+\,N\, & \,V\, & \,D\, & \,I\, & \,Z\, & \,C\, \\
+#2 & #3 & #4 & #5 & #6 & #7 \\
+\ifx&#8&%
+  \empty
+\else%
+  \multicolumn{6}{c}{#8} \\
+\fi
+\end{tabular}\hspace{1em}}
+
+\newcommand\opeffects[8]{%
+\ifx&#2&%
+  \ifx&#3&%
+    \ifx&#4&%
+      \ifx&#5&%
+        \ifx&#6&%
+          \ifx&#7&%
+            {#1}\hspace{1em}
+          \else
+            \flageffects{#1}{#2}{#3}{#4}{#5}{#6}{#7}{#8}
+          \fi
+        \else
+          \flageffects{#1}{#2}{#3}{#4}{#5}{#6}{#7}{#8}
+        \fi
+      \else
+        \flageffects{#1}{#2}{#3}{#4}{#5}{#6}{#7}{#8}
+      \fi
+    \else
+      \flageffects{#1}{#2}{#3}{#4}{#5}{#6}{#7}{#8}
+    \fi
+  \else
+    \flageffects{#1}{#2}{#3}{#4}{#5}{#6}{#7}{#8}
+  \fi
+\else
+  \flageffects{#1}{#2}{#3}{#4}{#5}{#6}{#7}{#8}
+\fi
+}
+
+\newcommand\opctable[1]{%
+\begin{tabular}[t]{l>{\ttfamily}l>{\ttfamily}ccc}
+Addressing & \textrm{Asm syntax} & \textrm{Opcode} & Bytes & Cycles \\
+#1
+\end{tabular}}
+
+\newcommand\fwsubroutinehdr[1]{%
+\filbreak
+\subsubsection{#1}}
+
+\newcommand\opcrow[5]{%
+#1 & #2 & #3 & #4 & #5\\}
+
 \interfootnotelinepenalty=10000
 \begin{document}
 \title{Retro 6k Programmer's Guide}
@@ -48,14 +121,16 @@ harder for people like me?\par
 Usually, byte values are written in hexadecimal with two digits, in monospaced type: \texttt{0F}. Addresses are written similarly but with four digits: \texttt{05AF}. A range of addresses is written with four digits indicating the start of the range, and the end of the range (interpreted inclusively) beginning with the most significant differing digit: \texttt{3680-BF}. Selected bits of a byte value may be represented in binary with a subscript letter b: $\texttt{10}_b$; or in hexadecimal as a full byte value with the irrelevant bits as zero and no leading zero: \texttt{7}. In math formul\ae, hexadecimal numbers are written in monospaced type with a subscript letter h: $\texttt{5A}_h$; some numbers in formul\ae may be written in binary for clarity, in monospaced type with a subscript letter b: $\texttt{110}_b$. Unicode codepoints are written in hexadecimal with as many digits as necessary and no leading zeroes, in monospaced type: \texttt{1F9D2}. In assembly source listings, hexadecimal numbers are prefixed by a dollar sign: \texttt{\$0FE1}.
 
 \subsection{Symbols Used in Math Formul\ae}
+\label{mathsym}
 
 \begin{center}\begin{tabular}{cl}
 Sym & Meaning \\
-\hline
-\raisebox{0pt}[1.125em]{$\lnot{}$} & Bitwise Not\hspace{\stretch{1}}(highest precedence) \\
+\Hline
+$\lnot{}$ & Bitwise Not\hspace{\stretch{1}}(highest precedence) \\
 $\ll$ & Bit Shift Left \\
 $\gg$ & Bit Shift Right \\
-$\wedge$ & Bitwise And\hspace{\stretch{2}}\raisebox{0pt}[0pt][0pt]{$\vdots$}\hspace*{\stretch{1}}\\
+$\wedge$ & Bitwise And\hspace{\stretch{2}}\raisebox{-.633em}[0pt][0pt]{$\vdots$}\hspace*{\stretch{1}}\\
+$\oplus$ & Bitwise Exclusive-Or \\
 $\vee$ & Bitwise Or \\
 $\times$ & Multiply \\
 $+$ & Add (with carry)\hspace{\stretch{1}}(lowest precedence) \\
@@ -78,8 +153,7 @@ $Y$ & Pixel row (within glyph) \\
 
 \begin{center}\begin{tabular}{cl}
 Sym & Flag name \\
-\hline
-\raisebox{0pt}[1.125em]{B} & Break \\
+\Hline
 C & Carry (compliment Borrow) \\
 D & Decimal \\
 I & Interrupt disable \\
@@ -540,15 +614,699 @@ FF & 221E & \scsg{ff} & Infinity & \textsf{Alt+Del}, \textsf{Alt+Ctrl+Shift+}\te
 
 The first ten bytes\,---\,that is, \texttt{2000-9}\,---\,of cartridge memory is used to identify the cartridge. It can contain any byte values, but it's recommended to be a human-readable string, padded with spaces if necessary, in the Stock Character Encoding. Immediately following that, at addresses \texttt{200A-D}, must be the cartridge ``magic number'', which is a literal byte sequence \texttt{47 A9 0C 1E}. If these byte values are not found at this address, the Retro 6k will not run the cartridge code.
 
-Immediately following the magic number, at \texttt{200E-F}, is where the CPU looks for the cartridge main program entry address. The 6502 CPU loads and stores addresses in little-endian format. The code to handle interrupts is assumed to begin at \texttt{2010}. If a cartridge does not use interrupts, this address should contain an \texttt{RTI} instruction. The main program entry point may be immediately after this, or it may be anywhere else in cartridge memory.
+Immediately following the magic number, at \texttt{200E-F}, is where the CPU looks for the cartridge main program entry address. The 6502 CPU loads and stores addresses in little-endian format. The code to handle interrupts is assumed to begin at \texttt{2010}. If a cartridge does not use interrupts, this address should contain an \texttt{RTI} instruction (see page \pageref{inst:rti}). The main program entry point may be immediately after this, or it may be anywhere else in cartridge memory.
 
-\section{6502 Instruction Set}
+\section{6502 Assembly Programming}
 
-To be included here later. See \url{https://www.masswerk.at/6502/6502_instruction_set.html}.
+\subsection{Effects Notation}
+While the documentation for most instructions contains a plain English description of what they do, the effects of all instructions (except for \texttt{NOP}) are arranged into a table that looks something like this:
+
+\nopagebreak\begin{center}\nopagebreak\opeffects{$M + \text{C} \to A$}
+{$\uparrow$}{1}{$M_3$}{}{$\uparrow$}{0}
+{$A \oplus M$}\end{center}
+
+Everything above the horizontal line if present, or the entire effect notation if no flag changes are specified, describes values that are stored in registers or memory. In this example, the value of the Carry flag is added to the value read from memory (according to the operand following the instruction in code and the instruction's address mode) and the result of that addition is stored in the accumulator register.
+
+The line N\,V\,D\,I\,Z\,C, if present, indicates that one or more flags are affected by the instruction, and the line below it indicates the specific effect on each flag. A 1 or 0 indicates the flag is set or cleared, respectively; in the above example, the Overflow flag is set and the Carry flag is cleared. Other expressions are possible; in the above example, the Decimal flag is set to the value of bit 3 of the value of $M$. An up-arrow symbol indicates the flag is set according to the value of the expression, or the conditions of the operation, found on the line below: the Negative flag is set according to the most-significant bit of the value of the expression; the Zero flag is set if the expression evaluates to zero; the Carry flag is set if the specified operation results in a carry (or an unsigned 8-bit overflow); and the Overflow flag is set if the specified operation results in a value that doesn't fit in a signed 8-bit register\footnote{See \url{http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html}.}. Values in the bottom expression are to be read as their state before any changes to registers or memory that may be specified. In the above example, the Negative flag is set if the exclusive-or of the accumulator and the value of $M$ has its most-significant bit set, and the Zero flag is set if the accumulator and the value of $M$ are equal (because any value exclusive-orred with itself is zero).
+Note, while an instruction with effects as in the above example may have obscure uses, it does not exist in the 6502 instruction set.
+
+\subsubsection{Symbols Used in Effects Notation}
+
+In addition to (and in some cases instead of) the symbols defined on page \pageref{mathsym}, the following symbols are used here:
+
+\begin{center}\begin{tabular}{cl}
+Sym & Meaning \\
+\Hline
+$A$ & Accumulator register \\
+$L$ & A memory address \\
+$M$ & Memory location (or a literal value, in immediate addressing mode) \\
+$M_n$ & The nth bit of value $M$, where 0 is least-significant \\
+PC & Program counter (16-bit) register \\
+SP & Stack pointer register \\
+SR & Processor status register (expressed in byte form as $\mathrm{NV10DIZC}_b$) \\
+$X$ & Index register X \\
+$Y$ & Index register Y \\
+$\to$ & A value (from the left) is stored in a location (to the right) \\
+$\textbf{Stack} \Rightarrow$ & A value is popped from the stack and stored in a location (to the right) \\
+$\textbf{Stack} \Leftarrow$ & A value (from the right) is pushed onto the stack \\
+\end{tabular}\end{center}
+
+\subsection{Addressing Modes}
+\newcommand\pbf{\textsuperscript{\ref{idxpagebdyfootnote}}}
+
+\subsubsection{Accumulator}
+$M$ refers to the accumulator register.
+
+\subsubsection{Absolute}
+$M$ refers to the location in memory whose address is the two-byte operand of the instruction (which may be an expression such as a label in the assembly code source, but is evaluated and written as a literal by the assembler). Some assemblers automatically assemble a zeropage instruction instead of an absolute instruction if the operand is a literal address less than \texttt{\$0100}.
+
+\subsubsection{Absolute, X-indexed}
+$M$ refers to the location in memory whose address is the two-byte operand of the instruction, offset by the value of the index register X.\pbf
+
+\subsubsection{Absolute, Y-indexed}
+$M$ refers to the location in memory whose address is the two-byte operand of the instruction, offset by the value of the index register Y.\pbf
+
+\subsubsection{Immediate}
+$M$ refers to the literal value in the single-byte operand of the instruction.
+
+\subsubsection{Implied}
+The instruction has no operand in the code. $M$ is meaningless unless it is otherwise defined in the description of the instruction.
+
+\subsubsection{Indirect}
+The CPU will read the two-byte operand of the instruction ($L_L$ and $L_H$), then the two bytes in memory at addresses $L_H \ll 8 \vee L_L$ and $L_H \ll 8 \vee (L_L + 1) \wedge \texttt{FF}_h$ (see note\footnote{This is the (NMOS) 6502 ``\texttt{JMP (\$xxFF)},'' or ``wrap-around,'' bug. The (CMOS) 65C02, W65C802, and W65C816S chips based on the 6502 do not share this bug.}); $M$ refers to the location in memory whose address has just been read in little-endian order.
+
+\subsubsection{X-Indexed, Indirect}
+The CPU will read the single-byte operand $L$ of the instruction, then two bytes from zeropage memory: first the byte at $(L + X) \wedge \texttt{FF}_h$, then the byte at $(L + X + 1) \wedge \texttt{FF}_h$. $M$ refers to the location in memory whose address has just been read in little-endian order. Some programmers may refer to this addressing mode as \texttt{(zp,X)}.
+
+\subsubsection{Indirect, Y-Indexed}
+The CPU will read the single-byte operand $L$ of the instruction, then two bytes from zeropage memory: first the byte at $L$, then the byte at $(L + 1) \wedge \texttt{FF}_h$. The CPU then adds the value of the Y register to the 16-bit little-endian value it just read from zeropage memory; $M$ refers to the location in memory whose address is that sum. Some programmers may refer to this addressing mode as \texttt{(zp),Y}.\footnote{\label{idxpagebdyfootnote}In absolute indexed and indirect indexed addressing modes, if adding the index to the specified address causes a carry which changes the high address byte, an extra clock cycle is consumed.}
+
+\subsubsection{Relative}
+$M$ refers to the literal signed 8-bit value in the operand of the instruction, which is a relative branch target. Typically this will be expressed as an absolute address, or a label, in the assembly source code, but the assembler will convert it to a literal relative value when assembling the code.\footnote{\label{relpagebdyfootnote}Similarly as in indexed addressing modes, if adding the operand to the program counter causes a carry which changes the high byte of the program counter, an extra clock cycle is consumed.}
+
+\subsubsection{Zeropage}
+$M$ refers to the location in zeropage memory whose address is the single-byte operand of the instruction (which may be an expression such as a label in the assembly code source, but is evaluated and written as a literal by the assembler). Some assemblers automatically assemble a zeropage instruction instead of an absolute instruction if the operand is an address less than \texttt{\$0100}; some assemblers will assemble a zeropage instruction if the operand is preceeded by an asterisk.
+
+\subsubsection{Zeropage, X-Indexed}
+The CPU will read the single-byte operand $L$ of the instruction, then $M$ refers to the location in zeropage memory whose address is $(L + X) \wedge \texttt{FF}_h$. Not to be confused with the X-indexed, indirect addressing mode which is sometimes written as \texttt{(zp,X)}.
+
+\subsubsection{Zeropage, Y-Indexed}
+The CPU will read the single-byte operand $L$ of the instruction, then $M$ refers to the location in zeropage memory whose address is $(L + X) \wedge \texttt{FF}_h$. Not to be confused with the indirect, Y-indexed addressing mode which is sometimes written as \texttt{(zp),Y}.
+
+\newpage
+\subsection{Instruction Set Reference}
+\newcommand\bpf{\textsuperscript{\ref{brpnyfootnote}}}
+
+\opdoc{ADC}{Add to Accumulator with Carry}
+{The specified value is added to the accumulator, potentially also incorporating a carry from a previous add operation. If the Decimal flag is set, the addends are treated as binary-coded-decimal values, and the result is stored in binary-coded-decimal format. See also \texttt{CLC}, page \pageref{inst:clc}.}
+{\opeffects{$A + M + C \to A$}
+{$\uparrow$}{$\uparrow$}{}{}{$\uparrow$}{$\uparrow$}
+{$A + (M + C)$}}
+{\opctable{
+\opcrow{immidiate}{ADC \#lit}{69}{2}{2}
+\opcrow{zeropage}{ADC loc}{65}{2}{3}
+\opcrow{zeropage, X}{ADC loc,X}{75}{2}{4}
+\opcrow{absolute}{ADC loc}{6D}{3}{4}
+\opcrow{absolute, X}{ADC loc,X}{7D}{3}{4 (note\pbf)}
+\opcrow{absolute, Y}{ADC loc,Y}{79}{3}{4 (note\pbf)}
+\opcrow{X, indirect}{ADC (ptr,X)}{61}{2}{6}
+\opcrow{indirect, Y}{ADC (ptr),Y}{71}{2}{5 (note\pbf)}
+}}
+
+\opdoc{AND}{Bitwise-And with Accumulator}
+{The specified value is combined with the accumulator in a bitwise-and operation, and the result is saved in the accumulator.}
+{\opeffects{$A \vee M \to A$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{$A \vee M$}}
+{\opctable{
+\opcrow{immidiate}{AND \#lit}{29}{2}{2}
+\opcrow{zeropage}{AND loc}{25}{2}{3}
+\opcrow{zeropage, X}{AND loc,X}{35}{2}{4}
+\opcrow{absolute}{AND loc}{2D}{3}{4}
+\opcrow{absolute, X}{AND loc,X}{3D}{3}{4 (note\pbf)}
+\opcrow{absolute, Y}{AND loc,Y}{39}{3}{4 (note\pbf)}
+\opcrow{X, indirect}{AND (ptr,X)}{21}{2}{6}
+\opcrow{indirect, Y}{AND (ptr),Y}{31}{2}{5 (note\pbf)}
+}}
+
+\opdoc{ASL}{Arithmetic Shift Left One Bit (Memory / Accumulator)}
+{A value is read from the accumulator or a memory location, shifted left one bit, and stored back where it was read from. The least-significant bit is set to zero, and the original value of the most-significant bit is saved in the Carry flag. This is effectively a multiply-by-two operation; however, it doesn't observe the Decimal flag, so it won't correctly double a binary-coded-decimal value. Useful for testing multiple bits of a value in turn, from most-significant to least-significant.}
+{\opeffects{$(M \wedge \texttt{7F}_h) \ll 1 \to M$}
+{$M_6$}{}{}{}{$\uparrow$}{$M_7$}
+{$(M \wedge \texttt{7F}_h)$}}
+{\opctable{
+\opcrow{accumulator}{ASL A}{0A}{1}{2}
+\opcrow{zeropage}{ASL loc}{06}{2}{5}
+\opcrow{zeropage, X}{ASL loc,X}{16}{2}{6}
+\opcrow{absolute}{ASL loc}{0E}{3}{6}
+\opcrow{absolute, X}{ASL loc,X}{1E}{3}{7}
+}}
+
+\opdoc{BCC}{Branch on Carry Clear / Compare Less Than / Borrow}
+{If the Carry flag is clear, such as after an addition that didn't cause a carry, or after a subtraction that caused a borrow, program execution jumps to the specified location; otherwise, program execution continues with code following the branch instruction.}
+{\opeffects{If $\text{C} = 0$, $\text{PC} + M \to \text{PC}$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{relative}{BCC loc}{90}{2}{2 (note\bpf)}
+}}
+
+\opdoc{BCS}{Branch on Carry Set / Compare Greater Than or Equal To / No Borrow}
+{If the Carry flag is set, such as after an addition that caused a carry, or after a subtraction that didn't cause a borrow, program execution jumps to the specified location; otherwise, program execution continues with code following the branch instruction.}
+{\opeffects{If $\text{C} = 1$, $\text{PC} + M \to \text{PC}$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{relative}{BCS loc}{B0}{2}{2 (note\bpf)}
+}}
+
+\opdoc{BEQ}{Branch on Zero Set / Result Zero / Compare Equal}
+{If the Zero flag is set, such as after loading a zero value, comparing equal values, or computing an operation with a zero result, program execution jumps to the specified location; otherwise, program execution continues with code following the branch instruction.}
+{\opeffects{If $\text{Z} = 1$, $\text{PC} + M \to \text{PC}$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{relative}{BEQ loc}{F0}{2}{2 (note\bpf)}
+}}
+
+\opdoc{BIT}{Test Bits in Memory with Accumulator}
+{Bits 7 and 6 of operand are transfered to bit 7 and 6 of Status Register (Negative and Overflow flags); the Zero flag is set according to whether the result of bitwise-anding the operand and accumulator is zero. Sometimes this instruction is used (or misused) to skip one or two (depending on the addressing mode) following bytes of code.}
+{\opeffects{}
+{$M_7$}{$M_6$}{}{}{$\uparrow$}{}
+{$A \wedge M$}}
+{\opctable{
+\opcrow{zeropage}{BIT loc}{24}{2}{3}
+\opcrow{absolute}{BIT loc}{2C}{3}{4}
+}}
+
+\opdoc{BMI}{Branch on Negative Set / Result Minus}
+{If the Negative flag is set, such as after loading or computing a negative value (or any byte with a 1 in its most-significant bit), program execution jumps to the specified location; otherwise, program execution continues with code following the branch instruction.}
+{\opeffects{If $\text{N} = 1$, $\text{PC} + M \to \text{PC}$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{relative}{BMI loc}{30}{2}{2 (note\bpf)}
+}}
+
+\opdoc{BNE}{Branch on Zero Clear / Result Not Zero / Compare Not Equal}
+{If the Zero flag is set, such as after loading a nonzero value, comparing inequal values, or computing an operation with a nonzero result, program execution jumps to the specified location; otherwise, program execution continues with code following the branch instruction.}
+{\opeffects{If $\text{Z} = 0$, $\text{PC} + M \to \text{PC}$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{relative}{BNE loc}{D0}{2}{2 (note\bpf)}
+}}
+
+\opdoc{BPL}{Branch on Negative Clear / Result Positive or Zero}
+{If the Negative flag is clear, such as after loading or computing a zero or positive value (or any byte with a 0 in its most-significant bit), program execution jumps to the specified location; otherwise, program execution continues with code following the branch instruction.}
+{\opeffects{If $\text{N} = 0$, $\text{PC} + M \to \text{PC}$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{relative}{BPL loc}{10}{2}{2 (note\bpf)}
+}}
+
+\opdoc{BRK}{Force Break}
+{The CPU proceeds as if an interrupt had been triggered. The program counter (pointing to the next instruction \emph{after} a skipped byte) and the a byte representing the state of the status register are pushed onto the stack. The Interrupt-disable flag is set, to prevent further interrupts from being triggered while this simulated interrupt is being handled. Unlike an externally-triggered interrupt, bit 4 is set in the saved status register byte. See also \texttt{RTI}, page \pageref{inst:rti}.}
+{\opeffects{\pbox[t]{12em}{$\textbf{Stack} \Leftarrow \text{PC} + 1$;\\
+$\textbf{Stack} \Leftarrow \text{SR} \vee \texttt{30}_h$;\\
+$(\texttt{FFFE-F}_h) \to \text{PC}\raisebox{0pt}[0pt][.333em]{}$}}
+{}{}{}{1}{}{}
+{}}
+{\opctable{
+\opcrow{implied}{BRK}{00}{1}{7}
+}}
+
+\opdoc{BVC}{Branch on Overflow Clear}
+{If the Overflow flag is clear, such as after computing an operation that results in a signed 8-bit value without overflowing, program execution jumps to the specified location; otherwise, program execution continues with code following the branch instruction.}
+{\opeffects{If $\text{V} = 0$, $\text{PC} + M \to \text{PC}$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{relative}{BVC loc}{50}{2}{2 (note\bpf)}
+}}
+
+\opdoc{BVS}{Branch on Overflow Set}
+{If the Overflow flag is set, such as after computing an operation that results in a value that can't be represented as a signed 8-bit number, program execution jumps to the specified location; otherwise, program execution continues with code following the branch instruction.}
+{\opeffects{If $\text{V} = 1$, $\text{PC} + M \to \text{PC}$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{relative}{BVC loc}{70}{2}{2 (note\footnotemark)}
+}}\footnotetext{\label{brpnyfootnote}If the branch is taken, an additional clock cycle is consumed. Furthermore, if taking the branch crosses a page boundary (changes the upper byte of the program counter), another additional clock cycle is consumed.}
+
+\opdoc{CLC}{Clear Carry Flag}
+{\label{inst:clc}The Carry flag is cleared. Useful in preparation for an add instruction.}
+{\opeffects{}
+{}{}{}{}{}{0}
+{}}
+{\opctable{
+\opcrow{implied}{CLC}{18}{1}{2}
+}}
+
+\opdoc{CLD}{Clear Decimal Flag}
+{The Decimal flag is cleared. Useful after performing arithmetic on binary-coded-decimal numbers.}
+{\opeffects{}
+{}{}{0}{}{}{}
+{}}
+{\opctable{
+\opcrow{implied}{CLD}{D8}{1}{2}
+}}
+
+\opdoc{CLI}{Clear Interrupt Disable Bit / Enable Interrupts}
+{}
+{\opeffects{}
+{}{}{}{0}{}{}
+{}}
+{\opctable{
+\opcrow{implied}{CLI}{58}{1}{2}
+}}
+
+\opdoc{CLV}{Clear Overflow Flag}
+{}
+{\opeffects{}
+{}{0}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{implied}{CLV}{B8}{1}{2}
+}}
+
+\opdoc{CMP}{Compare with Accumulator}
+{The Negative, Zero, and Carry flags are set as if after the result of a subtraction (with the Carry flag set and the Decimal flag clear) of the specified value from the accumulator, but the full result of that subtraction is not saved anywhere. The Zero flag is set if $A = M$, or cleared otherwise. The Carry flag is set if $A \geq M$, or cleared otherwise. The Negative flag is set if $-128 + M \leq A < M$ or $A \geq 128 + M$, or cleared otherwise.}
+{\opeffects{}
+{$\uparrow$}{}{}{}{$\uparrow$}{$\uparrow$}
+{$A - M$}}
+{\opctable{
+\opcrow{immidiate}{CMP \#lit}{C9}{2}{2}
+\opcrow{zeropage}{CMP loc}{C5}{2}{3}
+\opcrow{zeropage, X}{CMP loc,X}{D5}{2}{4}
+\opcrow{absolute}{CMP loc}{CD}{3}{4}
+\opcrow{absolute, X}{CMP loc,X}{DD}{3}{4 (note\pbf)}
+\opcrow{absolute, Y}{CMP loc,Y}{D9}{3}{4 (note\pbf)}
+\opcrow{X, indirect}{CMP (ptr,X)}{C1}{2}{6}
+\opcrow{indirect, Y}{CMP (ptr),Y}{D1}{2}{5 (note\pbf)}
+}}
+
+\opdoc{CPX}{Compare with Index X}
+{The Negative, Zero, and Carry flags are set as if after the result of a subtraction (with the Carry flag set and the Decimal flag clear) of the specified value from the index register X, but the full result of that subtraction is not saved anywhere. The Zero flag is set if $X = M$, or cleared otherwise. The Carry flag is set if $X \geq M$, or cleared otherwise. The Negative flag is set if $-128 + M \leq X < M$ or $X \geq 128 + M$, or cleared otherwise.}
+{\opeffects{}
+{$\uparrow$}{}{}{}{$\uparrow$}{$\uparrow$}
+{$X - M$}}
+{\opctable{
+\opcrow{immidiate}{CPX \#lit}{E0}{2}{2}
+\opcrow{zeropage}{CPX loc}{E4}{2}{3}
+\opcrow{absolute}{CPX loc}{EC}{3}{4}
+}}
+
+\opdoc{CPY}{Compare with Index Y}
+{The Negative, Zero, and Carry flags are set as if after the result of a subtraction (with the Carry flag set and the Decimal flag clear) of the specified value from the index register Y, but the full result of that subtraction is not saved anywhere. The Zero flag is set if $Y = M$, or cleared otherwise. The Carry flag is set if $Y \geq M$, or cleared otherwise. The Negative flag is set if $-128 + M \leq Y < M$ or $Y \geq 128 + M$, or cleared otherwise.}
+{\opeffects{}
+{$\uparrow$}{}{}{}{$\uparrow$}{$\uparrow$}
+{$Y - M$}}
+{\opctable{
+\opcrow{immidiate}{CPY \#lit}{C0}{2}{2}
+\opcrow{zeropage}{CPY loc}{C4}{2}{3}
+\opcrow{absolute}{CPY loc}{CC}{3}{4}
+}}
+
+\opdoc{DEC}{Decrement Memory by One}
+{A value is read from the a memory location, decremented by one, and stored back where it was read from. This instruction doesn't observe the Decimal flag, so it won't correctly decrement a binary-coded-decimal value. This instruction doen't affect the Overflow or Carry flags; if unsigned rollover or borrow needs to be detected, check whether the value is zero before decrementing.}
+{\opeffects{$M - 1 \to M$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{$M - 1$}}
+{\opctable{
+\opcrow{zeropage}{DEC loc}{C6}{2}{5}
+\opcrow{zeropage, X}{DEC loc,X}{D6}{2}{6}
+\opcrow{absolute}{DEC loc}{CE}{3}{6}
+\opcrow{absolute, X}{DEC loc,X}{DE}{3}{7}
+}}
+
+\opdoc{DEX}{Decrement Index X by One}
+{The index register X is decremented by one. This instruction doesn't observe the Decimal flag, so it won't correctly decrement a binary-coded-decimal value. This instruction doesn't affect the Overflow or Carry flags; if unsigned rollover or borrow needs to be detected, check whether the value is zero before decrementing.}
+{\opeffects{$X - 1 \to X$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{$X - 1$}}
+{\opctable{
+\opcrow{implied}{DEX}{CA}{1}{2}
+}}
+
+\opdoc{DEY}{Decrement Index Y by One}
+{The index register Y is decremented by one. This instruction doesn't observe the Decimal flag, so it won't correctly decrement a binary-coded-decimal value. This instruction doen't affect the Overflow or Carry flags; if unsigned rollover or borrow needs to be detected, check whether the value is zero before decrementing.}
+{\opeffects{$Y - 1 \to Y$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{$Y - 1$}}
+{\opctable{
+\opcrow{implied}{DEY}{88}{1}{2}
+}}
+
+\opdoc{EOR}{Bitwise-Exclusive-Or with Accumulator}
+{The specified value is combined with the accumulator in a bitwise-exclusive-or operation, and the result is saved in the accumulator.}
+{\opeffects{$A \oplus M \to A$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{$A \oplus M$}}
+{\opctable{
+\opcrow{immidiate}{EOR \#lit}{49}{2}{2}
+\opcrow{zeropage}{EOR loc}{45}{2}{3}
+\opcrow{zeropage, X}{EOR loc,X}{55}{2}{4}
+\opcrow{absolute}{EOR loc}{4D}{3}{4}
+\opcrow{absolute, X}{EOR loc,X}{5D}{3}{4 (note\pbf)}
+\opcrow{absolute, Y}{EOR loc,Y}{59}{3}{4 (note\pbf)}
+\opcrow{X, indirect}{EOR (ptr,X)}{41}{2}{6}
+\opcrow{indirect, Y}{EOR (ptr),Y}{51}{2}{5 (note\pbf)}
+}}
+
+\opdoc{INC}{Increment Memory by One}
+{A value is read from the a memory location, incremented by one, and stored back where it was read from. This instruction doesn't observe the Decimal flag, so it won't correctly increment a binary-coded-decimal value. This instruction doesn't affect the Overflow or Carry flags; if unsigned rollover or carry needs to be detected, check the Zero flag after incrementing.}
+{\opeffects{$M + 1 \to M$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{$M + 1$}}
+{\opctable{
+\opcrow{zeropage}{INC loc}{E6}{2}{5}
+\opcrow{zeropage, X}{INC loc,X}{F6}{2}{6}
+\opcrow{absolute}{INC loc}{EE}{3}{6}
+\opcrow{absolute, X}{INC loc,X}{FE}{3}{7}
+}}
+
+\opdoc{INX}{Increment Index X by One}
+{The index register X is incremented by one. This instruction doesn't observe the Decimal flag, so it won't correctly increment a binary-coded-decimal value. This instruction doesn't affect the Overflow or Carry flags; if unsigned rollover or carry needs to be detected, check the Zero flag after incrementing.}
+{\opeffects{$X + 1 \to X$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{$X + 1$}}
+{\opctable{
+\opcrow{implied}{INX}{E8}{1}{2}
+}}
+
+\opdoc{INY}{Increment Index Y by One}
+{The index register Y is incremented by one. This instruction doesn't observe the Decimal flag, so it won't correctly increment a binary-coded-decimal value. This instruction doesn't affect the Overflow or Carry flags; if unsigned rollover or carry needs to be detected, check the Zero flag after incrementing.}
+{\opeffects{$Y + 1 \to Y$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{$Y + 1$}}
+{\opctable{
+\opcrow{implied}{INY}{C8}{1}{2}
+}}
+
+\opdoc{JMP}{Jump to New Location}
+{Program execution jumps to the specified location. The computer forgets where it jumped from.}
+{\opeffects{$M \to \text{PC}$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{absolute}{JMP loc}{4C}{3}{3}
+\opcrow{indirect}{JMP (ptr)}{6C}{3}{5}
+}}
+
+\opdoc{JSR}{Jump to Subroutine, Saving Return Address}
+{\label{inst:jsr}The program counter (pointing to the \emph{next} instruction) is pushed onto the stack, and then program execution jumps to the specified location. See also \texttt{RTS}, page \pageref{inst:rts}.}
+{\opeffects{\pbox[t]{12em}{$\textbf{Stack} \Leftarrow \text{PC}$\\
+$M \to \text{PC}$\raisebox{0pt}[0pt][.333em]{}}}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{absolute}{JSR loc}{20}{3}{6}
+}}
+
+\opdoc{LDA}{Load Accumulator}
+{The specified literal value, or a byte read from the specified memory location, is stored in the accumulator register.}
+{\opeffects{$M \to A$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{$M$}}
+{\opctable{
+\opcrow{immidiate}{LDA \#lit}{A9}{2}{2}
+\opcrow{zeropage}{LDA loc}{A5}{2}{3}
+\opcrow{zeropage, X}{LDA loc,X}{B5}{2}{4}
+\opcrow{absolute}{LDA loc}{AD}{3}{4}
+\opcrow{absolute, X}{LDA loc,X}{BD}{3}{4 (note\pbf)}
+\opcrow{absolute, Y}{LDA loc,Y}{B9}{3}{4 (note\pbf)}
+\opcrow{X, indirect}{LDA (ptr,X)}{A1}{2}{6}
+\opcrow{indirect, Y}{LDA (ptr),Y}{B1}{2}{5 (note\pbf)}
+}}
+
+\opdoc{LDX}{Load Index X}
+{The specified literal value, or a byte read from the specified memory location, is stored in the index register X.}
+{\opeffects{$M \to X$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{$M$}}
+{\opctable{
+\opcrow{immidiate}{LDX \#lit}{A2}{2}{2}
+\opcrow{zeropage}{LDX loc}{A6}{2}{3}
+\opcrow{zeropage, Y}{LDX loc,Y}{B6}{2}{4}
+\opcrow{absolute}{LDX loc}{AE}{3}{4}
+\opcrow{absolute, Y}{LDX loc,Y}{BE}{3}{4 (note\pbf)}
+}}
+
+\opdoc{LDY}{Load Index Y}
+{The specified literal value, or a byte read from the specified memory location, is stored in the index register Y.}
+{\opeffects{$M \to Y$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{$M$}}
+{\opctable{
+\opcrow{immidiate}{LDY \#lit}{A0}{2}{2}
+\opcrow{zeropage}{LDY loc}{A4}{2}{3}
+\opcrow{zeropage, X}{LDY loc,X}{B4}{2}{4}
+\opcrow{absolute}{LDY loc}{AC}{3}{4}
+\opcrow{absolute, X}{LDY loc,X}{BC}{3}{4 (note\pbf)}
+}}
+
+\opdoc{LSR}{Logical Shift Right One Bit (Memory or Accumulator)}
+{A value is read from the accumulator or a memory location, shifted right one bit, and stored back where it was read from. The most-significant bit is set to zero, and the original value of the least-significant bit is saved in the Carry flag. This is effectively a divide-by-two operation; however, it doesn't observe the Decimal flag, so it won't correctly halve a binary-coded-decimal value. Useful for testing multiple bits of a value in turn, from least-significant to most-significant.}
+{\opeffects{$(M \wedge \texttt{FE}_h) \gg 1 \to M$}
+{0}{}{}{}{$\uparrow$}{$M_0$}
+{$M \wedge \texttt{FE}_h$}}
+{\opctable{
+\opcrow{accumulator}{LSR A}{4A}{1}{2}
+\opcrow{zeropage}{LSR loc}{46}{2}{5}
+\opcrow{zeropage, X}{LSR loc,X}{56}{2}{6}
+\opcrow{absolute}{LSR loc}{4E}{3}{6}
+\opcrow{absolute, X}{LSR loc,X}{5E}{3}{7}
+}}
+
+\opdoc{NOP}{No operation}
+{This instruction does nothing but burn two clock cycles.}
+{\opeffects{}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{implied}{NOP}{EA}{1}{2}
+}}
+
+\opdoc{ORA}{Bitwise-Or with Accumulator}
+{The specified value is combined with the accumulator in a bitwise-exclusive-or operation, and the result is saved in the accumulator.}
+{\opeffects{$A \vee M \to A$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{$A \vee M$}}
+{\opctable{
+\opcrow{immidiate}{ORA \#lit}{09}{2}{2}
+\opcrow{zeropage}{ORA loc}{05}{2}{3}
+\opcrow{zeropage, X}{ORA loc,X}{15}{2}{4}
+\opcrow{absolute}{ORA loc}{0D}{3}{4}
+\opcrow{absolute, X}{ORA loc,X}{1D}{3}{4 (note\pbf)}
+\opcrow{absolute, Y}{ORA loc,Y}{19}{3}{4 (note\pbf)}
+\opcrow{X, indirect}{ORA (ptr,X)}{01}{2}{6}
+\opcrow{indirect, Y}{ORA (ptr),Y}{11}{2}{5 (note\pbf)}
+}}
+
+\opdoc{PHA}{Push Accumulator on Stack}
+{The value of the accumulator register is pushed onto the top of the stack, to be retrieved and used later.}
+{\opeffects{$\textbf{Stack} \Leftarrow A$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{implied}{PHA}{48}{1}{3}
+}}
+
+\opdoc{PHP}{Push Processor Status on Stack}
+{A byte representing the state of the processor status register is pushed onto the top of the stack, to be restored, or possibly retrieved and analyzed, later. Bits 5 and 4 of the byte pushed onto the stack are set, although they don't correspond to any status flags.}
+{\opeffects{$\textbf{Stack} \Leftarrow \text{SR} \vee \texttt{30}_h$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{implied}{PHP}{08}{1}{3}
+}}
+
+\opdoc{PLA}{Pull / Pop Accumulator from Stack}
+{A byte value is popped and removed from the top of the stack, and stored in the accumulator register.}
+{\opeffects{$\textbf{Stack} \Rightarrow A$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{popped value}}
+{\opctable{
+\opcrow{implied}{PLA}{68}{1}{4}
+}}
+
+\opdoc{PLP}{Pull / Pop Processor Status from Stack}
+{A byte value is popped and removed from the top of the stack, and status flags are set according to individual bit values in that byte. Bits 5 and 4 of the byte value are ignored.}
+{\opeffects{$\textbf{Stack} \overset{\wedge\texttt{CF}_h}{\Rightarrow} \text{SR}$}
+{$M_7$}{$M_6$}{$M_3$}{$M_2$}{$M_1$}{$M_0$}
+{$M = \text{popped value}$}}
+{\opctable{
+\opcrow{implied}{PLP}{28}{1}{4}
+}}
+
+\opdoc{ROL}{Rotate Left One Bit (Memory or Accumulator)}
+{A value is read from the accumulator or a memory location, shifted left one bit, and stored back where it was read from. The least-significant bit is set according to the Carry flag, and the original value of the most-significant bit is saved in the Carry flag. Useful for shifting a multi-byte value, operating on each byte in turn, from least-significant to most-significant.}
+{\opeffects{$(M \wedge \texttt{7F}_h) \ll 1 \vee \text{C} \to M$}
+{$M_6$}{}{}{}{$\uparrow$}{$M_7$}
+{$M \wedge \texttt{7F}_h$}}
+{\opctable{
+\opcrow{accumulator}{ROL A}{2A}{1}{2}
+\opcrow{zeropage}{ROL loc}{26}{2}{5}
+\opcrow{zeropage, X}{ROL loc,X}{36}{2}{6}
+\opcrow{absolute}{ROL loc}{2E}{3}{6}
+\opcrow{absolute, X}{ROL loc,X}{3E}{3}{7}
+}}
+
+\opdoc{ROR}{Rotate Right One Bit (Memory or Accumulator)}
+{A value is read from the accumulator or a memory location, shifted right one bit, and stored back where it was read from. The most-significant bit is set according to the Carry flag, and the original value of the least-significant bit is saved in the Carry flag. Useful for shifting a multi-byte value, operating on each byte in turn, from most-significant to least-significant.}
+{\opeffects{$(M \wedge \texttt{FE}_h) \gg 1 \vee \text{C} \ll 7 \to M$}
+{C}{}{}{}{$\uparrow$}{$M_0$}
+{$M \wedge \texttt{FE}_h$}}
+{\opctable{
+\opcrow{accumulator}{ROR A}{6A}{1}{2}
+\opcrow{zeropage}{ROR loc}{66}{2}{5}
+\opcrow{zeropage, X}{ROR loc,X}{76}{2}{6}
+\opcrow{absolute}{ROR loc}{6E}{3}{6}
+\opcrow{absolute, X}{ROR loc,X}{7E}{3}{7}
+}}
+
+\opdoc{RTI}{Return from Interrupt}
+{\label{inst:rti}A byte value is popped and removed from the top of the stack, and status flags are set according to individual bit values in that byte, ignoring bits 5 and 4. Then program execution jumps to a location popped from the stack, which is ostensibly the next instruction that was to be executed when the interrupt being handled was triggered.}
+{\opeffects{\pbox[t]{21em}{$\textbf{Stack} \overset{\wedge\texttt{CF}_h}{\Rightarrow} \text{SR}$;\\
+$\textbf{Stack} \Rightarrow \text{PC}$\raisebox{0pt}[0pt][.333em]{}}}
+{$M_7$}{$M_6$}{$M_3$}{$M_2$}{$M_1$}{$M_0$}
+{$M = \text{first popped value}$}}
+{\opctable{
+\opcrow{implied}{RTI}{40}{1}{6}
+}}
+
+\opdoc{RTS}{Return from Subroutine}
+{\label{inst:rts}Program execution jumps to a location popped from the stack, which is ostensibly the next instruction after the \texttt{JSR} instruction that called the subroutine being exited. Sometimes used as an indirect \texttt{JMP} to an address that's stored on the stack instead of a fixed memory location. See also \texttt{JSR}, page \pageref{inst:jsr}.}
+{\opeffects{$\textbf{Stack} \Rightarrow \text{PC}$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{implied}{RTS}{60}{1}{6}
+}}
+
+\opdoc{SBC}{Subtract from Accumulator with Borrow}
+{The specified value is subtracted to the accumulator, potentially also incorporating a borrow from a previous subtract operation (according to the complement of the Carry flag). If the Decimal flag is set, the minuend and subtrahend are treated as binary-coded-decimal values, and the result is stored in binary-coded-decimal format. See also \texttt{SEC}, next.}
+{\opeffects{$A - M - \neg C \to A$}
+{$\uparrow$}{$\uparrow$}{}{}{$\uparrow$}{$\uparrow$}
+{$A + (255 - M + C)$}}
+{\opctable{
+\opcrow{immidiate}{SBC \#lit}{E9}{2}{2}
+\opcrow{zeropage}{SBC loc}{E5}{2}{3}
+\opcrow{zeropage, X}{SBC loc,X}{F5}{2}{4}
+\opcrow{absolute}{SBC loc}{ED}{3}{4}
+\opcrow{absolute, X}{SBC loc,X}{FD}{3}{4 (note\pbf)}
+\opcrow{absolute, Y}{SBC loc,Y}{F9}{3}{4 (note\pbf)}
+\opcrow{X, indirect}{SBC (ptr,X)}{E1}{2}{6}
+\opcrow{indirect, Y}{SBC (ptr),Y}{F1}{2}{5 (note\pbf)}
+}}
+
+\opdoc{SEC}{Set Carry Flag}
+{\label{inst:sec}The Carry flag is set. Useful in preparation for a subtract instruction.}
+{\opeffects{}
+{}{}{}{}{}{1}
+{}}
+{\opctable{
+\opcrow{implied}{SEC}{38}{1}{2}
+}}
+
+\opdoc{SED}{Set Decimal Flag}
+{The Decimal flag is set. Necessary before arithmetic operations on binary-coded-decimal numbers.}
+{\opeffects{}
+{}{}{1}{}{}{}
+{}}
+{\opctable{
+\opcrow{implied}{SED}{F8}{1}{2}
+}}
+
+\opdoc{SEI}{Set Interrupt Disable Bit / Disable Interrupts}
+{}
+{\opeffects{}
+{}{}{}{1}{}{}
+{}}
+{\opctable{
+\opcrow{implied}{SEI}{78}{1}{2}
+}}
+
+\opdoc{STA}{Store Accumulator in Memory}
+{The value of the accumulator register is stored in the specified memory location.}
+{\opeffects{$A \to M$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{zeropage}{STA loc}{85}{2}{3}
+\opcrow{zeropage, X}{STA loc,X}{95}{2}{4}
+\opcrow{absolute}{STA loc}{8D}{3}{4}
+\opcrow{absolute, X}{STA loc,X}{9D}{3}{5}
+\opcrow{absolute, Y}{STA loc,Y}{99}{3}{5}
+\opcrow{X, indirect}{STA (ptr,X)}{81}{2}{6}
+\opcrow{indirect, Y}{STA (ptr),Y}{91}{2}{6}
+}}
+
+\opdoc{STX}{Store Index X in Memory}
+{The value of the index register X is stored in the specified memory location.}
+{\opeffects{$X \to M$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{zeropage}{STX loc}{86}{2}{3}
+\opcrow{zeropage, Y}{STX loc,Y}{96}{2}{4}
+\opcrow{absolute}{STX loc}{8E}{3}{4}
+}}
+
+\opdoc{STY}{Sore Index Y in Memory}
+{The value of the index register Y is stored in the specified memory location.}
+{\opeffects{$Y \to M$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{zeropage}{STY loc}{84}{2}{3}
+\opcrow{zeropage, X}{STY loc,X}{94}{2}{4}
+\opcrow{absolute}{STY loc}{8C}{3}{4}
+}}
+
+\opdoc{TAX}{Transfer Accumulator to Index X}
+{The value of the accumulator register is copied into the index register X.}
+{\opeffects{$A \to X$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{}}
+{\opctable{
+\opcrow{implied}{TAX}{AA}{1}{2}
+}}
+
+\opdoc{TAY}{Transfer Accumulator to Index Y}
+{The value of the accumulator register is copied into the index register Y.}
+{\opeffects{$A \to Y$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{}}
+{\opctable{
+\opcrow{implied}{TAY}{A8}{1}{2}
+}}
+
+\opdoc{TSX}{Transfer Stack Pointer to Index X}
+{The value of the stack pointer register is copied into the index register X. Useful for examining the stack contents without ``popping'' any bytes from it.}
+{\opeffects{$\text{SP} \to X$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{}}
+{\opctable{
+\opcrow{implied}{TSX}{BA}{1}{2}
+}}
+
+\opdoc{TXA}{Transfer Index X to Accumulator}
+{The value of the index register X is copied into the accumulator register.}
+{\opeffects{$X \to A$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{}}
+{\opctable{
+\opcrow{implied}{TXA}{8A}{1}{2}
+}}
+
+\opdoc{TXS}{Transfer Index X to Stack Pointer}
+{The value of the index register X is copied into the stack pointer register, potentially disrupting uses of the stack.}
+{\opeffects{$X \to \text{SP}$}
+{}{}{}{}{}{}
+{}}
+{\opctable{
+\opcrow{implied}{TXS}{9A}{1}{2}
+}}
+
+\opdoc{TYA}{Transfer Index Y to Accumulator}
+{The value of the index register Y is copied into the accumulator register.}
+{\opeffects{$Y \to A$}
+{$\uparrow$}{}{}{}{$\uparrow$}{}
+{}}
+{\opctable{
+\opcrow{implied}{TYA}{98}{1}{2}
+}}
+
+Sources:\\
+\url{https://www.masswerk.at/6502/6502_instruction_set.html}\\
+\url{6502.org/tutorials/6502opcodes.html}
 
 \section{Subroutines Provided By Firmware}
 
-\subsection{Byte To Decimal}
+\fwsubroutinehdr{Byte To Decimal}
 
 \begin{center}\begin{tabular}{r>{\ttfamily}l>{\ttfamily}ccr@{\,--\,}rl}
 & \textrm{Label} & \textrm{Address} & Flag & \multicolumn{2}{c}{\phantom{--}Range} & Use case \\
@@ -564,7 +1322,7 @@ This routine converts the value in the Accumulator to decimal for display in SCE
 
 Side effects: Result is stored in \texttt{008C-F} (text order). Count of digits is stored as a negative number in the X register. Accumulator is not preserved.
 
-\subsection{Byte To Hex}
+\fwsubroutinehdr{Byte To Hex}
 
 \begin{center}\begin{tabular}{>{\ttfamily}l>{\ttfamily}r}
 \textrm{Label} & \textrm{Address} \\
@@ -575,19 +1333,19 @@ This routine converts the value stored in the Accumulator to uppercase hexadecim
 
 Side effects: Result is stored in \texttt{0086-7} (text order). Count of digits is stored as a negative number in the X register.
 
-\subsection{Divide}
+\fwsubroutinehdr{Divide}
 
 This routine will be included in a future version of the firmware.
 
-\subsection{Set Cell Colors}
+\fwsubroutinehdr{Set Cell Colors}
 
 This routine or family of routines will be included in a future version of the firmware.
 
-\subsection{Multiply}
+\fwsubroutinehdr{Multiply}
 
 This routine will be included in a future version of the firmware.
 
-\subsection{Wait V-Scan}
+\fwsubroutinehdr{Wait V-Scan}
 
 \begin{center}\begin{tabular}{r>{\ttfamily}l>{\ttfamily}cr}
 & \textrm{Label} & \textrm{Address} & Reg \\
@@ -600,10 +1358,11 @@ This routine waits for the start of the vertical blanking interval, then returns
 
 Side effects: The X register (2), Y register (3), or Accumulator (1), is overwritten by this subroutine.
 
-\subsection{Word To Decimal}
+\fwsubroutinehdr{Word To Decimal}
 
 This routine will be included in a future version of the firmware.
 
+\newpage
 \section{User \& Device Input Addresses}
 \label{sec:userinput}
 
@@ -677,8 +1436,8 @@ The address range \texttt{0380-C} maps to the registers which control sound outp
 \begin{center}\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}cl}
 \multicolumn{4}{c}{Address} & Register purpose \\
 \textrm{Voice 0} & \textrm{Voice 1} & \textrm{Voice 2} & \textrm{Voice 3} \\
-\hline
-\raisebox{0pt}[13.5pt]{0380-1} & 0382-3 & 0384-5 & 0386-7 & Frequency \\
+\Hline
+0380-1 & 0382-3 & 0384-5 & 0386-7 & Frequency \\
 0388 & 0389 & 038A & 038B & Volume \\
 \multicolumn{4}{c}{\texttt{038C} (all voices)} & Voice types
 \end{tabular}\nopagebreak\end{center}
@@ -700,8 +1459,8 @@ The address range \texttt{038D-CF} maps to the registers which control queued so
 
 \begin{center}\nopagebreak\begin{tabular}{>{\ttfamily}c>{\ttfamily}cl}
 \textrm{Addr} & \textrm{Bit} & Meaning if set \\
-\hline
-\raisebox{0pt}[1.125em]{038D} & 7 & Schedule controller 1 operates on Voice 3 \\
+\Hline
+038D & 7 & Schedule controller 1 operates on Voice 3 \\
  & 6 & Schedule controller 1 operates on Voice 2 \\
  & 5 & Schedule controller 1 operates on Voice 1 \\
 \raisebox{-.633em}[0pt][0pt]{$\vdots$} & 4 & Schedule controller 1 operates on Voice 0 \\
@@ -709,8 +1468,8 @@ The address range \texttt{038D-CF} maps to the registers which control queued so
  & 2 & Schedule controller 0 operates on Voice 2 \\
  & 1 & Schedule controller 0 operates on Voice 1 \\
 038D & 0 & Schedule controller 0 operates on Voice 0 \\
-\hline
-\raisebox{0pt}[1.125em]{038E} & 7 & Clear Voice 3 Volume \& Frequency entries \\
+\Hline
+038E & 7 & Clear Voice 3 Volume \& Frequency entries \\
  & 6 & Clear Voice 2 Volume \& Frequency entries \\
  & 5 & Clear Voice 1 Volume \& Frequency entries \\
 \raisebox{-.633em}[0pt][0pt]{$\vdots$} & 4 & Clear Voice 0 Volume \& Frequency entries \\
@@ -734,8 +1493,8 @@ The duration of schedule entries is expressed in ``ticks'', where there are 900 
 \begin{center}\nopagebreak\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c}
 \textrm{Entry} & \multicolumn{2}{c}{Address} \\
 \textrm{(within page)} & \textrm{Schedule controller 0} & \textrm{Schedule controller 1} \\
-\hline
-\raisebox{0pt}[1.125em]{0} & 0390-1 & 0398-9 \\
+\Hline
+0 & 0390-1 & 0398-9 \\
 1 & 0392-3 & 039A-B \\
 2 & 0394-5 & 039C-D \\
 3 & 0396-7 & 039E-F
@@ -753,8 +1512,8 @@ Writing to addresses \texttt{03A0-BF} sets the frequency entry shift registers:
 \begin{center}\nopagebreak\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c}
 \textrm{Entry} & \multicolumn{4}{c}{Address} \\
 \textrm{(within page)} & \textrm{Voice 0} & \textrm{Voice 1} & \textrm{Voice 2} & \textrm{Voice 3} \\
-\hline
-\raisebox{0pt}[1.125em]{0} & 03A0-1 & 03A8-9 & 03B0-1 & 03B8-9 \\
+\Hline
+0 & 03A0-1 & 03A8-9 & 03B0-1 & 03B8-9 \\
 1 & 03A2-3 & 03AA-B & 03B2-3 & 03BA-B \\
 2 & 03A4-5 & 03AC-D & 03B4-5 & 03BC-D \\
 3 & 03A6-7 & 03AE-F & 03B6-7 & 03BE-F
@@ -766,8 +1525,8 @@ Writing to addresses \texttt{03C0-F} sets the volume entry shift registers:
 \begin{center}\begin{tabular}{>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c}
 \textrm{Entry} & \multicolumn{4}{c}{Address} \\
 \textrm{(within page)} & \textrm{Voice 0} & \textrm{Voice 1} & \textrm{Voice 2} & \textrm{Voice 3} \\
-\hline
-\raisebox{0pt}[1.125em]{0} & 03C0 & 03C4 & 03C8 & 03CC \\
+\Hline
+0 & 03C0 & 03C4 & 03C8 & 03CC \\
 1 & 03C1 & 03C5 & 03C9 & 03CD \\
 2 & 03C2 & 03C6 & 03CA & 03CE \\
 3 & 03C3 & 03C7 & 03CB & 03CF
