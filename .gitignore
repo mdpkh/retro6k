@@ -60,3 +60,4 @@
 
 #compile stuff
 /compiled/bin/**
+**/fake6502.o
