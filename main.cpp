@@ -92,6 +92,7 @@ dlogentry* partialinst = nullptr;
 std::random_device seedgen;
 std::mt19937 floatgen;
 std::mt19937 noisegen;
+std::filesystem::path rompath;
 std::filesystem::path cartpath;
 std::filesystem::path savepath;
 std::filesystem::path screencappath;
@@ -1891,7 +1892,7 @@ void DoPickFile(filetype ft, std::string &path)
 						break;
 					case SDLK_RETURN:
 					case SDLK_KP_ENTER:
-						path = pathlist[filesel].string();
+						path = browsedir / pathlist[filesel].string();
 						UIBeepTakeAction();
 						goto exitpickfile;
 					case SDLK_ESCAPE:
@@ -2109,7 +2110,8 @@ int InitMemory()
 
 int InitPaths()
 {
-	cartpath = std::filesystem::canonical("."); // TODO: read from config
+	rompath = std::filesystem::canonical("../rom"); // TODO: read from config
+	cartpath = std::filesystem::canonical("../cart"); // TODO: read from config
 	savepath = std::filesystem::canonical("."); // TODO: read from config
 	screencappath = std::filesystem::canonical("."); // TODO: read from config
 	return 0;
@@ -2537,10 +2539,10 @@ void InitVideoMem() // this function is a cheat. don't call it.
 void InstallROM()
 {
 	const char* infilename[4] = {
-		"bankc.rom",
-		"bankd.rom",
-		"banke.rom",
-		"bankf.rom"
+		"../rom/bankc.rom", //TODO: use actual rom path
+		"../rom/bankd.rom", // "
+		"../rom/banke.rom", // "
+		"../rom/bankf.rom"  // "
 	};
 	for (int i = 0; i < 4; ++i)
 	{
