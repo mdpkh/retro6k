@@ -18,7 +18,7 @@ I generate my cartridges by using [vasm](http://sun.hasenbraten.de/vasm/index.ph
 
 ### Linux / GCC
 
-Install the SDL2 binaries and development libraries for your system if you don't already have them. In Debian, that's the packages `libsdl2-2.0-0`, `libsdl2-dev`, and their dependencies. You'll need GCC/G++ version 8 or higher, because C++17 features such as `std::filesystem` are used. Run the script `buildr6k` in the source root. If you move the compiled program elsewhere, copy or move the `.rom` and `.R6kCart` files with it.
+Install the SDL2 binaries and development libraries for your system if you don't already have them.  You'll need GCC/G++ version 8 or higher, because C++17 features such as `std::filesystem` are used. On Debian based distros, that's the packages `libsdl2-2.0-0`, `libsdl2-dev`, `gcc-8`, `g++-8`, and their dependencies. Run `make` in the root directory to finish compilation.
 
 ### MS Visual Studio
 
@@ -48,7 +48,7 @@ Take whatever steps suit your workflow to ensure that when run, the compiled emu
 
 ## Binary Releases
 
-I intend to periodically provide releases with Windows 64-bit binaries, documentation compiled to PDF, and possibly Debian packages. 
+I intend to periodically provide releases with Windows 64-bit binaries, documentation compiled to PDF, and possibly Debian packages.
 
 ---
 

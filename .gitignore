@@ -57,3 +57,6 @@
 /sdk/colorcycle.c
 /ver.cpp
 /updatever.py
+
+#compile stuff
+/compiled/bin/**
