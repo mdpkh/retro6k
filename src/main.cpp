@@ -106,18 +106,6 @@ SDL_AudioSpec soundspec;
 SDL_AudioDeviceID sounddev;
 unsigned int UE_RESETCPU;
 
-inline void DisplayHexByte(char* dest, char val)
-{
-	const char nybbles[16] = {
-		0x30, 0x31, 0x32, 0x33,
-		0x34, 0x35, 0x36, 0x37,
-		0x38, 0x39, 0x41, 0x42,
-		0x43, 0x44, 0x45, 0x46,
-	};
-	*dest = nybbles[(val >> 4) & 0xf];
-	*++dest = nybbles[val & 0xf];
-}
-
 inline void DisplayArgs(char* dest, unsigned char opc, char* args, char** end)
 {
 	const enum amode : char {
@@ -263,6 +251,18 @@ inline void DisplayArgs(char* dest, unsigned char opc, char* args, char** end)
 	}
 }
 
+inline void DisplayHexByte(char* dest, char val)
+{
+	const char nybbles[16] = {
+		0x30, 0x31, 0x32, 0x33,
+		0x34, 0x35, 0x36, 0x37,
+		0x38, 0x39, 0x41, 0x42,
+		0x43, 0x44, 0x45, 0x46,
+	};
+	*dest = nybbles[(val >> 4) & 0xf];
+	*++dest = nybbles[val & 0xf];
+}
+
 inline void DisplayHexWord(char* dest, short val)
 {
 	const char nybbles[16] = {
@@ -363,372 +363,6 @@ inline void DisplayOpcode(char* dest, unsigned char opc)
 	*dest = *src;
 	*++dest = *++src;
 	*++dest = *++src;
-}
-
-void DrawText(const char* text, int &x, const int y0, unsigned char fg, unsigned char bg, SDL_Surface* destsurf)
-{
-	unsigned char c[2] = { bg, fg };
-	while (*text)
-	{
-		int gw = hifont[(unsigned char)*text].w;
-		unsigned short gbits[16];
-		for (unsigned short* src = (unsigned short*)hifont[(unsigned char)*text].bmp, * dst = gbits; src < hifont[(unsigned char)*text].bmp + 16; ++src, ++dst)
-			*dst = *src;
-		unsigned char* rowstart = (unsigned char*)destsurf->pixels + (long long)destsurf->pitch * y0 + x;
-		for (int gy = 0; gy < 16; ++gy)
-		{
-			for (int gx = 0; gx < gw; ++gx)
-			{
-				rowstart[gx] = c[gbits[gy] & 1];
-				gbits[gy] >>= 1;
-			}
-			rowstart += destsurf->pitch;
-		}
-		x += gw;
-		++text;
-	}
-}
-
-inline void DrawTextCX(const char* text, const int x0, const int y0, unsigned char fg, unsigned char bg, SDL_Surface* destsurf)
-{
-	int tx0 = x0;
-	DrawText(text, tx0, y0, fg, bg, destsurf);
-}
-
-int TextWidth(const char* text)
-{
-	int w = 0;
-	while (*text)
-	{
-		w += hifont[(unsigned char)*text].w;
-		++text;
-	}
-	return w;
-}
-
-int SetHWPalette(SDL_Palette* dstpal)
-{
-	SDL_Color d[256];
-	for (int j = 0; j < 256; ++j)
-	{
-		d[j].a = 255;
-		int i = ((j & 0x8) >> 2 | (j & 0x80) >> 7) * 0x11;
-		d[j].r = ((j & 0x4) >> 1 | (j & 0x40) >> 6) * 0x44 | i;
-		d[j].g = ((j & 0x2) | (j & 0x20) >> 5) * 0x44 | i;
-		d[j].b = ((j & 0x1) << 1 | (j & 0x10) >> 4) * 0x44 | i;
-	}
-	return SDL_SetPaletteColors(dstpal, d, 0, 256);
-}
-
-void EjectCartridge()
-{
-	for (int p = 0x20; p < 0xc0; ++p)
-		syspflags[p] = pageflags::PF_TFLOATING;
-	cartridgeinserted = false;
-}
-
-dlogentry* ExtendLog(dletype etype)
-{
-	if (debuglogend == debuglogstart)
-	{
-		++debuglogstart;
-		debuglogstart &= dlogidxmask;
-	}
-	debuglog[debuglogstart].entrytype = dletype::LT_START;
-	debuglog[debuglogend].entrytype = etype;
-	dlogentry* newentry = debuglog + debuglogend;
-	++debuglogend;
-	debuglogend &= dlogidxmask;
-	return newentry;
-}
-
-void StepSoundSchedules()
-{
-	bool shiftregister[4]{ false, false, false, false };
-	bool scheduleisempty[2]{ false, false };
-	for (int s = 0; s < 2; ++s)
-	{
-		if (!soundcndcounter[s])
-		{
-			for (int v = 0; v < 4; ++v)
-			{
-				if (soundscvmapregister & (1 << (4 * s + v)))
-				{
-					soundvolregister[v] = soundqueue[v][0].vol;
-					soundfreqregister[v] = soundqueue[v][0].freq;
-					soundcndcounter[s] = soundqueuedur[s][0];
-					shiftregister[v] = true;
-				}
-			}
-			for (int i = 0; i < 15; ++i)
-				soundqueuedur[s][i] = soundqueuedur[s][i + 1];
-			soundqueuedur[s][15] = 0xffff;
-			++soundncounter[s];
-			if (!soundncounter[s])
-				scheduleisempty[s] = true;
-		}
-		--soundcndcounter[s];
-	}
-	for (int v = 0; v < 4; ++v)
-	{
-		for (int i = 0; i < 15; ++i)
-			soundqueue[v][i] = soundqueue[v][i + 1];
-		soundqueue[v][15] = { 0, 0 };
-	}
-	if (scheduleisempty[0] || scheduleisempty[1])
-		; // TODO: trigger interrupt if appropriate flag (?) is set
-}
-
-void GenerateStereoAudio(void* userdata, Uint8* stream, int len) //callback to fill audio buffer
-{
-	if (!menuhassound)
-	{
-		static signed char tickcounter{ 49 }; // 900 ticks per 1s at 44.1k sample rate
-		static unsigned short phase[4]{ 0, 0, 0, 0 };
-		static short lev[16];
-		// clipped normal-ish distribution with RMS 8; when multiplied by volume and divided by 4, RMS maxes out at 30 (equal to max vol square wave RMS) while value is clipped at +/-37
-		static std::discrete_distribution<short> dis{ 240127971, 49520773, 52161640, 54569628, 56671960, 58394828, 59666729, 60422379, 60606996, 60180662, 53532056, 60180662, 60606996, 60422379, 59666729, 58394828, 56671960, 54569628, 52161640, 49520773, 240127971 };
-		for (int v = 0; v < 4; ++v)
-		{
-			switch ((voicetype)((soundvoicetyperegister >> (v << 1)) & 0x3))
-			{
-			case voicetype::VT_SQUARE:
-				lev[(v << 2)    ] = -(soundvolregister[v] & (short)0xf0) >> 3;
-				lev[(v << 2) | 1] = (soundvolregister[v] & (short)0xf0) >> 3;
-				lev[(v << 2) | 2] = -(soundvolregister[v] & (short)0xf) << 1;
-				lev[(v << 2) | 3] = (soundvolregister[v] & (short)0xf) << 1;
-				break;
-			case voicetype::VT_NOISE:
-				// retain existing levels
-				break;
-			default:
-				// undefined
-				lev[(v << 2)    ] = 0;
-				lev[(v << 2) | 1] = 0;
-				lev[(v << 2) | 2] = 0;
-				lev[(v << 2) | 3] = 0;
-			}
-			if (!soundfreqregister[v])
-			{
-				lev[v << 2    ] = 0;
-				lev[v << 2 | 1] = 0;
-				lev[v << 2 | 2] = 0;
-				lev[v << 2 | 3] = 0;
-			}
-		}
-		int t = soundspec.freq >> 1;
-		for (; len > 0; len -= 2)
-		{
-			--tickcounter;
-			if (tickcounter < 0)
-			{
-				tickcounter = 49;
-				StepSoundSchedules();
-			}
-			phase[0] += soundfreqregister[0];
-			phase[1] += soundfreqregister[1];
-			phase[2] += soundfreqregister[2];
-			phase[3] += soundfreqregister[3];
-			if (phase[0] > soundspec.freq)
-			{
-				phase[0] -= soundspec.freq;
-				if ((voicetype)(soundvoicetyperegister & 0x3) == voicetype::VT_NOISE)
-				{ // on falling edge of square wave, sample and hold new random value
-					short r = dis(noisegen) - 10;
-					lev[0] = (r * ((soundvolregister[0] & (short)0xf0) >> 4) + 1) >> 2;
-					lev[1] = lev[0];
-					lev[2] = (r * (soundvolregister[0] & (short)0xf) + 1) >> 2;
-					lev[3] = lev[2];
-				}
-			}
-			if (phase[1] > soundspec.freq)
-			{
-				phase[1] -= soundspec.freq;
-				if ((voicetype)((soundvoicetyperegister >> 2) & 0x3) == voicetype::VT_NOISE)
-				{ // on falling edge of square wave, sample and hold new random value
-					short r = dis(noisegen) - 10;
-					lev[4] = (r * ((soundvolregister[1] & (short)0xf0) >> 4) + 1) >> 2;
-					lev[5] = lev[0];
-					lev[6] = (r * (soundvolregister[1] & (short)0xf) + 1) >> 2;
-					lev[7] = lev[2];
-				}
-			}
-			if (phase[2] > soundspec.freq)
-			{
-				phase[2] -= soundspec.freq;
-				if ((voicetype)((soundvoicetyperegister >> 4) & 0x3) == voicetype::VT_NOISE)
-				{ // on falling edge of square wave, sample and hold new random value
-					short r = dis(noisegen) - 10;
-					lev[8] = (r * ((soundvolregister[2] & (short)0xf0) >> 4) + 1) >> 2;
-					lev[9] = lev[0];
-					lev[10] = (r * (soundvolregister[2] & (short)0xf) + 1) >> 2;
-					lev[11] = lev[2];
-				}
-			}
-			if (phase[3] > soundspec.freq)
-			{
-				phase[3] -= soundspec.freq;
-				if ((voicetype)((soundvoicetyperegister >> 6) & 0x3) == voicetype::VT_NOISE)
-				{ // on falling edge of square wave, sample and hold new random value
-					short r = dis(noisegen) - 10;
-					lev[12] = (r * ((soundvolregister[3] & (short)0xf0) >> 4) + 1) >> 2;
-					lev[13] = lev[0];
-					lev[14] = (r * (soundvolregister[3] & (short)0xf) + 1) >> 2;
-					lev[15] = lev[2];
-				}
-			}
-			*stream = soundspec.silence
-				+ lev[     (int)(phase[0] >= t)]
-				- lev[4  | (int)(phase[1] >= t)]
-				+ lev[8  | (int)(phase[2] >= t)]
-				- lev[12 | (int)(phase[3] >= t)];
-			++stream;
-			*stream = soundspec.silence
-				+ lev[2  | (int)(phase[0] >= t)]
-				- lev[6  | (int)(phase[1] >= t)]
-				+ lev[10 | (int)(phase[2] >= t)]
-				- lev[14 | (int)(phase[3] >= t)];
-			++stream;
-		}
-	}
-	else
-	{
-		static unsigned short phase{ 0 };
-		short lev[2]{ -13, 13 };
-		int t = soundspec.freq >> 1;
-		if (!menubeepfreq || !menubeepdur)
-		{
-			lev[0] = 0;
-			lev[1] = 0;
-		}
-		for (; len > 0; len -= 2)
-		{
-			if (menubeepdur)
-			{
-				phase += menubeepfreq;
-				--menubeepdur;
-			}
-			if (phase > soundspec.freq)
-				phase -= soundspec.freq;
-			*stream = soundspec.silence + lev[(int)(phase >= t)];
-			++stream;
-			*stream = soundspec.silence + lev[(int)(phase >= t)];
-			++stream;
-		}
-	}
-}
-
-void RoundWinCorners(SDL_Surface* destsurf, unsigned int key, unsigned int bg, unsigned int fg)
-{
-#define r0 wincornercliprect[i]
-	for (int i = 0; i < NWINCORNERCLIPRECTS; ++i)
-	{
-		SDL_Rect r1 = wincornercliprect[i];
-		SDL_Rect r2 = wincornercliprect[i];
-		SDL_Rect r3 = wincornercliprect[i];
-		r1.x = r3.x = destsurf->w - r0.x - r0.w;
-		r2.y = r3.y = destsurf->h - r0.y - r0.h;
-		SDL_FillRect(destsurf, &r0, key);
-		SDL_FillRect(destsurf, &r1, key);
-		SDL_FillRect(destsurf, &r2, key);
-		SDL_FillRect(destsurf, &r3, key);
-	}
-#undef r0
-#define r0 wincornerborder0rect[i]
-	for (int i = 0; i < NWINCORNERBORDER0RECTS; ++i)
-	{
-		SDL_Rect r1 = wincornerborder0rect[i];
-		SDL_Rect r2 = wincornerborder0rect[i];
-		SDL_Rect r3 = wincornerborder0rect[i];
-		r1.x = r3.x = destsurf->w - r0.x - r0.w;
-		r2.y = r3.y = destsurf->h - r0.y - r0.h;
-		SDL_FillRect(destsurf, &r0, bg);
-		SDL_FillRect(destsurf, &r1, bg);
-		SDL_FillRect(destsurf, &r2, bg);
-		SDL_FillRect(destsurf, &r3, bg);
-	}
-#undef r0
-#define r0 wincornerborder1rect[i]
-	for (int i = 0; i < NWINCORNERBORDER1RECTS; ++i)
-	{
-		SDL_Rect r2 = wincornerborder1rect[i];
-		SDL_Rect r3 = wincornerborder1rect[i];
-		r3.x        = destsurf->w - r0.x - r0.w;
-		r2.y = r3.y = destsurf->h - r0.y - r0.h;
-		SDL_FillRect(destsurf, &r2, fg);
-		SDL_FillRect(destsurf, &r3, fg);
-	}
-#undef r0
-}
-
-void PaintWindow(SDL_Surface* win, unsigned int bg, unsigned int acc, const char* title, unsigned int tc)
-{
-	SDL_Rect boxrect;
-	boxrect = { 0, 0, win->w, 1 };
-	SDL_FillRect(win, &boxrect, bg);
-	boxrect.y = win->h - 1;
-	SDL_FillRect(win, &boxrect, bg);
-	boxrect = { 0, 0, 1, win->h };
-	SDL_FillRect(win, &boxrect, bg);
-	boxrect.x = win->w - 1;
-	SDL_FillRect(win, &boxrect, bg);
-	boxrect = { 2, 19, win->w - 4, win->h - 21 };
-	SDL_FillRect(win, &boxrect, bg);
-	boxrect = { 1, 19, 1, win->h - 20 };
-	SDL_FillRect(win, &boxrect, acc);
-	boxrect.x = win->w - 2;
-	SDL_FillRect(win, &boxrect, acc);
-	boxrect = { 1, win->h - 2, win->w - 2, 1 };
-	SDL_FillRect(win, &boxrect, acc);
-	int tx0 = (win->w - TextWidth(title)) >> 1;
-	boxrect = { 1, 1, win->w - 2, 18 };
-	SDL_FillRect(win, &boxrect, acc);
-	boxrect.h = 1;
-	boxrect.y = 5;
-	SDL_FillRect(win, &boxrect, darkercolor[acc]);
-	boxrect.y = 6;
-	SDL_FillRect(win, &boxrect, lightercolor[acc]);
-	boxrect.y = 12;
-	SDL_FillRect(win, &boxrect, darkercolor[acc]);
-	boxrect.y = 13;
-	SDL_FillRect(win, &boxrect, lightercolor[acc]);
-	DrawText(title, tx0, 2, tc, acc, win);
-	uint32_t k;
-	SDL_GetColorKey(win, &k);
-	if (k != 0xffffffff)
-		RoundWinCorners(win, k, bg, acc);
-}
-
-inline void UIBeepMoveSel()
-{
-	menubeepdur = 2205;
-	menubeepfreq = 440;
-}
-
-inline void UIBeepTakeAction()
-{
-	menubeepdur = 2205;
-	menubeepfreq = 880;
-}
-
-inline void UIBeepUnavailable()
-{
-	menubeepdur = 8820;
-	menubeepfreq = 55;
-}
-
-void DrawLogo(int x0, int y0, SDL_Surface* destsurf) {
-	char* sptr = (char*)aboutlogopixels;
-	char* rptr = (char*)(destsurf->pixels) + y0 * (long long)destsurf->pitch + x0;
-	for (int y = 0; y < 27; ++y)
-	{
-		char* dptr = rptr;
-		for (int x = 0; x < 29; ++x)
-		{
-			*dptr++ = *sptr++;
-		}
-		rptr += destsurf->pitch;
-	}
 }
 
 void DoAbout() {
@@ -1973,6 +1607,72 @@ exitpickfile:
 	SDL_FreeSurface(winbuffer);
 }
 
+void DrawLogo(int x0, int y0, SDL_Surface* destsurf) {
+	char* sptr = (char*)aboutlogopixels;
+	char* rptr = (char*)(destsurf->pixels) + y0 * (long long)destsurf->pitch + x0;
+	for (int y = 0; y < 27; ++y)
+	{
+		char* dptr = rptr;
+		for (int x = 0; x < 29; ++x)
+		{
+			*dptr++ = *sptr++;
+		}
+		rptr += destsurf->pitch;
+	}
+}
+
+void DrawText(const char* text, int &x, const int y0, unsigned char fg, unsigned char bg, SDL_Surface* destsurf)
+{
+	unsigned char c[2] = { bg, fg };
+	while (*text)
+	{
+		int gw = hifont[(unsigned char)*text].w;
+		unsigned short gbits[16];
+		for (unsigned short* src = (unsigned short*)hifont[(unsigned char)*text].bmp, * dst = gbits; src < hifont[(unsigned char)*text].bmp + 16; ++src, ++dst)
+			*dst = *src;
+		unsigned char* rowstart = (unsigned char*)destsurf->pixels + (long long)destsurf->pitch * y0 + x;
+		for (int gy = 0; gy < 16; ++gy)
+		{
+			for (int gx = 0; gx < gw; ++gx)
+			{
+				rowstart[gx] = c[gbits[gy] & 1];
+				gbits[gy] >>= 1;
+			}
+			rowstart += destsurf->pitch;
+		}
+		x += gw;
+		++text;
+	}
+}
+
+inline void DrawTextCX(const char* text, const int x0, const int y0, unsigned char fg, unsigned char bg, SDL_Surface* destsurf)
+{
+	int tx0 = x0;
+	DrawText(text, tx0, y0, fg, bg, destsurf);
+}
+
+void EjectCartridge()
+{
+	for (int p = 0x20; p < 0xc0; ++p)
+		syspflags[p] = pageflags::PF_TFLOATING;
+	cartridgeinserted = false;
+}
+
+dlogentry* ExtendLog(dletype etype)
+{
+	if (debuglogend == debuglogstart)
+	{
+		++debuglogstart;
+		debuglogstart &= dlogidxmask;
+	}
+	debuglog[debuglogstart].entrytype = dletype::LT_START;
+	debuglog[debuglogend].entrytype = etype;
+	dlogentry* newentry = debuglog + debuglogend;
+	++debuglogend;
+	debuglogend &= dlogidxmask;
+	return newentry;
+}
+
 void FillRoundedRect(SDL_Surface* dst, const SDL_Rect &r, unsigned c)
 {
 	SDL_Rect b;
@@ -1998,6 +1698,145 @@ void FillRoundedRect(SDL_Surface* dst, const SDL_Rect &r, unsigned c)
 	SDL_FillRect(dst, &b, c);
 	b = { r.x, r.y + 6, r.w, r.h - 12 };
 	SDL_FillRect(dst, &b, c);
+}
+
+void GenerateStereoAudio(void* userdata, Uint8* stream, int len) //callback to fill audio buffer
+{
+	if (!menuhassound)
+	{
+		static signed char tickcounter{ 49 }; // 900 ticks per 1s at 44.1k sample rate
+		static unsigned short phase[4]{ 0, 0, 0, 0 };
+		static short lev[16];
+		// clipped normal-ish distribution with RMS 8; when multiplied by volume and divided by 4, RMS maxes out at 30 (equal to max vol square wave RMS) while value is clipped at +/-37
+		static std::discrete_distribution<short> dis{ 240127971, 49520773, 52161640, 54569628, 56671960, 58394828, 59666729, 60422379, 60606996, 60180662, 53532056, 60180662, 60606996, 60422379, 59666729, 58394828, 56671960, 54569628, 52161640, 49520773, 240127971 };
+		for (int v = 0; v < 4; ++v)
+		{
+			switch ((voicetype)((soundvoicetyperegister >> (v << 1)) & 0x3))
+			{
+			case voicetype::VT_SQUARE:
+				lev[(v << 2)    ] = -(soundvolregister[v] & (short)0xf0) >> 3;
+				lev[(v << 2) | 1] = (soundvolregister[v] & (short)0xf0) >> 3;
+				lev[(v << 2) | 2] = -(soundvolregister[v] & (short)0xf) << 1;
+				lev[(v << 2) | 3] = (soundvolregister[v] & (short)0xf) << 1;
+				break;
+			case voicetype::VT_NOISE:
+				// retain existing levels
+				break;
+			default:
+				// undefined
+				lev[(v << 2)    ] = 0;
+				lev[(v << 2) | 1] = 0;
+				lev[(v << 2) | 2] = 0;
+				lev[(v << 2) | 3] = 0;
+			}
+			if (!soundfreqregister[v])
+			{
+				lev[v << 2    ] = 0;
+				lev[v << 2 | 1] = 0;
+				lev[v << 2 | 2] = 0;
+				lev[v << 2 | 3] = 0;
+			}
+		}
+		int t = soundspec.freq >> 1;
+		for (; len > 0; len -= 2)
+		{
+			--tickcounter;
+			if (tickcounter < 0)
+			{
+				tickcounter = 49;
+				StepSoundSchedules();
+			}
+			phase[0] += soundfreqregister[0];
+			phase[1] += soundfreqregister[1];
+			phase[2] += soundfreqregister[2];
+			phase[3] += soundfreqregister[3];
+			if (phase[0] > soundspec.freq)
+			{
+				phase[0] -= soundspec.freq;
+				if ((voicetype)(soundvoicetyperegister & 0x3) == voicetype::VT_NOISE)
+				{ // on falling edge of square wave, sample and hold new random value
+					short r = dis(noisegen) - 10;
+					lev[0] = (r * ((soundvolregister[0] & (short)0xf0) >> 4) + 1) >> 2;
+					lev[1] = lev[0];
+					lev[2] = (r * (soundvolregister[0] & (short)0xf) + 1) >> 2;
+					lev[3] = lev[2];
+				}
+			}
+			if (phase[1] > soundspec.freq)
+			{
+				phase[1] -= soundspec.freq;
+				if ((voicetype)((soundvoicetyperegister >> 2) & 0x3) == voicetype::VT_NOISE)
+				{ // on falling edge of square wave, sample and hold new random value
+					short r = dis(noisegen) - 10;
+					lev[4] = (r * ((soundvolregister[1] & (short)0xf0) >> 4) + 1) >> 2;
+					lev[5] = lev[0];
+					lev[6] = (r * (soundvolregister[1] & (short)0xf) + 1) >> 2;
+					lev[7] = lev[2];
+				}
+			}
+			if (phase[2] > soundspec.freq)
+			{
+				phase[2] -= soundspec.freq;
+				if ((voicetype)((soundvoicetyperegister >> 4) & 0x3) == voicetype::VT_NOISE)
+				{ // on falling edge of square wave, sample and hold new random value
+					short r = dis(noisegen) - 10;
+					lev[8] = (r * ((soundvolregister[2] & (short)0xf0) >> 4) + 1) >> 2;
+					lev[9] = lev[0];
+					lev[10] = (r * (soundvolregister[2] & (short)0xf) + 1) >> 2;
+					lev[11] = lev[2];
+				}
+			}
+			if (phase[3] > soundspec.freq)
+			{
+				phase[3] -= soundspec.freq;
+				if ((voicetype)((soundvoicetyperegister >> 6) & 0x3) == voicetype::VT_NOISE)
+				{ // on falling edge of square wave, sample and hold new random value
+					short r = dis(noisegen) - 10;
+					lev[12] = (r * ((soundvolregister[3] & (short)0xf0) >> 4) + 1) >> 2;
+					lev[13] = lev[0];
+					lev[14] = (r * (soundvolregister[3] & (short)0xf) + 1) >> 2;
+					lev[15] = lev[2];
+				}
+			}
+			*stream = soundspec.silence
+				+ lev[     (int)(phase[0] >= t)]
+				- lev[4  | (int)(phase[1] >= t)]
+				+ lev[8  | (int)(phase[2] >= t)]
+				- lev[12 | (int)(phase[3] >= t)];
+			++stream;
+			*stream = soundspec.silence
+				+ lev[2  | (int)(phase[0] >= t)]
+				- lev[6  | (int)(phase[1] >= t)]
+				+ lev[10 | (int)(phase[2] >= t)]
+				- lev[14 | (int)(phase[3] >= t)];
+			++stream;
+		}
+	}
+	else
+	{
+		static unsigned short phase{ 0 };
+		short lev[2]{ -13, 13 };
+		int t = soundspec.freq >> 1;
+		if (!menubeepfreq || !menubeepdur)
+		{
+			lev[0] = 0;
+			lev[1] = 0;
+		}
+		for (; len > 0; len -= 2)
+		{
+			if (menubeepdur)
+			{
+				phase += menubeepfreq;
+				--menubeepdur;
+			}
+			if (phase > soundspec.freq)
+				phase -= soundspec.freq;
+			*stream = soundspec.silence + lev[(int)(phase >= t)];
+			++stream;
+			*stream = soundspec.silence + lev[(int)(phase >= t)];
+			++stream;
+		}
+	}
 }
 
 int InitEmulator()
@@ -2420,6 +2259,44 @@ inline void PaintCell(unsigned char col, unsigned char row)
 	PaintCell(col, row, glyph, att);
 }
 
+void PaintWindow(SDL_Surface* win, unsigned int bg, unsigned int acc, const char* title, unsigned int tc)
+{
+	SDL_Rect boxrect;
+	boxrect = { 0, 0, win->w, 1 };
+	SDL_FillRect(win, &boxrect, bg);
+	boxrect.y = win->h - 1;
+	SDL_FillRect(win, &boxrect, bg);
+	boxrect = { 0, 0, 1, win->h };
+	SDL_FillRect(win, &boxrect, bg);
+	boxrect.x = win->w - 1;
+	SDL_FillRect(win, &boxrect, bg);
+	boxrect = { 2, 19, win->w - 4, win->h - 21 };
+	SDL_FillRect(win, &boxrect, bg);
+	boxrect = { 1, 19, 1, win->h - 20 };
+	SDL_FillRect(win, &boxrect, acc);
+	boxrect.x = win->w - 2;
+	SDL_FillRect(win, &boxrect, acc);
+	boxrect = { 1, win->h - 2, win->w - 2, 1 };
+	SDL_FillRect(win, &boxrect, acc);
+	int tx0 = (win->w - TextWidth(title)) >> 1;
+	boxrect = { 1, 1, win->w - 2, 18 };
+	SDL_FillRect(win, &boxrect, acc);
+	boxrect.h = 1;
+	boxrect.y = 5;
+	SDL_FillRect(win, &boxrect, darkercolor[acc]);
+	boxrect.y = 6;
+	SDL_FillRect(win, &boxrect, lightercolor[acc]);
+	boxrect.y = 12;
+	SDL_FillRect(win, &boxrect, darkercolor[acc]);
+	boxrect.y = 13;
+	SDL_FillRect(win, &boxrect, lightercolor[acc]);
+	DrawText(title, tx0, 2, tc, acc, win);
+	uint32_t k;
+	SDL_GetColorKey(win, &k);
+	if (k != 0xffffffff)
+		RoundWinCorners(win, k, bg, acc);
+}
+
 void PickAndInsertCartridge()
 {
 	std::string cart;
@@ -2457,6 +2334,129 @@ void RenderScanline(int scanline, SDL_Surface* framebuffer, SDL_Surface* winsurf
 		++dst;
 	}
 	scanlinedirty[scanline] = false;
+}
+
+void RoundWinCorners(SDL_Surface* destsurf, unsigned int key, unsigned int bg, unsigned int fg)
+{
+#define r0 wincornercliprect[i]
+	for (int i = 0; i < NWINCORNERCLIPRECTS; ++i)
+	{
+		SDL_Rect r1 = wincornercliprect[i];
+		SDL_Rect r2 = wincornercliprect[i];
+		SDL_Rect r3 = wincornercliprect[i];
+		r1.x = r3.x = destsurf->w - r0.x - r0.w;
+		r2.y = r3.y = destsurf->h - r0.y - r0.h;
+		SDL_FillRect(destsurf, &r0, key);
+		SDL_FillRect(destsurf, &r1, key);
+		SDL_FillRect(destsurf, &r2, key);
+		SDL_FillRect(destsurf, &r3, key);
+	}
+#undef r0
+#define r0 wincornerborder0rect[i]
+	for (int i = 0; i < NWINCORNERBORDER0RECTS; ++i)
+	{
+		SDL_Rect r1 = wincornerborder0rect[i];
+		SDL_Rect r2 = wincornerborder0rect[i];
+		SDL_Rect r3 = wincornerborder0rect[i];
+		r1.x = r3.x = destsurf->w - r0.x - r0.w;
+		r2.y = r3.y = destsurf->h - r0.y - r0.h;
+		SDL_FillRect(destsurf, &r0, bg);
+		SDL_FillRect(destsurf, &r1, bg);
+		SDL_FillRect(destsurf, &r2, bg);
+		SDL_FillRect(destsurf, &r3, bg);
+	}
+#undef r0
+#define r0 wincornerborder1rect[i]
+	for (int i = 0; i < NWINCORNERBORDER1RECTS; ++i)
+	{
+		SDL_Rect r2 = wincornerborder1rect[i];
+		SDL_Rect r3 = wincornerborder1rect[i];
+		r3.x        = destsurf->w - r0.x - r0.w;
+		r2.y = r3.y = destsurf->h - r0.y - r0.h;
+		SDL_FillRect(destsurf, &r2, fg);
+		SDL_FillRect(destsurf, &r3, fg);
+	}
+#undef r0
+}
+
+int SetHWPalette(SDL_Palette* dstpal)
+{
+	SDL_Color d[256];
+	for (int j = 0; j < 256; ++j)
+	{
+		d[j].a = 255;
+		int i = ((j & 0x8) >> 2 | (j & 0x80) >> 7) * 0x11;
+		d[j].r = ((j & 0x4) >> 1 | (j & 0x40) >> 6) * 0x44 | i;
+		d[j].g = ((j & 0x2) | (j & 0x20) >> 5) * 0x44 | i;
+		d[j].b = ((j & 0x1) << 1 | (j & 0x10) >> 4) * 0x44 | i;
+	}
+	return SDL_SetPaletteColors(dstpal, d, 0, 256);
+}
+
+void StepSoundSchedules()
+{
+	bool shiftregister[4]{ false, false, false, false };
+	bool scheduleisempty[2]{ false, false };
+	for (int s = 0; s < 2; ++s)
+	{
+		if (!soundcndcounter[s])
+		{
+			for (int v = 0; v < 4; ++v)
+			{
+				if (soundscvmapregister & (1 << (4 * s + v)))
+				{
+					soundvolregister[v] = soundqueue[v][0].vol;
+					soundfreqregister[v] = soundqueue[v][0].freq;
+					soundcndcounter[s] = soundqueuedur[s][0];
+					shiftregister[v] = true;
+				}
+			}
+			for (int i = 0; i < 15; ++i)
+				soundqueuedur[s][i] = soundqueuedur[s][i + 1];
+			soundqueuedur[s][15] = 0xffff;
+			++soundncounter[s];
+			if (!soundncounter[s])
+				scheduleisempty[s] = true;
+		}
+		--soundcndcounter[s];
+	}
+	for (int v = 0; v < 4; ++v)
+	{
+		for (int i = 0; i < 15; ++i)
+			soundqueue[v][i] = soundqueue[v][i + 1];
+		soundqueue[v][15] = { 0, 0 };
+	}
+	if (scheduleisempty[0] || scheduleisempty[1])
+		; // TODO: trigger interrupt if appropriate flag (?) is set
+}
+
+int TextWidth(const char* text)
+{
+	int w = 0;
+	while (*text)
+	{
+		w += hifont[(unsigned char)*text].w;
+		++text;
+	}
+	return w;
+}
+
+inline void UIBeepMoveSel()
+{
+	menubeepdur = 2205;
+	menubeepfreq = 440;
+}
+
+inline void UIBeepTakeAction()
+{
+	menubeepdur = 2205;
+	menubeepfreq = 880;
+}
+
+inline void UIBeepUnavailable()
+{
+	menubeepdur = 8820;
+	menubeepfreq = 55;
 }
 
 Uint32 SetBool(Uint32 interval, void* boolvar)

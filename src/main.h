@@ -488,6 +488,7 @@ void DoPickFile(filetype ft, std::string &path);
 void DrawLogo(int x0, int y0, SDL_Surface* destsurf);
 void DrawText(const char* text, int& x, const int y0, unsigned char fg, unsigned char bg, SDL_Surface* destsurf);
 void DrawTextCX(const char* text, const int x0, const int y0, unsigned char fg, unsigned char bg, SDL_Surface* destsurf);
+void EjectCartridge();
 dlogentry* ExtendLog(dletype etype);
 void FillRoundedRect(SDL_Surface* dst, const SDL_Rect& r, unsigned c);
 void GenerateStereoAudio(void* userdata, Uint8* stream, int len);
