@@ -2492,6 +2492,8 @@ inline uint8_t bare_read6502(uint16_t address)
 }
 
 bool cilstreq(const char* a, const char* b)
+// case-insensitive c-string equality comparison,
+// optimized by assuming b is already lowercase
 {
 	if (a == b)
 		return true;
@@ -2507,6 +2509,7 @@ bool cilstreq(const char* a, const char* b)
 }
 
 bool cistreq(const char* a, const char* b)
+// case-insensitive c-string equality comparison
 {
 	if (a == b)
 		return true;
