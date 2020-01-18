@@ -1892,7 +1892,7 @@ void DoPickFile(filetype ft, std::string &path)
 						break;
 					case SDLK_RETURN:
 					case SDLK_KP_ENTER:
-						path = browsedir / pathlist[filesel].string();
+						path = pathlist[filesel].string();
 						UIBeepTakeAction();
 						goto exitpickfile;
 					case SDLK_ESCAPE:
