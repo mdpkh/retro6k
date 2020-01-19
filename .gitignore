@@ -1,15 +1,6 @@
 #misc Windows
 **/Thumbs.db
 
-#visual studio builds and project stuff
-/.vs/
-/.vs/**
-/x86/
-/x86/**
-/x64/
-/x64/**
-/retro6k.vcxproj*
-
 #convenience shortcuts
 /Retro 6k debug.lnk
 /Retro 6k release.lnk
@@ -61,3 +52,9 @@
 #compile stuff
 /compiled/bin/**
 **/fake6502.o
+/.vs/
+/.vs/**
+/x86/
+/x86/**
+/x64/
+/x64/**

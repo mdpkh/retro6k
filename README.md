@@ -24,31 +24,17 @@ Install the SDL2 binaries and development libraries for your system if you don't
 
 Go to the [SDL2 download page](http://www.libsdl.org/download-2.0.php) and download the latest Visual C++ Development Libraries. Create a folder for your SDL2 libraries in a convenient location, *e. g.* `C:\Program Files\SDL2-`*(version number)* and extract the `include` and `lib` folders there from the ZIP file you downloaded.  
 
-Create an empty Visual C++ project. In the project Property Pages, make sure you have All Configurations and All Platforms selected, then go to the VC++ Directories page. Add the full path to the extracted `include` folder to the list in the property Include Directories. The list is semicolon-delimited.
+Extract the Retro 6k source tree somewhere. Open `retro6k.vcxproj` in Visual Studio Code. Open the retro6k Project Properties. Select All Configurations, and the `Win32` platform. Under Linker / General, ensure that Additional Library Directories contains the full path to the `lib\x86` subfolder you extracted earlier. Click Apply, then select the `x64` platform. ensure that Additional Library Directories contains the full path to the `lib\x64` subfolder you extracted earlier. Click Apply, then select All Platforms.
 
-Go to the Linker / General page. Select the Win32 platform, and add the full path to the `x86` subfolder of the `lib` folder that was extracted earlier, to the Additional Library Directories property. Again, that's a semicolon-delimited list. Select the x64 platform, and do the same thing, except this time add the path to the `x64` subfolder instead of the `x86` subfolder. Then select All Platforms again.
-
-Then on the Linker / Input, replace the value of Additional Dependencies with `SDL2.lib;SDL2main.lib`. Finally, go to the Linker / System page, and for SubSystem, select Windows.
-
-Extract the Retro 6k source code into the same folder as the project `.vcxproj` file.
-
-Now add to your new project the following header files:
-* `custombuild.h`
-* `fake6502.h`
-* `main.h`
-* `strcpys.h`
-
-And the following source files:
-* `fake6502.c`
-* `main.cpp`
-
-If you intend to introduce your own modifications to the Retro 6k emulator, edit `custombuild.h` and place in the string literal whatever version / author information you want to appear in the emulator's About box.
-
-Take whatever steps suit your workflow to ensure that when run, the compiled emulator's working directory contains `banke.rom` and `bankf.rom`. Note, when launched from Visual Studio, the working directory is where the project file is, which should be where the `.rom` files wound up. However, when `.exe` files built by Visual Studio won't be in that directory. Instead they'll be in `..\`*(platform)*`\`*(configuration)* relative to the project directory. Relative to the `.exe` files, the `.rom` files are in `..\..\retro6k` *(or whatever the project got named)*. I personally chose to create shortcuts in the project directory pointing to the Debug and Release configuration builds of my computer's architecture (x64) and made sure the working directory set in those shortcuts' properties was the project directory where the `.rom` files are.
+Under VC++ Directories, ensure that Include Directories includes the full path to the `include` folder you extracted earlier. Then under C/C++ / Preprocessor, remove `;OFFICIAL_BUILD` from the Preprocessor Definitions list.
 
 ## Binary Releases
 
 I intend to periodically provide releases with Windows 64-bit binaries, documentation compiled to PDF, and possibly Debian packages.
+
+## Custom Builds
+
+If you intend to modifiy the Retro 6k Emulator's functionality, please edit `custombuild.h` to indicate what is customized, version info if applicable, and your name.
 
 ---
 
