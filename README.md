@@ -28,6 +28,8 @@ Extract the Retro 6k source tree somewhere. Open `retro6k.vcxproj` in Visual Stu
 
 Under VC++ Directories, ensure that Include Directories includes the full path to the `include` folder you extracted earlier. Then under C/C++ / Preprocessor, remove `;OFFICIAL_BUILD` from the Preprocessor Definitions list.
 
+Under Build Events / Pre-Build, clear the pre-build command line entry.
+
 ## Binary Releases
 
 I intend to periodically provide releases with Windows 64-bit binaries, documentation compiled to PDF, and possibly Debian packages.
