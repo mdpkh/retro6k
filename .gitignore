@@ -51,6 +51,7 @@
 
 #compile stuff
 /compiled/bin/**
+/intermed/**
 **/fake6502.o
 /.vs/
 /.vs/**
