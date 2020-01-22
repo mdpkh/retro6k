@@ -15,6 +15,7 @@
 #include "fake6502.h"
 #include "main.h"
 #include "strcpys.h"
+#include "sys.h"
 
 /*** SYSTEM GENERAL MEMORY: ***
 8-bit RAM:  0x0000-0x00FF (can be accessed faster than memory locations with higher addresses)
@@ -92,13 +93,6 @@ dlogentry* partialinst = nullptr;
 std::random_device seedgen;
 std::mt19937 floatgen;
 std::mt19937 noisegen;
-std::vector<std::filesystem::path> rompath;
-std::vector<std::filesystem::path> cartpath;
-std::vector<std::filesystem::path> savepath;
-std::vector<std::filesystem::path> screencappath;
-
-int pixwidth;
-int pixheight;
 SDL_Window* mainwindow;
 SDL_Surface* cellcanvas;
 SDL_Surface* framebuffer;
@@ -510,7 +504,7 @@ void DoDebugger() {
 	SDL_Surface* winbuffer = SDL_CreateRGBSurfaceWithFormat(
 		0,
 		480,
-		pixheight * 141,
+		config.screen.pixheight * 141,
 		8,
 		SDL_PIXELFORMAT_INDEX8);
 	SDL_SetSurfaceBlendMode(winbuffer, SDL_BLENDMODE_BLEND);
@@ -1281,7 +1275,7 @@ void DoPickFile(filetype ft, std::string &path)
 	SDL_Surface* winbuffer = SDL_CreateRGBSurfaceWithFormat(
 		0,
 		480,
-		pixheight * 109,
+		config.screen.pixheight * 109,
 		8,
 		SDL_PIXELFORMAT_INDEX8);
 	SDL_SetSurfaceBlendMode(winbuffer, SDL_BLENDMODE_BLEND);
@@ -1327,21 +1321,42 @@ void DoPickFile(filetype ft, std::string &path)
 	case filetype::FT_ROM:
 		wintitle = (char*)titles[1];
 		filterext = (char*)exts[1];
-		browsedir = cartpath[0];
+		for (auto& path : config.path.rompath)
+		{
+			if (std::filesystem::exists(path))
+			{
+				browsedir = std::filesystem::canonical(path);
+				break;
+			}
+		}
 		winmacrox = 4;
 		winmacroy = 4;
 		break;
 	case filetype::FT_CART:
 		wintitle = (char*)titles[2];
 		filterext = (char*)exts[2];
-		browsedir = cartpath[0];
+		for (auto& path : config.path.cartpath)
+		{
+			if (std::filesystem::exists(path))
+			{
+				browsedir = std::filesystem::canonical(path);
+				break;
+			}
+		}
 		winmacrox = 2;
 		winmacroy = 3;
 		break;
 	case filetype::FT_CARTSAVE:
 		wintitle = (char*)titles[3];
 		filterext = (char*)exts[3];
-		browsedir = savepath[0];
+		for (auto& path : config.path.savepath)
+		{
+			if (std::filesystem::exists(path))
+			{
+				browsedir = std::filesystem::canonical(path);
+				break;
+			}
+		}
 		winmacrox = 6;
 		winmacroy = 5;
 		break;
@@ -1874,21 +1889,15 @@ int InitMainWindow()
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER);
 	SDL_DisplayMode desktopmode;
 	SDL_GetDesktopDisplayMode(0, &desktopmode);
-	pixwidth = (desktopmode.w - 64) / 256;
-	pixheight = (desktopmode.h - 36) / 144;
-	if (pixwidth > pixheight)
-	{
-		pixwidth = pixheight;
-	}
-	else if (pixheight * 3 > pixwidth * 4)
-	{
-		pixheight = pixwidth * 4 / 3;
-	}
+	if (config.screen.pixwidth == -1)
+		config.screen.pixwidth = (desktopmode.w - 64) / 256;
+	if (config.screen.pixheight == -1)
+		config.screen.pixheight = (desktopmode.h - 36) / 144;
 	mainwindow = SDL_CreateWindow("Retro 6k Emulator",
 		SDL_WINDOWPOS_UNDEFINED,
 		SDL_WINDOWPOS_UNDEFINED,
-		pixwidth * 256,
-		pixheight * 144,
+		config.screen.pixwidth * 256,
+		config.screen.pixheight * 144,
 		0);
 	if (!mainwindow)
 	{
@@ -1898,8 +1907,8 @@ int InitMainWindow()
 	SDL_Surface* mwsurface = SDL_GetWindowSurface(mainwindow);
 	framebuffer = SDL_CreateRGBSurfaceWithFormat(
 		0,
-		pixwidth * 256,
-		pixheight * 144,
+		config.screen.pixwidth * 256,
+		config.screen.pixheight * 144,
 		mwsurface->format->BitsPerPixel,
 		SDL_MasksToPixelFormatEnum(
 			mwsurface->format->BitsPerPixel,
@@ -1912,7 +1921,7 @@ int InitMainWindow()
 		SDL_Log("Could not create frame buffer: %s", SDL_GetError());
 		return -1;
 	}
-	cellcanvas = SDL_CreateRGBSurface(0, pixwidth * 8, pixheight * 8, 8, 0, 0, 0, 0);
+	cellcanvas = SDL_CreateRGBSurface(0, config.screen.pixwidth * 8, config.screen.pixheight * 8, 8, 0, 0, 0, 0);
 	if (!cellcanvas)
 	{
 		SDL_Log("Could not create cell canvas: %s", SDL_GetError());
@@ -1949,10 +1958,94 @@ int InitMemory()
 
 int InitPaths()
 {
-	rompath.push_back(std::filesystem::canonical("../rom")); // TODO: read from config
-	cartpath.push_back(std::filesystem::canonical("../cart")); // TODO: read from config
-	savepath.push_back(std::filesystem::canonical(".")); // TODO: read from config
-	screencappath.push_back(std::filesystem::canonical(".")); // TODO: read from config
+	{ // find executable file location
+#ifdef WINDOWS
+		TCHAR rtnbuf[MAX_PATH];
+		DWORD rtnlen = GetModuleFileName(NULL, rtnbuf, MAX_PATH);
+		if (rtnlen < 0)
+		{
+			rtnbuf[0] = '.';
+			rtnbuf[1] = 0;
+		}
+		else if (rtnlen < MAX_PATH)
+		{
+			rtnbuf[rtnlen] = 0;
+		}
+		rtnbuf[MAX_PATH - 1] = 0;
+#else // *nix
+		char rtnbuf[4096];
+		ssize_t rtnlen = readlink("/proc/self/exe", rtnbuf, 4096);
+		if (rtnlen < 0)
+		{
+			rtnbuf[0] = '.';
+			rtnbuf[1] = 0;
+		}
+		else if (rtnlen < 4096)
+		{
+			rtnbuf[rtnlen] = 0;
+		}
+		rtnbuf[4095] = 0;
+#endif
+		config.system.exepath = std::filesystem::canonical(rtnbuf).remove_filename();
+	}
+	{ // find user home directory
+#ifdef WINDOWS
+		char homedrive[MAX_PATH], homedir[MAX_PATH];
+		size_t homedrivelen;
+		size_t homedirlen;
+		getenv_s(&homedrivelen, homedrive, MAX_PATH, "HOMEDRIVE");
+		if (homedrivelen < 0)
+		{
+			homedrive[0] = 'C';
+			homedrive[1] = ':';
+			homedrive[2] = 0;
+		}
+		else if (homedrivelen < MAX_PATH)
+		{
+			homedrive[homedrivelen] = 0;
+		}
+		homedrive[MAX_PATH - 1] = 0;
+		getenv_s(&homedirlen, homedir, MAX_PATH, "HOMEDIR");
+		if (homedrivelen < 0)
+		{
+			homedrive[0] = '\\';
+			homedrive[1] = 0;
+		}
+		else if (homedrivelen < MAX_PATH)
+		{
+			homedrive[homedrivelen] = 0;
+		}
+		homedrive[MAX_PATH - 1] = 0;
+		config.system.homepath = std::filesystem::canonical(
+			std::filesystem::path(homedrive)
+			/ std::filesystem::path(homedir));
+#else // *nix
+		config.system.homepath = std::filesystem::canonical(std::getenv("HOME"));
+#endif
+	}
+	{ // possible places to find configuration file
+#ifdef WINDOWS
+		config.system.configloc.push_back("Windows Registry");
+#else // *nix
+		config.system.configloc.push_back("/etc/.retro6k-config");
+#endif
+		config.system.configloc.push_back(
+			config.system.homepath
+			/ std::filesystem::path(".retro6k-config"));
+		config.system.configloc.push_back(
+			config.system.exepath / std::filesystem::path(".retro6k-config"));
+	}
+	// fallback paths in case of failure to load config
+	config.path.rompath.push_back(config.system.exepath / std::filesystem::path("../rom"));
+	config.path.rompath.push_back(std::filesystem::canonical("./../rom"));
+	config.path.rompath.push_back(config.system.exepath);
+	config.path.cartpath.push_back(config.system.exepath / std::filesystem::path("../cart"));
+	config.path.cartpath.push_back(std::filesystem::canonical("./../cart"));
+	config.path.cartpath.push_back(config.system.exepath);
+	config.path.savepath.push_back(config.system.homepath / std::filesystem::path("Documents"));
+	config.path.savepath.push_back(config.system.homepath);
+	config.path.screencappath.push_back(config.system.homepath / std::filesystem::path("Pictures"));
+	config.path.screencappath.push_back(config.system.homepath);
 	return 0;
 }
 
@@ -2079,6 +2172,11 @@ bool LoadCartridge(const char* infilename)
 	infile.close();
 	cartridgeinserted = true;
 	return true;
+}
+
+void LoadConfig(const char* infilename)
+{
+
 }
 
 void LogFVMC(uint16_t dest, uint16_t src, uint8_t value)
@@ -2220,12 +2318,12 @@ void PaintCell(unsigned char col, unsigned char row, unsigned char glyph, unsign
 		pix[6] = paddr[att[(*faddr & 0xC) >> 2]];
 		pix[7] = paddr[att[(*faddr & 0x3)]];
 		faddr++;
-		for (int ry = 0; ry < pixheight; ++ry, ++cy)
+		for (int ry = 0; ry < config.screen.pixheight; ++ry, ++cy)
 		{
 			unsigned char* dst = (unsigned char*)cellcanvas->pixels + (long long)cellcanvas->pitch * cy;
 			for (int gx = 0, cx = 0; gx < 8; ++gx)
 			{
-				for (int rx = 0; rx < pixwidth; ++rx, ++dst)
+				for (int rx = 0; rx < config.screen.pixwidth; ++rx, ++dst)
 				{
 					*dst = pix[gx];
 				}
@@ -2237,8 +2335,8 @@ void PaintCell(unsigned char col, unsigned char row, unsigned char glyph, unsign
 		scanlinedirty[sy++] = true;
 	}
 	SDL_Rect dstrect;
-	dstrect.x = col * pixwidth * 8;
-	dstrect.y = row * pixheight * 8;
+	dstrect.x = col * config.screen.pixwidth * 8;
+	dstrect.y = row * config.screen.pixheight * 8;
 	SDL_BlitSurface(cellcanvas, nullptr, framebuffer, &dstrect);
 }
 

@@ -472,6 +472,29 @@ const unsigned char aboutlogopixels[783] = {
 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc7, 0xdb, 0xf7, 0x07, 0x7f, 0xff, 0xe7, 0x97, 0x7f, 0x67, 0xf8, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f, 0x96, 0x40, 0xa9, 0x7f, 0xff, 0xe7, 0x24, 0x10, 0x43, 0xf7, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
+enum class aspectratiocat {
+	AR_FREE,
+	AR_CLASSIC,
+	AR_WIDE
+};
+struct {
+	struct {
+		std::filesystem::path exepath;
+		std::filesystem::path homepath;
+		std::vector<std::filesystem::path> configloc;
+	} system;
+	struct {
+		std::vector<std::filesystem::path> rompath;
+		std::vector<std::filesystem::path> cartpath;
+		std::vector<std::filesystem::path> savepath;
+		std::vector<std::filesystem::path> screencappath;
+	} path;
+	struct {
+		int pixwidth = -1;
+		int pixheight = -1;
+		aspectratiocat aspectratio = aspectratiocat::AR_FREE;
+	} screen;
+} config;
 
 uint8_t bare_read6502(uint16_t address);
 bool cilstreq(const char* a, const char* b);
@@ -494,6 +517,7 @@ void FillRoundedRect(SDL_Surface* dst, const SDL_Rect& r, unsigned c);
 void GenerateStereoAudio(void* userdata, Uint8* stream, int len);
 void InstallROM();
 bool LoadCartridge(const char* infilename);
+void LoadConfig(const char* infilename);
 void LogFVMC(uint16_t dest, uint16_t src, uint8_t value);
 void LogRead(uint16_t address, uint8_t value);
 void LogReset();

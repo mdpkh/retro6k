@@ -41,6 +41,9 @@
     <ClInclude Include="src\res-win.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\sys.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="src\r6k-win.rc">

@@ -188,6 +188,7 @@
     <ClInclude Include="src\main.h" />
     <ClInclude Include="src\res-win.h" />
     <ClInclude Include="src\strcpys.h" />
+    <ClInclude Include="src\sys.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="src\r6k-win.rc" />
