@@ -92,10 +92,10 @@ dlogentry* partialinst = nullptr;
 std::random_device seedgen;
 std::mt19937 floatgen;
 std::mt19937 noisegen;
-std::filesystem::path rompath;
-std::filesystem::path cartpath;
-std::filesystem::path savepath;
-std::filesystem::path screencappath;
+std::vector<std::filesystem::path> rompath;
+std::vector<std::filesystem::path> cartpath;
+std::vector<std::filesystem::path> savepath;
+std::vector<std::filesystem::path> screencappath;
 
 int pixwidth;
 int pixheight;
@@ -1327,21 +1327,21 @@ void DoPickFile(filetype ft, std::string &path)
 	case filetype::FT_ROM:
 		wintitle = (char*)titles[1];
 		filterext = (char*)exts[1];
-		browsedir = cartpath;
+		browsedir = cartpath[0];
 		winmacrox = 4;
 		winmacroy = 4;
 		break;
 	case filetype::FT_CART:
 		wintitle = (char*)titles[2];
 		filterext = (char*)exts[2];
-		browsedir = cartpath;
+		browsedir = cartpath[0];
 		winmacrox = 2;
 		winmacroy = 3;
 		break;
 	case filetype::FT_CARTSAVE:
 		wintitle = (char*)titles[3];
 		filterext = (char*)exts[3];
-		browsedir = savepath;
+		browsedir = savepath[0];
 		winmacrox = 6;
 		winmacroy = 5;
 		break;
@@ -1949,10 +1949,10 @@ int InitMemory()
 
 int InitPaths()
 {
-	rompath = std::filesystem::canonical("../rom"); // TODO: read from config
-	cartpath = std::filesystem::canonical("../cart"); // TODO: read from config
-	savepath = std::filesystem::canonical("."); // TODO: read from config
-	screencappath = std::filesystem::canonical("."); // TODO: read from config
+	rompath.push_back(std::filesystem::canonical("../rom")); // TODO: read from config
+	cartpath.push_back(std::filesystem::canonical("../cart")); // TODO: read from config
+	savepath.push_back(std::filesystem::canonical(".")); // TODO: read from config
+	screencappath.push_back(std::filesystem::canonical(".")); // TODO: read from config
 	return 0;
 }
 
