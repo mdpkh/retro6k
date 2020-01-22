@@ -10,7 +10,7 @@
 	@mkdir ./compiled/bin 2> /dev/null || echo > /dev/null
 
 ./intermed/main.o: ./src/main.cpp ./src/custombuild.h ./src/fake6502.h \
-		./src/main.h ./src/strcpys.h /.src/sys.h | ./intermed
+		./src/main.h ./src/strcpys.h ./src/sys.h | ./intermed
 	@echo "Compiling main..."
 	g++-8 -c ./src/main.cpp -std=c++17 -o ./intermed/main.o
 
