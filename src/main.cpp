@@ -2070,16 +2070,25 @@ int InitSound()
 void InstallROM()
 {
 	const char* infilename[4] = {
-		"../rom/bankc.rom", //TODO: use actual rom path
-		"../rom/bankd.rom", // "
-		"../rom/banke.rom", // "
-		"../rom/bankf.rom"  // "
+		"bankc.rom",
+		"bankd.rom",
+		"banke.rom",
+		"bankf.rom" 
 	};
 	for (int i = 0; i < 4; ++i)
 	{
+		std::filesystem::path romfile;
+		for (auto& path : config.path.rompath)
+		{
+			if (std::filesystem::exists(path / std::filesystem::path(infilename[i])))
+			{
+				romfile = path / std::filesystem::path(infilename[i]);
+				break;
+			}
+		}
 		for (int p = 0; p < 16; ++p)
 			syspflags[0xc0 | (i << 4) | p] = pageflags::PF_TROM;
-		std::ifstream infile(infilename[i], std::ios::binary);
+		std::ifstream infile(romfile, std::ios::binary);
 		if (infile.is_open())
 		{
 			std::streamsize readsize = 0x1000;
