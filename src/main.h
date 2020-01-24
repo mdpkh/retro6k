@@ -490,15 +490,27 @@ struct {
 		std::vector<std::filesystem::path> screencappath;
 	} path;
 	struct {
+		std::vector<std::filesystem::path> rompath;
+		std::vector<std::filesystem::path> cartpath;
+		std::vector<std::filesystem::path> savepath;
+		std::vector<std::filesystem::path> screencappath;
+	} sessionpath;
+	struct {
 		int pixwidth = -1;
 		int pixheight = -1;
 		aspectratiocat aspectratio = aspectratiocat::AR_FREE;
 	} screen;
 } config;
+enum class configfilesection {
+	CF_PATHS,
+	CF_SCREEN
+};
 
 uint8_t bare_read6502(uint16_t address);
 bool cilstreq(const char* a, const char* b);
 bool cistreq(const char* a, const char* b);
+int main(int argc, char** argv);
+void CollapsePaths();
 void DisplayArgs(char* dest, unsigned char opc, char* args, char** end);
 void DisplayHexByte(char* dest, char val);
 void DisplayHexWord(char* dest, short val);
@@ -517,7 +529,8 @@ void FillRoundedRect(SDL_Surface* dst, const SDL_Rect& r, unsigned c);
 void GenerateStereoAudio(void* userdata, Uint8* stream, int len);
 void InstallROM();
 bool LoadCartridge(const char* infilename);
-void LoadConfig(const char* infilename);
+void LoadConfig();
+bool LoadConfigFromFile(const char* infilename);
 void LogFVMC(uint16_t dest, uint16_t src, uint8_t value);
 void LogRead(uint16_t address, uint8_t value);
 void LogReset();

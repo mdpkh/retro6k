@@ -100,6 +100,17 @@ SDL_AudioSpec soundspec;
 SDL_AudioDeviceID sounddev;
 unsigned int UE_RESETCPU;
 
+void CollapsePaths()
+{
+	// TODO: merge config.sessionpath and config.path vectors (sessionpath first)
+	// --- combination goes in config.sessionpath, i guess
+	//     (TODO then: update DoPickFile to use sessionpath vectors)
+	// in each combined vector, set every path to its canonical form
+	// --- delete path item if it doesn't exist in filesystem
+	// in each combined vector, remove any duplicates of previous items
+	return;
+}
+
 inline void DisplayArgs(char* dest, unsigned char opc, char* args, char** end)
 {
 	const enum amode : char {
@@ -2183,9 +2194,74 @@ bool LoadCartridge(const char* infilename)
 	return true;
 }
 
-void LoadConfig(const char* infilename)
-{
+void LoadConfig() {
+	for (auto& configloc : config.system.configloc)
+	{
+		if (cilstreq((const char*)configloc.c_str(), "windows registry"))
+		{
+			// TODO: read config from Windows Registry
+		}
+		else
+		{
+			if (LoadConfigFromFile((const char*)configloc.c_str()))
+				break;
+		}
+	}
+}
 
+bool LoadConfigFromFile(const char* infilename)
+{
+	std::ifstream infile(infilename, std::ios::binary);
+	if (!infile.is_open())
+	{
+		infile.close();
+		return false;
+	}
+	std::string line;
+	configfilesection section;
+	while (std::getline(infile, line))
+	{
+		if (!line.size())
+			continue;
+		if (line[0] == '[')
+		{
+			if (cilstreq(line.c_str(), "[paths]"))
+			{
+				section = configfilesection::CF_PATHS;
+				continue;
+			}
+			if (cilstreq(line.c_str(), "[screen]"))
+			{
+				section = configfilesection::CF_SCREEN;
+				continue;
+			}
+			continue;
+		}
+		int splitpos = -1;
+		for (int i = 0; i < line.size(); ++i)
+		{
+			if (line[i] == '=')
+			{
+				splitpos = i;
+				break;
+			}
+		}
+		if (splitpos < 0)
+			continue;
+		std::string_view key(line.c_str(), splitpos);
+		++splitpos;
+		std::string_view value(line.c_str() + splitpos, line.size() - splitpos);
+		switch (section)
+		{
+		case configfilesection::CF_PATHS:
+			// TODO: interpret key=value lines for [paths] section
+			break;
+		case configfilesection::CF_SCREEN:
+			// TODO: interpret key=value lines for [screen] section
+			break;
+		}
+	}
+	return true;
 }
 
 void LogFVMC(uint16_t dest, uint16_t src, uint8_t value)
@@ -2422,6 +2498,16 @@ void RandomBitFlip()
 	int addr = dis(gen);
 	int bit = dis(gen) & 7;
 	write6502(addr, sysram[addr] ^ (1 << bit));
+}
+
+int ReadArgs(int argc, char** argv)
+{
+	// TODO: read command-line arguments.
+	// config file spec should become only item of config.system.configloc
+	// other path spec lists should be saved to config.sessionpath vectors
+	// --- should other config items be taken from command line?
+	//     this function is executed before .retro6k-config is loaded...
+	return 0;
 }
 
 void RenderScanline(int scanline, SDL_Surface* framebuffer, SDL_Surface* winsurface)
@@ -3024,6 +3110,10 @@ int main(int argc, char** argv)
 {
 	if (int rv = InitPaths())
 		return rv;
+	if (int rv = ReadArgs(argc, argv))
+		return rv;
+	LoadConfig();
+	CollapsePaths();
 	if (int rv = InitMainWindow())
 		return rv;
 	if (int rv = InitMemory())
