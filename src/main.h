@@ -502,6 +502,7 @@ struct {
 	} screen;
 } config;
 enum class configfilesection {
+	CF_UNKNOWN,
 	CF_PATHS,
 	CF_SCREEN
 };

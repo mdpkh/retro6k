@@ -2218,7 +2218,7 @@ bool LoadConfigFromFile(const char* infilename)
 		return false;
 	}
 	std::string line;
-	configfilesection section;
+	configfilesection section = configfilesection::CF_UNKNOWN;
 	while (std::getline(infile, line))
 	{
 		if (!line.size())
@@ -2235,6 +2235,7 @@ bool LoadConfigFromFile(const char* infilename)
 				section = configfilesection::CF_SCREEN;
 				continue;
 			}
+			section = configfilesection::CF_UNKNOWN;
 			continue;
 		}
 		int splitpos = -1;
