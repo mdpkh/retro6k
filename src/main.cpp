@@ -2048,10 +2048,10 @@ int InitPaths()
 	}
 	// fallback paths in case of failure to load config
 	config.path.rompath.push_back(config.system.exepath / std::filesystem::path("../rom"));
-	config.path.rompath.push_back(std::filesystem::canonical("./../rom"));
+	config.path.rompath.push_back(std::filesystem::path("./../rom"));
 	config.path.rompath.push_back(config.system.exepath);
 	config.path.cartpath.push_back(config.system.exepath / std::filesystem::path("../cart"));
-	config.path.cartpath.push_back(std::filesystem::canonical("./../cart"));
+	config.path.cartpath.push_back(std::filesystem::path("./../cart"));
 	config.path.cartpath.push_back(config.system.exepath);
 	config.path.savepath.push_back(config.system.homepath / std::filesystem::path("Documents"));
 	config.path.savepath.push_back(config.system.homepath);
