@@ -2,8 +2,7 @@
 **/Thumbs.db
 
 #convenience shortcuts
-/Retro 6k debug.lnk
-/Retro 6k release.lnk
+/*.lnk
 
 #LaTeX/MikTex output
 **/*.aux
