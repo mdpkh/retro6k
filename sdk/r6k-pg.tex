@@ -1250,7 +1250,7 @@ $\textbf{Stack} \Rightarrow \text{PC}$\raisebox{0pt}[0pt][.333em]{}}}
 {The value of the accumulator register is copied into the index register X.}
 {\opeffects{$A \to X$}
 {$\uparrow$}{}{}{}{$\uparrow$}{}
-{}}
+{$A$}}
 {\opctable{
 \opcrow{implied}{TAX}{AA}{1}{2}
 }}
@@ -1259,7 +1259,7 @@ $\textbf{Stack} \Rightarrow \text{PC}$\raisebox{0pt}[0pt][.333em]{}}}
 {The value of the accumulator register is copied into the index register Y.}
 {\opeffects{$A \to Y$}
 {$\uparrow$}{}{}{}{$\uparrow$}{}
-{}}
+{$A$}}
 {\opctable{
 \opcrow{implied}{TAY}{A8}{1}{2}
 }}
@@ -1268,7 +1268,7 @@ $\textbf{Stack} \Rightarrow \text{PC}$\raisebox{0pt}[0pt][.333em]{}}}
 {The value of the stack pointer register is copied into the index register X. Useful for examining the stack contents without ``popping'' any bytes from it.}
 {\opeffects{$\text{SP} \to X$}
 {$\uparrow$}{}{}{}{$\uparrow$}{}
-{}}
+{$\text{SP}$}}
 {\opctable{
 \opcrow{implied}{TSX}{BA}{1}{2}
 }}
@@ -1277,7 +1277,7 @@ $\textbf{Stack} \Rightarrow \text{PC}$\raisebox{0pt}[0pt][.333em]{}}}
 {The value of the index register X is copied into the accumulator register.}
 {\opeffects{$X \to A$}
 {$\uparrow$}{}{}{}{$\uparrow$}{}
-{}}
+{$X$}}
 {\opctable{
 \opcrow{implied}{TXA}{8A}{1}{2}
 }}
@@ -1295,7 +1295,7 @@ $\textbf{Stack} \Rightarrow \text{PC}$\raisebox{0pt}[0pt][.333em]{}}}
 {The value of the index register Y is copied into the accumulator register.}
 {\opeffects{$Y \to A$}
 {$\uparrow$}{}{}{}{$\uparrow$}{}
-{}}
+{$Y$}}
 {\opctable{
 \opcrow{implied}{TYA}{98}{1}{2}
 }}
@@ -1320,7 +1320,7 @@ Sources:\\
 
 This routine converts the value in the Accumulator to decimal for display in SCE. The output range and interpretation of flags is different depending on the variant of the subroutine. In \texttt{BYTE2DECUA} (3), the output is 0\,--\,255 if the Carry flag is clear, or 256\,--\,511 if the flag is set. In \texttt{BYTE2DECUS} (4), the output is --256\,--\,--1 if the Carry flag is clear, or 0\,--\,255 if the flag is set. This recognizes the 6502's use of the Carry flag as the compliment of a Borrow flag. In \texttt{BYTE2DECS} (5), the output is --128\,--\,127 if the Overflow flag is clear, or --256\,--\,--129 or 128\,--\,255\footnote{\texttt{BYTE2DECS} chooses the sign based on the exclusive-or of the Overflow and Negative flags.} if the Overflow flag is set.
 
-Side effects: Result is stored in \texttt{008C-F} (text order). Count of digits is stored as a negative number in the X register. Accumulator is not preserved.
+Side effects: Result is stored in \texttt{008C-F} (text order). Address \texttt{008C} holds `\texttt{-}' if the number is negative, or `\texttt{ }' (space) if the number is nonnegative. Digits are right-aligned in the result, so \textit{e.\,g.}\ the `ones' digit is always found in \texttt{008F}. Count of digits (not including sign) is stored as a negative number in the X register. Accumulator is not preserved.
 
 \fwsubroutinehdr{Byte To Hex}
 
@@ -1360,7 +1360,21 @@ Side effects: The X register (2), Y register (3), or Accumulator (1), is overwri
 
 \fwsubroutinehdr{Word To Decimal}
 
-This routine will be included in a future version of the firmware.
+\textit{Not yet implemented.}
+
+\begin{center}\begin{tabular}{r>{\ttfamily}l>{\ttfamily}ccr@{\,--\,}rl}
+& \textrm{Label} & \textrm{Address} & Flag & \multicolumn{2}{c}{\phantom{--}Range} & Use case \\
+(1) & WORD2DECP & ???? & & 0&65535 & Unsigned value \\
+(2) & WORD2DECN & ???? & & --65536&--1 & Count up to zero \\
+(3) & WORD2DECUA & ???? & C & 0&131071 & Unsigned addition result \\
+(4) & WORD2DECUS & ???? & C & --65536&65535 & Unsigned subtraction result \\
+(5) & WORD2DECS & ???? & V & --65536&65535 & Signed add or sub result \\
+(6) & WORD2DECBP & ???? & & 65536&131071 \\
+\end{tabular}\end{center}
+
+This routine converts the little-endian value in memory at \texttt{0088-9} to decimal for display in SCE. The output range and interpretation of flags is different depending on the variant of the subroutine. In \texttt{WORD2DECUA} (3), the output is 0\,--\,65535 if the Carry flag is clear, or 65536\,--\,131071 if the flag is set. In \texttt{WORD2DECUS} (4), the output is --65536\,--\,--1 if the Carry flag is clear, or 0\,--\,65535 if the flag is set. This recognizes the 6502's use of the Carry flag as the compliment of a Borrow flag. In \texttt{WORD2DECS} (5), the output is --32768\,--\,32767 if the Overflow flag is clear, or --65536\,--\,--32769 or 32768\,--\,65535\footnote{\texttt{WORD2DECS} chooses the sign based on the exclusive-or of the Overflow and Negative flags.} if the Overflow flag is set.
+
+Side effects: Result is stored in \texttt{008A-F} (text order). Address \texttt{008A} holds `\texttt{-}' if the number is negative, `\texttt{ }' (space) if the number is nonnegative and less than 100,000, or `\texttt{1}' if the number is greater than or equal to 100,000. Digits are right-aligned in the result, so \textit{e.\,g.}\ the `ones' digit is always found in \texttt{008F}. A thousands-separator is not used. Count of digits (not including sign) is stored as a negative number in the X register. Accumulator is not preserved.
 
 \newpage
 \section{User \& Device Input Addresses}
