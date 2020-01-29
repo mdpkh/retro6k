@@ -6,7 +6,7 @@ The Retro 6k is a “fantasy computer entertainment system”, a. k. a. “f
 
 ## Using the Retro 6k Emulator
 
-Open the emulator menu with numpad 0, then use arrow keys / enter to select an option. If you know the number of the main menu option you want, you can activate it without first opening the menu, by pressing the corresponding digit key on the numpad. Note, several menu options are not yet imple!ented.
+Open the emulator menu with numpad 0, then use arrow keys / enter to select an option. If you know the number of the main menu option you want, you can activate it without first opening the menu, by pressing the corresponding digit key on the numpad. Note, several menu options are not yet implemented.
 
 ## Programming the Retro 6k Emulator
 
