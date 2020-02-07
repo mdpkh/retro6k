@@ -37,7 +37,6 @@
 
 #misc things to keep to myself
 /**/chicago.png
-/**/scs.svg
 /**/extractcharsvg.py
 /**/cropcharsvg.py
 /**/makecharpdf.py
@@ -45,6 +44,7 @@
 /**/*.bat
 /**/packhifont.py
 /**/colorcycle.c
+/docs/*-src/*.svg
 /ver.cpp
 /updatever.py
 
