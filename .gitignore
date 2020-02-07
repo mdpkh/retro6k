@@ -13,11 +13,11 @@
 **/*.synctex.gz
 **/*.toc
 **/*.pdf
-!/sdk/logolineart.pdf
-!/sdk/char??.pdf
-!/sdk/fvmc.pdf
-!/sdk/gamepad.pdf
-!/sdk/keyboard.pdf
+!/docs/pg-src/logolineart.pdf
+!/docs/pg-src/char??.pdf
+!/docs/pg-src/fvmc.pdf
+!/docs/pg-src/gamepad.pdf
+!/docs/pg-src/keyboard.pdf
 
 #assembler output in SDK folder
 /sdk/*.R6kCart
