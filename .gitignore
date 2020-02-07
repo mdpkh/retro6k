@@ -23,6 +23,9 @@
 /sdk/*.R6kCart
 /sdk/*.rom
 /sdk/*.txt
+/app-src/**/*.R6kCart
+/app-src/**/*.rom
+/app-src/**/*.txt
 
 #versioning files
 /lastpush
