@@ -1,0 +1,1148 @@
+  .org $1F4C ; this may need to be adjusted to allow room for header
+header:
+  .text "\x47\xA9\x02\x6A\xBB\x47\xF3\xA7" ; cartridge file format 1986c
+  .word pflags-header ; file offset (LE) to base address space page flags
+  .word $0000 ; upper bytes of 4-byte number
+  .word cartromstart-header ; file offset (LE) to base address space data start
+  .word $0000 ; upper bytes of 4-byte number
+extensions:
+  .text "\x00\x00\x00\x00" ; extensions format not yet defined
+pflags:
+  ; flags for pages $20xx-$BFxx
+  ; 00: floating (no memory installed at this address)
+  ; 01: ROM
+  ; 02: RAM
+  ; 03: NVM (persistent storage in cartridge)
+  ; 04: bank-switched flags
+  .blk $20,$01 ; (8K ROM)
+  .blk $80,$00 ; (32K floating)
+headerend:
+  .org $2000 ; actual data contained on emulated cartridge starts here
+cartromstart:
+  .text "Wo\204De Test" ; must be 10 bytes
+  .text "\x47\xA9\x0C\x1E" ; cartridge signature, must be 47 A9 0C 1E
+  .word entry ; cartridge code entry point
+interruptroutine: ; this label must equal $2010
+  RTI
+FVMCDEST   = $03F8
+FVMCSRC    = $03F9
+  .include subroutines.s
+entry:
+  LDA #$20
+  ; TODO: blank out certain cells
+  ; copy system font
+  LDY #$E0 ; system font source page start
+  LDA #$10 ; video RAM font page start
+copyfontpageloop:
+  JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
+  ; enable fast video memory copy
+  CLC
+  STA FVMCDEST
+  STY FVMCSRC
+  LDX #$00
+copyfontbyteloop:
+  STA $00,X ; actual address and value written is overridden by fast video memory copy circuit
+  INX
+  STA $00,X
+  INX
+  STA $00,X
+  INX
+  STA $00,X
+  INX
+  BNE copyfontbyteloop
+  ; disable fast video memory copy
+  ; X should be zero
+  STX FVMCDEST
+  INY ; increment source page
+  CLC
+  ADC #$01 ; increment destination page
+  CMP #$18 ; compare against stop page number
+  BNE copyfontpageloop
+  JSR WAITVSCANX ; wait for vertical retrace
+  ; initialize screen display
+  LDX #$00
+initscreenloop:
+  LDA #$96 ; screen lines 16&17: shade blocks
+  STA $0A00,X
+  LDA #$CF ; screen lines 0-15 attribute bit 0: 0/1 0/1 1/1 1/1
+  STA $0A40,X
+  STA $0A80,X
+  STA $0AC0,X
+  STA $0B00,X
+  LDA #$CC ; screen lines 16&17 attribute bit 0, sl 0&1 ab 1: 0/0 0/0 1/1 1/1
+  STA $0B40,X
+  ; screen lines 2-17 attribute bit 1: 0/0 0/0 1/1 1/1
+  STA $0B80,X
+  STA $0BC0,X
+  STA $0C00,X
+  STA $0C40,X
+  ; screen lines 0-3, 8-11 attribute bit 2: 0/0 0/0 1/1 1/1
+  STA $0C80,X
+  STA $0D00,X
+  LDA #$FF ; screen lines 4-7, 12-15 attribute bit 2: 1/1 1/1 1/1 1/1
+  STA $0CC0,X
+  STA $0D40,X
+  LDA #$FF ; screen lines 16&17 attribute bit 2, sl 0-17 ab 3: 1/1 1/1 1/1 1/1
+  STA $0D80,X
+  STA $0DC0,X
+  STA $0E00,X
+  STA $0E40,X
+  STA $0E80,X
+  LDA #$00 ; screen lines 0-15 attribute bit 4: 0/0 0/0 0/0 0/0
+  STA $0EC0,X
+  STA $0F00,X
+  STA $0F40,X
+  STA $0F80,X
+  LDA datasyscolors-$20,X ; sl 16&17 ab 4, palette colors
+  STA $0FC0,X
+  INX
+  TXA
+  AND #$07
+  CMP #$00
+  BNE initscreenloop
+  TXA
+  JSR WAITVSCANX
+  CMP #$40
+  BNE initscreenloop
+  ;--------------------------------------------------------------------
+  ; initialize Word2Dec output area with filler
+  LDA #$1D
+  STA $8A
+  LDA #$31
+  STA $8B
+  LDA #$32
+  STA $8C
+  LDA #$33
+  STA $8D
+  LDA #$34
+  STA $8E
+  LDA #$35
+  STA $8F
+  LDX #$00
+  ;--------------------------------------------------------------------
+  ; clear screen buffer
+  LDX #$00
+clearscreenloop:
+  LDA #$20
+  STA $0400,X
+  STA $0500,X
+  INX
+  BNE clearscreenloop
+  ;--------------------------------------------------------------------
+  ; actual number work
+  LDA #<0
+  STA $88
+  LDA #>0
+  STA $89
+  LDY #$00
+  JSR NUMLINE
+  LDA #<200
+  STA $88
+  LDA #>200
+  STA $89
+  LDY #$01
+  JSR NUMLINE
+  LDA #<500
+  STA $88
+  LDA #>500
+  STA $89
+  LDY #$02
+  JSR NUMLINE
+  LDA #<1000
+  STA $88
+  LDA #>1000
+  STA $89
+  LDY #$03
+  JSR NUMLINE
+  LDA #<1500
+  STA $88
+  LDA #>1500
+  STA $89
+  LDY #$04
+  JSR NUMLINE
+  LDA #<2000
+  STA $88
+  LDA #>2000
+  STA $89
+  LDY #$05
+  JSR NUMLINE
+  LDA #<3000
+  STA $88
+  LDA #>3000
+  STA $89
+  LDY #$06
+  JSR NUMLINE
+  LDA #<4000
+  STA $88
+  LDA #>4000
+  STA $89
+  LDY #$07
+  JSR NUMLINE
+  LDA #<6000
+  STA $88
+  LDA #>6000
+  STA $89
+  LDY #$08
+  JSR NUMLINE
+  LDA #<8000
+  STA $88
+  LDA #>8000
+  STA $89
+  LDY #$09
+  JSR NUMLINE
+  LDA #<12000
+  STA $88
+  LDA #>12000
+  STA $89
+  LDY #$0A
+  JSR NUMLINE
+  LDA #<16000
+  STA $88
+  LDA #>16000
+  STA $89
+  LDY #$0B
+  JSR NUMLINE
+  LDA #<24000
+  STA $88
+  LDA #>24000
+  STA $89
+  LDY #$0C
+  JSR NUMLINE
+  LDA #<32000
+  STA $88
+  LDA #>32000
+  STA $89
+  LDY #$0D
+  JSR NUMLINE
+  LDA #<48000
+  STA $88
+  LDA #>48000
+  STA $89
+  LDY #$0E
+  JSR NUMLINE
+  LDA #<64000
+  STA $88
+  LDA #>64000
+  STA $89
+  LDY #$0F
+  JSR NUMLINE
+  ;--------------------------------------------------------------------
+  LDA #$01
+  ;STA $03FF ; debug break
+  ;--------------------------------------------------------------------
+  LDY #$04 ; general memory page
+  LDA #$08 ; character page
+  JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
+  ; enable fast video memory copy
+  CLC
+  STA FVMCDEST
+  STY FVMCSRC
+  STA $00
+  STA $01
+  STA $02
+  STA $03
+  STA $04
+  STA $05
+  STA $06
+  STA $07
+  STA $08
+  STA $09
+  STA $0A
+  STA $0B
+  STA $0C
+  STA $0D
+  STA $0E
+  STA $0F
+  STA $10
+  STA $11
+  STA $12
+  STA $13
+  STA $14
+  STA $15
+  STA $16
+  STA $17
+  STA $18
+  STA $19
+  STA $1A
+  STA $1B
+  STA $1C
+  STA $1D
+  STA $1E
+  STA $1F
+  STA $20
+  STA $21
+  STA $22
+  STA $23
+  STA $24
+  STA $25
+  STA $26
+  STA $27
+  STA $28
+  STA $29
+  STA $2A
+  STA $2B
+  STA $2C
+  STA $2D
+  STA $2E
+  STA $2F
+  STA $30
+  STA $31
+  STA $32
+  STA $33
+  STA $34
+  STA $35
+  STA $36
+  STA $37
+  STA $38
+  STA $39
+  STA $3A
+  STA $3B
+  STA $3C
+  STA $3D
+  STA $3E
+  STA $3F
+  STA $40
+  STA $41
+  STA $42
+  STA $43
+  STA $44
+  STA $45
+  STA $46
+  STA $47
+  STA $48
+  STA $49
+  STA $4A
+  STA $4B
+  STA $4C
+  STA $4D
+  STA $4E
+  STA $4F
+  STA $50
+  STA $51
+  STA $52
+  STA $53
+  STA $54
+  STA $55
+  STA $56
+  STA $57
+  STA $58
+  STA $59
+  STA $5A
+  STA $5B
+  STA $5C
+  STA $5D
+  STA $5E
+  STA $5F
+  STA $60
+  STA $61
+  STA $62
+  STA $63
+  STA $64
+  STA $65
+  STA $66
+  STA $67
+  STA $68
+  STA $69
+  STA $6A
+  STA $6B
+  STA $6C
+  STA $6D
+  STA $6E
+  STA $6F
+  STA $70
+  STA $71
+  STA $72
+  STA $73
+  STA $74
+  STA $75
+  STA $76
+  STA $77
+  STA $78
+  STA $79
+  STA $7A
+  STA $7B
+  STA $7C
+  STA $7D
+  STA $7E
+  STA $7F
+  STA $80
+  STA $81
+  STA $82
+  STA $83
+  STA $84
+  STA $85
+  STA $86
+  STA $87
+  STA $88
+  STA $89
+  STA $8A
+  STA $8B
+  STA $8C
+  STA $8D
+  STA $8E
+  STA $8F
+  STA $90
+  STA $91
+  STA $92
+  STA $93
+  STA $94
+  STA $95
+  STA $96
+  STA $97
+  STA $98
+  STA $99
+  STA $9A
+  STA $9B
+  STA $9C
+  STA $9D
+  STA $9E
+  STA $9F
+  STA $A0
+  STA $A1
+  STA $A2
+  STA $A3
+  STA $A4
+  STA $A5
+  STA $A6
+  STA $A7
+  STA $A8
+  STA $A9
+  STA $AA
+  STA $AB
+  STA $AC
+  STA $AD
+  STA $AE
+  STA $AF
+  STA $B0
+  STA $B1
+  STA $B2
+  STA $B3
+  STA $B4
+  STA $B5
+  STA $B6
+  STA $B7
+  STA $B8
+  STA $B9
+  STA $BA
+  STA $BB
+  STA $BC
+  STA $BD
+  STA $BE
+  STA $BF
+  STA $C0
+  STA $C1
+  STA $C2
+  STA $C3
+  STA $C4
+  STA $C5
+  STA $C6
+  STA $C7
+  STA $C8
+  STA $C9
+  STA $CA
+  STA $CB
+  STA $CC
+  STA $CD
+  STA $CE
+  STA $CF
+  STA $D0
+  STA $D1
+  STA $D2
+  STA $D3
+  STA $D4
+  STA $D5
+  STA $D6
+  STA $D7
+  STA $D8
+  STA $D9
+  STA $DA
+  STA $DB
+  STA $DC
+  STA $DD
+  STA $DE
+  STA $DF
+  STA $E0
+  STA $E1
+  STA $E2
+  STA $E3
+  STA $E4
+  STA $E5
+  STA $E6
+  STA $E7
+  STA $E8
+  STA $E9
+  STA $EA
+  STA $EB
+  STA $EC
+  STA $ED
+  STA $EE
+  STA $EF
+  STA $F0
+  STA $F1
+  STA $F2
+  STA $F3
+  STA $F4
+  STA $F5
+  STA $F6
+  STA $F7
+  STA $F8
+  STA $F9
+  STA $FA
+  STA $FB
+  STA $FC
+  STA $FD
+  STA $FE
+  STA $FF
+  LDY #$05 ; general memory page
+  LDA #$09 ; character page
+  STA FVMCDEST
+  STY FVMCSRC
+  JSR WAITVSCANX
+  STA $00
+  STA $01
+  STA $02
+  STA $03
+  STA $04
+  STA $05
+  STA $06
+  STA $07
+  STA $08
+  STA $09
+  STA $0A
+  STA $0B
+  STA $0C
+  STA $0D
+  STA $0E
+  STA $0F
+  STA $10
+  STA $11
+  STA $12
+  STA $13
+  STA $14
+  STA $15
+  STA $16
+  STA $17
+  STA $18
+  STA $19
+  STA $1A
+  STA $1B
+  STA $1C
+  STA $1D
+  STA $1E
+  STA $1F
+  STA $20
+  STA $21
+  STA $22
+  STA $23
+  STA $24
+  STA $25
+  STA $26
+  STA $27
+  STA $28
+  STA $29
+  STA $2A
+  STA $2B
+  STA $2C
+  STA $2D
+  STA $2E
+  STA $2F
+  STA $30
+  STA $31
+  STA $32
+  STA $33
+  STA $34
+  STA $35
+  STA $36
+  STA $37
+  STA $38
+  STA $39
+  STA $3A
+  STA $3B
+  STA $3C
+  STA $3D
+  STA $3E
+  STA $3F
+  STA $40
+  STA $41
+  STA $42
+  STA $43
+  STA $44
+  STA $45
+  STA $46
+  STA $47
+  STA $48
+  STA $49
+  STA $4A
+  STA $4B
+  STA $4C
+  STA $4D
+  STA $4E
+  STA $4F
+  STA $50
+  STA $51
+  STA $52
+  STA $53
+  STA $54
+  STA $55
+  STA $56
+  STA $57
+  STA $58
+  STA $59
+  STA $5A
+  STA $5B
+  STA $5C
+  STA $5D
+  STA $5E
+  STA $5F
+  STA $60
+  STA $61
+  STA $62
+  STA $63
+  STA $64
+  STA $65
+  STA $66
+  STA $67
+  STA $68
+  STA $69
+  STA $6A
+  STA $6B
+  STA $6C
+  STA $6D
+  STA $6E
+  STA $6F
+  STA $70
+  STA $71
+  STA $72
+  STA $73
+  STA $74
+  STA $75
+  STA $76
+  STA $77
+  STA $78
+  STA $79
+  STA $7A
+  STA $7B
+  STA $7C
+  STA $7D
+  STA $7E
+  STA $7F
+  STA $80
+  STA $81
+  STA $82
+  STA $83
+  STA $84
+  STA $85
+  STA $86
+  STA $87
+  STA $88
+  STA $89
+  STA $8A
+  STA $8B
+  STA $8C
+  STA $8D
+  STA $8E
+  STA $8F
+  STA $90
+  STA $91
+  STA $92
+  STA $93
+  STA $94
+  STA $95
+  STA $96
+  STA $97
+  STA $98
+  STA $99
+  STA $9A
+  STA $9B
+  STA $9C
+  STA $9D
+  STA $9E
+  STA $9F
+  STA $A0
+  STA $A1
+  STA $A2
+  STA $A3
+  STA $A4
+  STA $A5
+  STA $A6
+  STA $A7
+  STA $A8
+  STA $A9
+  STA $AA
+  STA $AB
+  STA $AC
+  STA $AD
+  STA $AE
+  STA $AF
+  STA $B0
+  STA $B1
+  STA $B2
+  STA $B3
+  STA $B4
+  STA $B5
+  STA $B6
+  STA $B7
+  STA $B8
+  STA $B9
+  STA $BA
+  STA $BB
+  STA $BC
+  STA $BD
+  STA $BE
+  STA $BF
+  STA $C0
+  STA $C1
+  STA $C2
+  STA $C3
+  STA $C4
+  STA $C5
+  STA $C6
+  STA $C7
+  STA $C8
+  STA $C9
+  STA $CA
+  STA $CB
+  STA $CC
+  STA $CD
+  STA $CE
+  STA $CF
+  STA $D0
+  STA $D1
+  STA $D2
+  STA $D3
+  STA $D4
+  STA $D5
+  STA $D6
+  STA $D7
+  STA $D8
+  STA $D9
+  STA $DA
+  STA $DB
+  STA $DC
+  STA $DD
+  STA $DE
+  STA $DF
+  STA $E0
+  STA $E1
+  STA $E2
+  STA $E3
+  STA $E4
+  STA $E5
+  STA $E6
+  STA $E7
+  STA $E8
+  STA $E9
+  STA $EA
+  STA $EB
+  STA $EC
+  STA $ED
+  STA $EE
+  STA $EF
+  STA $F0
+  STA $F1
+  STA $F2
+  STA $F3
+  STA $F4
+  STA $F5
+  STA $F6
+  STA $F7
+  STA $F8
+  STA $F9
+  STA $FA
+  STA $FB
+  STA $FC
+  STA $FD
+  STA $FE
+  STA $FF
+  LDA #$00
+  STA FVMCDEST
+  STA FVMCSRC
+halt:
+  JMP halt ; do-nothing infinite loop
+WORD2DECP:
+  ; treat value as unsigned in range 0-65535
+  LDA #$20 ; space for sign column
+  STA $8A ; write sign column
+  LDA #$00 ; zero for digits initialization
+  STA $8B ; hundred-thousands and ten-thousands
+  STA $8D ; thousands and hundreds
+  STA $8F ; tens and units
+  SED ; begin adding data bits...
+w2dbit0: ; all variants of WORD2DEC get here eventually
+  LSR $89
+  ROR $88
+  BCC w2dbit1
+  LDA $8F  ; value is either 00 or 72
+  ADC #$01 ; carry is impossible, don't worry about other columns
+  STA $8F
+w2dbit1:
+  LSR $89
+  ROR $88
+  BCC w2dbit2
+  LDA $8F  ; value is either 00-01 or 72-73
+  ADC #$02 ; carry is impossible
+  STA $8F
+w2dbit2:
+  LSR $89
+  ROR $88
+  BCC w2dbit3
+  LDA $8F  ; value is either 00-03 or 72-75
+  ADC #$04 ; carry is impossible
+  STA $8F
+w2dbit3:
+  LSR $89
+  ROR $88
+  BCC w2dbit4
+  LDA $8F  ; value is either 00-07 or 72-79
+  ADC #$08 ; carry (to hundreds digit) is impossible
+  STA $8F
+w2dbit4:
+  LSR $89
+  ROR $88
+  BCC w2dbit5
+  LDA $8F  ; value is either 00-15 or 72-87
+  ADC #$16 ; carry to hundreds digit is possible
+  STA $8F
+  LDA $8D  ; value is either 00 or 10
+  ADC #$00 ; carry the 1
+  STA $8D
+w2dbit5:
+  LSR $89
+  ROR $88
+  BCC w2dbit6
+  LDA $8F  ; value is either 00-31 or 72-99
+  ADC #$32 ; carry to hundreds digit is possible
+  STA $8F
+  LDA $8D  ; value is either 00 or 10-11
+  ADC #$00 
+  STA $8D
+w2dbit6:
+  LSR $89
+  ROR $88
+  BCC w2dbit7
+  LDA $8F  ; value is either 00-63 or 72-99
+  ADC #$64 ; carry to hundreds digit is likely
+  STA $8F
+  LDA $8D  ; value is either 00 or 10-11
+  ADC #$00 
+  STA $8D
+w2dbit7:
+  LSR $89 ; most significant bit shifted out of upper input byte
+  ROR $88
+  BCC w2dbit8
+  LDA $8F
+  ADC #$28
+  STA $8F
+  LDA $8D  ; value is either 00-01 or 10-11
+  ADC #$01 ; carry is impossible
+  STA $8D
+w2dbit8:
+  LSR $88
+  BCC w2dbit9
+  LDA $8F
+  ADC #$56
+  STA $8F
+  LDA $8D  ; value is either 00-02 or 10-13
+  ADC #$02 ; carry is impossible
+  STA $8D
+w2dbit9:
+  LSR $88
+  BCC w2dbit10
+  LDA $8F
+  ADC #$12
+  STA $8F
+  LDA $8D  ; value is either 00-05 or 10-15
+  ADC #$05 ; carry (to ten-thousands digit) is impossible
+  STA $8D
+w2dbit10:
+  LSR $88
+  BCC w2dbit11
+  LDA $8F
+  ADC #$24
+  STA $8F
+  LDA $8D  ; value is 00-20
+  ADC #$10 ; carry (to ten-thousands digit) is impossible
+  STA $8D
+w2dbit11:
+  LSR $88
+  BCC w2dbit12
+  LDA $8F
+  ADC #$48
+  STA $8F
+  LDA $8D  ; value is 00-31
+  ADC #$20 ; carry (to ten-thousands digit) is impossible
+  STA $8D
+w2dbit12:
+  LSR $88
+  BCC w2dbit13
+  LDA $8F
+  ADC #$96
+  STA $8F
+  LDA $8D  ; value is 00-51
+  ADC #$40 ; carry (to ten-thousands digit) is impossible
+  STA $8D
+w2dbit13:
+  LSR $88
+  BCC w2dbit14
+  LDA $8F
+  ADC #$92
+  STA $8F
+  LDA $8D  ; value is 00-92
+  ADC #$81 ; carry is likely
+  STA $8D
+  LDA $8B
+  ADC #$00 ; carry the 1
+  STA $8B
+w2dbit14:
+  LSR $88
+  BCC w2dbit15
+  LDA $8F
+  ADC #$84
+  STA $8F
+  LDA $8D
+  ADC #$63
+  STA $8D
+  LDA $8B
+  ADC #$01
+  STA $8B
+w2dbit15:
+  LSR $88
+  BCC w2dcheckhigh
+  LDA $8F
+  ADC #$68
+  STA $8F
+  LDA $8D
+  ADC #$27
+  STA $8D
+  LDA $8B
+  ADC #$03
+  STA $8B
+; format the output, below
+w2dcheckhigh:
+  CLD
+  LDA $8B
+  BEQ w2dcheckmid ; 4 or fewer digits (else 5 or 6)
+  AND #$F0
+  BEQ w2dreturn5d ; 5 digits (else 6)
+  LSR A
+  LSR A
+  LSR A
+  LSR A
+  ORA #$30
+  STA $8A ; write hundred-thousands digit (which is nonzero)
+  LDA $8B
+  AND #$0F
+  ORA #$30
+  STA $8B ; write ten-thousands digit
+  LDA $8D ; pre-load thousands digit
+  LDX #$FA ; -6
+  BNE w2dwritemid ; (branch always; Z cleared by preceeding LDX)
+w2dreturn5d:
+  LDA $8B
+  AND #$0F
+  ORA #$30
+  STA $8B ; write ten-thousands digit
+  LDA $8D ; pre-load thousands digit
+  LDX #$FB ; -5
+  BNE w2dwritemid ; (branch always; Z cleared by preceeding LDX)
+w2dcheckmid:
+  ; before actually checking middle digits, ensure ten-thousands output is a space
+  LDA #$20
+  STA $8B
+  LDA $8D
+  BEQ w2dchecklow ; 1 or 2 digits (else 3 or 4)
+  AND #$F0
+  BEQ w2dreturn3d ; 3 digits (else 4)
+  LDX #$FC ; -4
+w2dwritemid: ; assume A holds (at least high nybble of) value at $8D
+  LSR A
+  LSR A
+  LSR A
+  LSR A
+  ORA #$30
+  STA $8C ; write thousands digit
+  LDA $8D
+  AND #$0F
+  ORA #$30
+  STA $8D ; write hundreds digit
+  LDA $8F ; pre-load tens digit
+  ORA #$01 ; writelow doesn't care about low nybble of A on entry, but we need to clear Zero status bit and can't overwrite X here
+  BNE w2dwritelow ; (branch always; Z cleared by preceeding ORA)
+w2dreturn3d:
+  LDA #$20 ; space
+  STA $8C ; thousands output
+  LDA $8D
+  AND #$0F
+  ORA #$30
+  STA $8D ; write hundreds digit
+  LDA $8F ; pre-load tens digit
+  LDX #$FD ; -3
+  BNE w2dwritelow ; (branch always; Z cleared by preceeding LDX)
+w2dchecklow:
+  ; before actually checking low digits, ensure thousands and hundreds outputs are spaces
+  LDA #$20 ; space
+  STA $8C ; thousands output
+  STA $8D ; hundreds output
+  LDA $8F
+  AND #$F0
+  BEQ w2dreturn5d ; 1 digit (else 2)
+  LDX #$FE ; -2
+w2dwritelow: ; assume A holds (at least high nybble of) value at $8F
+  LSR A
+  LSR A
+  LSR A
+  LSR A
+  ORA #$30
+  STA $8E ; write tens digit
+  LDA $8F
+  AND #$0F
+  ORA #$30
+  STA $8F ; write ones digit
+  RTS
+w2dreturn1d:
+  LDA #$20 ; space
+  STA $8E ; tens output
+  LDA $8F
+  AND #$0F
+  ORA #$30
+  STA $8F ; write ones digit
+  LDX #$FF ; -1
+  RTS
+
+WORD2DECUA:
+WORD2DECUS:
+WORD2DECS:
+WORD2DECN:
+WORD2DECBP:
+  RTS
+NUMLINE:
+  ; Process the value already stored in $88-9 and display results on
+  ; screen line identified by Y register (which is not preserved as given)
+  TYA
+  ASL
+  ASL
+  ASL
+  ASL
+  ASL
+  TAY
+  BCS numline2
+  JSR WORD2DECP
+  TXA
+  CLC
+  EOR #$FF
+  ADC #$31
+  STA $0400,Y
+  LDA $8A
+  STA $0402,Y
+  LDA $8B
+  STA $0403,Y
+  LDA $8C
+  STA $0404,Y
+  LDA $8D
+  STA $0405,Y
+  LDA $8E
+  STA $0406,Y
+  LDA $8F
+  STA $0407,Y
+  JSR WORD2DECN
+  TXA
+  CLC
+  EOR #$FF
+  ADC #$31
+  STA $040C,Y
+  LDA $8A
+  STA $040E,Y
+  LDA $8B
+  STA $040F,Y
+  LDA $8C
+  STA $0410,Y
+  LDA $8D
+  STA $0411,Y
+  LDA $8E
+  STA $0412,Y
+  LDA $8F
+  STA $0413,Y
+  JSR WORD2DECBP
+  TXA
+  CLC
+  EOR #$FF
+  ADC #$31
+  STA $0418,Y
+  LDA $8A
+  STA $041A,Y
+  LDA $8B
+  STA $041B,Y
+  LDA $8C
+  STA $041C,Y
+  LDA $8D
+  STA $041D,Y
+  LDA $8E
+  STA $041E,Y
+  LDA $8F
+  STA $041F,Y
+  RTS
+numline2:
+  JSR WORD2DECP
+  TXA
+  CLC
+  EOR #$FF
+  ADC #$31
+  STA $0500,Y
+  LDA $8A
+  STA $0502,Y
+  LDA $8B
+  STA $0503,Y
+  LDA $8C
+  STA $0504,Y
+  LDA $8D
+  STA $0505,Y
+  LDA $8E
+  STA $0506,Y
+  LDA $8F
+  STA $0507,Y
+  JSR WORD2DECN
+  TXA
+  CLC
+  EOR #$FF
+  ADC #$31
+  STA $050C,Y
+  LDA $8A
+  STA $050E,Y
+  LDA $8B
+  STA $050F,Y
+  LDA $8C
+  STA $0510,Y
+  LDA $8D
+  STA $0511,Y
+  LDA $8E
+  STA $0512,Y
+  LDA $8F
+  STA $0513,Y
+  JSR WORD2DECBP
+  TXA
+  CLC
+  EOR #$FF
+  ADC #$31
+  STA $0518,Y
+  LDA $8A
+  STA $051A,Y
+  LDA $8B
+  STA $051B,Y
+  LDA $8C
+  STA $051C,Y
+  LDA $8D
+  STA $051D,Y
+  LDA $8E
+  STA $051E,Y
+  LDA $8F
+  STA $051F,Y
+  RTS
+  
+  .align 5
+datasyscolors:
+  .byte $00,$11,$22,$33,$44,$55,$66,$77
+  .byte $80,$91,$A2,$B3,$C4,$D5,$E6,$F7
+  .byte $08,$19,$2A,$3B,$4C,$5D,$6E,$7F
+  .byte $88,$99,$AA,$BB,$CC,$DD,$EE,$FF
+
+  .align 12
