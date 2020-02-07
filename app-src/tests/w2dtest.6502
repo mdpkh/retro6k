@@ -767,7 +767,7 @@ WORD2DECBP:
   LDA #$36
   STA $8F ; tens and units
   SED ; begin adding data bits...
-  JMP w2dbit0 ; TODO: make this a BRA somehow?
+  BNE w2dbit0 ; (branch always; Z cleared by preceeding LDA)
 WORD2DECP:
   ; treat value as unsigned in range 0-65535
   LDA #$20 ; space for sign column
