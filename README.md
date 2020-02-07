@@ -10,9 +10,9 @@ Open the emulator menu with numpad 0, then use arrow keys / enter to select an o
 
 ## Programming the Retro 6k Emulator
 
-Compile [sdk/r6k-pg.tex](sdk/r6k-pg.tex) using `pdflatex` and then consult `r6k-pg.pdf`.
+Compile [docs/pg-src/r6k-pg.tex](docs/pg-src/r6k-pg.tex) using `pdflatex` (may need to run a few times to get TOC and table-layout stuff right) and then consult `r6k-pg.pdf`. (To make it easy to find again, move `r6k-pg.pdf` to `docs`.)
 
-I generate my cartridges by using [vasm](http://sun.hasenbraten.de/vasm/index.php?view=main) and its Oldstyle Syntax Module. [Windows vasm binaries](https://www.chibiakumas.com/z80/vasm.php) are available for download.
+I generate my cartridges by using [vasm](http://sun.hasenbraten.de/vasm/index.php?view=main) and its Oldstyle Syntax Module. Windows users: [Windows vasm binaries](https://www.chibiakumas.com/z80/vasm.php) are available for download so you don't have to try to build vasm from source.
 
 ## Compiling the Retro 6k Emulator from Source
 
