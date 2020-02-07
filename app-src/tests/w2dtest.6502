@@ -26,7 +26,7 @@ interruptroutine: ; this label must equal $2010
   RTI
 FVMCDEST   = $03F8
 FVMCSRC    = $03F9
-  .include subroutines.s
+  .include ../include/subroutines.6502
 entry:
   LDA #$20
   ; TODO: blank out certain cells
@@ -130,69 +130,69 @@ clearscreenloop:
   BNE clearscreenloop
   ;--------------------------------------------------------------------
   ; actual number work
-  LDA #<0
+  LDA #<5
   STA $88
-  LDA #>0
+  LDA #>5
   STA $89
   LDY #$00
+  JSR NUMLINE
+  LDA #<10
+  STA $88
+  LDA #>10
+  STA $89
+  LDY #$01
+  JSR NUMLINE
+  LDA #<20
+  STA $88
+  LDA #>20
+  STA $89
+  LDY #$02
+  JSR NUMLINE
+  LDA #<50
+  STA $88
+  LDA #>50
+  STA $89
+  LDY #$03
+  JSR NUMLINE
+  LDA #<100
+  STA $88
+  LDA #>100
+  STA $89
+  LDY #$04
   JSR NUMLINE
   LDA #<200
   STA $88
   LDA #>200
   STA $89
-  LDY #$01
+  LDY #$05
   JSR NUMLINE
   LDA #<500
   STA $88
   LDA #>500
   STA $89
-  LDY #$02
+  LDY #$06
   JSR NUMLINE
   LDA #<1000
   STA $88
   LDA #>1000
   STA $89
-  LDY #$03
-  JSR NUMLINE
-  LDA #<1500
-  STA $88
-  LDA #>1500
-  STA $89
-  LDY #$04
+  LDY #$07
   JSR NUMLINE
   LDA #<2000
   STA $88
   LDA #>2000
   STA $89
-  LDY #$05
-  JSR NUMLINE
-  LDA #<3000
-  STA $88
-  LDA #>3000
-  STA $89
-  LDY #$06
-  JSR NUMLINE
-  LDA #<4000
-  STA $88
-  LDA #>4000
-  STA $89
-  LDY #$07
-  JSR NUMLINE
-  LDA #<6000
-  STA $88
-  LDA #>6000
-  STA $89
   LDY #$08
   JSR NUMLINE
-  LDA #<8000
+  LDA #<5000
   STA $88
-  LDA #>8000
+  LDA #>5000
   STA $89
   LDY #$09
   JSR NUMLINE
-  LDA #<12000
+  LDA #<10000
   STA $88
-  LDA #>12000
+  LDA #>10000
   STA $89
   LDY #$0A
   JSR NUMLINE
@@ -226,10 +226,6 @@ clearscreenloop:
   STA $89
   LDY #$0F
   JSR NUMLINE
-  ;--------------------------------------------------------------------
-  LDA #$01
-  ;STA $03FF ; debug break
-  ;--------------------------------------------------------------------
   LDY #$04 ; general memory page
   LDA #$08 ; character page
   JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
@@ -771,37 +767,37 @@ WORD2DECP:
 w2dbit0: ; all variants of WORD2DEC get here eventually
   LSR $89
   ROR $88
-  BCC w2dbit1
+  BCC w2dbit1 ; note, carry flag is set for first ADC of each bit handler!
   LDA $8F  ; value is either 00 or 72
-  ADC #$01 ; carry is impossible, don't worry about other columns
+  ADC #$00 ; (add 1) carry is impossible, don't worry about other columns
   STA $8F
 w2dbit1:
   LSR $89
   ROR $88
   BCC w2dbit2
   LDA $8F  ; value is either 00-01 or 72-73
-  ADC #$02 ; carry is impossible
+  ADC #$01 ; (add 2) carry is impossible
   STA $8F
 w2dbit2:
   LSR $89
   ROR $88
   BCC w2dbit3
   LDA $8F  ; value is either 00-03 or 72-75
-  ADC #$04 ; carry is impossible
+  ADC #$03 ; (add 4) carry is impossible
   STA $8F
 w2dbit3:
   LSR $89
   ROR $88
   BCC w2dbit4
   LDA $8F  ; value is either 00-07 or 72-79
-  ADC #$08 ; carry (to hundreds digit) is impossible
+  ADC #$07 ; (add 8) carry (to hundreds digit) is impossible
   STA $8F
 w2dbit4:
   LSR $89
   ROR $88
   BCC w2dbit5
   LDA $8F  ; value is either 00-15 or 72-87
-  ADC #$16 ; carry to hundreds digit is possible
+  ADC #$15 ; (add 16) carry to hundreds digit is possible
   STA $8F
   LDA $8D  ; value is either 00 or 10
   ADC #$00 ; carry the 1
@@ -811,7 +807,7 @@ w2dbit5:
   ROR $88
   BCC w2dbit6
   LDA $8F  ; value is either 00-31 or 72-99
-  ADC #$32 ; carry to hundreds digit is possible
+  ADC #$31 ; (add 32) carry to hundreds digit is possible
   STA $8F
   LDA $8D  ; value is either 00 or 10-11
   ADC #$00 
@@ -821,7 +817,7 @@ w2dbit6:
   ROR $88
   BCC w2dbit7
   LDA $8F  ; value is either 00-63 or 72-99
-  ADC #$64 ; carry to hundreds digit is likely
+  ADC #$63 ; (add 64) carry to hundreds digit is likely
   STA $8F
   LDA $8D  ; value is either 00 or 10-11
   ADC #$00 
@@ -831,7 +827,7 @@ w2dbit7:
   ROR $88
   BCC w2dbit8
   LDA $8F
-  ADC #$28
+  ADC #$27 ; add 128
   STA $8F
   LDA $8D  ; value is either 00-01 or 10-11
   ADC #$01 ; carry is impossible
@@ -840,7 +836,7 @@ w2dbit8:
   LSR $88
   BCC w2dbit9
   LDA $8F
-  ADC #$56
+  ADC #$55 ; add 256
   STA $8F
   LDA $8D  ; value is either 00-02 or 10-13
   ADC #$02 ; carry is impossible
@@ -849,7 +845,7 @@ w2dbit9:
   LSR $88
   BCC w2dbit10
   LDA $8F
-  ADC #$12
+  ADC #$11 ; add 512
   STA $8F
   LDA $8D  ; value is either 00-05 or 10-15
   ADC #$05 ; carry (to ten-thousands digit) is impossible
@@ -858,7 +854,7 @@ w2dbit10:
   LSR $88
   BCC w2dbit11
   LDA $8F
-  ADC #$24
+  ADC #$23 ; add 1024
   STA $8F
   LDA $8D  ; value is 00-20
   ADC #$10 ; carry (to ten-thousands digit) is impossible
@@ -867,7 +863,7 @@ w2dbit11:
   LSR $88
   BCC w2dbit12
   LDA $8F
-  ADC #$48
+  ADC #$47 ; add 2048
   STA $8F
   LDA $8D  ; value is 00-31
   ADC #$20 ; carry (to ten-thousands digit) is impossible
@@ -876,7 +872,7 @@ w2dbit12:
   LSR $88
   BCC w2dbit13
   LDA $8F
-  ADC #$96
+  ADC #$95 ; add 4096
   STA $8F
   LDA $8D  ; value is 00-51
   ADC #$40 ; carry (to ten-thousands digit) is impossible
@@ -885,7 +881,7 @@ w2dbit13:
   LSR $88
   BCC w2dbit14
   LDA $8F
-  ADC #$92
+  ADC #$91 ; add 8192
   STA $8F
   LDA $8D  ; value is 00-92
   ADC #$81 ; carry is likely
@@ -897,7 +893,7 @@ w2dbit14:
   LSR $88
   BCC w2dbit15
   LDA $8F
-  ADC #$84
+  ADC #$83 ; add 16384
   STA $8F
   LDA $8D
   ADC #$63
@@ -909,7 +905,7 @@ w2dbit15:
   LSR $88
   BCC w2dcheckhigh
   LDA $8F
-  ADC #$68
+  ADC #$67 ; add 32768
   STA $8F
   LDA $8D
   ADC #$27
@@ -985,7 +981,7 @@ w2dchecklow:
   STA $8D ; hundreds output
   LDA $8F
   AND #$F0
-  BEQ w2dreturn5d ; 1 digit (else 2)
+  BEQ w2dreturn1d ; 1 digit (else 2)
   LDX #$FE ; -2
 w2dwritelow: ; assume A holds (at least high nybble of) value at $8F
   LSR A
@@ -1027,6 +1023,10 @@ NUMLINE:
   TAY
   BCS numline2
   JSR WORD2DECP
+  ;--------------------------------------------------------------------
+  ;LDA #$01
+  ;STA $03FF ; debug break
+  ;--------------------------------------------------------------------
   TXA
   CLC
   EOR #$FF
