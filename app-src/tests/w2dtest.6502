@@ -131,99 +131,99 @@ clearscreenloop:
   ;--------------------------------------------------------------------
   ; actual number work
   LDA #<5
-  STA $88
+  STA $08
   LDA #>5
-  STA $89
+  STA $09
   LDY #$00
   JSR NUMLINE
   LDA #<10
-  STA $88
+  STA $08
   LDA #>10
-  STA $89
+  STA $09
   LDY #$01
   JSR NUMLINE
   LDA #<20
-  STA $88
+  STA $08
   LDA #>20
-  STA $89
+  STA $09
   LDY #$02
   JSR NUMLINE
   LDA #<50
-  STA $88
+  STA $08
   LDA #>50
-  STA $89
+  STA $09
   LDY #$03
   JSR NUMLINE
   LDA #<100
-  STA $88
+  STA $08
   LDA #>100
-  STA $89
+  STA $09
   LDY #$04
   JSR NUMLINE
   LDA #<200
-  STA $88
+  STA $08
   LDA #>200
-  STA $89
+  STA $09
   LDY #$05
   JSR NUMLINE
   LDA #<500
-  STA $88
+  STA $08
   LDA #>500
-  STA $89
+  STA $09
   LDY #$06
   JSR NUMLINE
   LDA #<1000
-  STA $88
+  STA $08
   LDA #>1000
-  STA $89
+  STA $09
   LDY #$07
   JSR NUMLINE
   LDA #<2000
-  STA $88
+  STA $08
   LDA #>2000
-  STA $89
+  STA $09
   LDY #$08
   JSR NUMLINE
   LDA #<5000
-  STA $88
+  STA $08
   LDA #>5000
-  STA $89
+  STA $09
   LDY #$09
   JSR NUMLINE
   LDA #<10000
-  STA $88
+  STA $08
   LDA #>10000
-  STA $89
+  STA $09
   LDY #$0A
   JSR NUMLINE
   LDA #<16000
-  STA $88
+  STA $08
   LDA #>16000
-  STA $89
+  STA $09
   LDY #$0B
   JSR NUMLINE
   LDA #<24000
-  STA $88
+  STA $08
   LDA #>24000
-  STA $89
+  STA $09
   LDY #$0C
   JSR NUMLINE
   LDA #<32000
-  STA $88
+  STA $08
   LDA #>32000
-  STA $89
+  STA $09
   LDY #$0D
   JSR NUMLINE
   LDA #<48000
-  STA $88
+  STA $08
   LDA #>48000
-  STA $89
+  STA $09
   LDY #$0E
   JSR NUMLINE
   LDA #<64000
-  STA $88
+  STA $08
   LDA #>64000
-  STA $89
+  STA $09
   LDY #$0F
   JSR NUMLINE
   LDY #$04 ; general memory page
@@ -1031,6 +1031,10 @@ NUMLINE:
   ASL
   TAY
   BCS numline2
+  LDA $08
+  STA $88
+  LDA $09
+  STA $89
   JSR WORD2DECP
   ;--------------------------------------------------------------------
   ;LDA #$01
@@ -1053,6 +1057,10 @@ NUMLINE:
   STA $0406,Y
   LDA $8F
   STA $0407,Y
+  LDA $08
+  STA $88
+  LDA $09
+  STA $89
   JSR WORD2DECN
   TXA
   CLC
@@ -1071,6 +1079,10 @@ NUMLINE:
   STA $0412,Y
   LDA $8F
   STA $0413,Y
+  LDA $08
+  STA $88
+  LDA $09
+  STA $89
   JSR WORD2DECBP
   TXA
   CLC
@@ -1091,6 +1103,10 @@ NUMLINE:
   STA $041F,Y
   RTS
 numline2:
+  LDA $08
+  STA $88
+  LDA $09
+  STA $89
   JSR WORD2DECP
   TXA
   CLC
@@ -1109,6 +1125,10 @@ numline2:
   STA $0506,Y
   LDA $8F
   STA $0507,Y
+  LDA $08
+  STA $88
+  LDA $09
+  STA $89
   JSR WORD2DECN
   TXA
   CLC
@@ -1127,6 +1147,10 @@ numline2:
   STA $0512,Y
   LDA $8F
   STA $0513,Y
+  LDA $08
+  STA $88
+  LDA $09
+  STA $89
   JSR WORD2DECBP
   TXA
   CLC
