@@ -755,6 +755,19 @@ clearscreenloop:
   STA FVMCSRC
 halt:
   JMP halt ; do-nothing infinite loop
+
+WORD2DECBP:
+  ; treat value as unsigned in range 65536-131071
+  LDA #$20 ; space for sign column
+  STA $8A ; write sign column (may be overwritten later)
+  LDA #$06 ; digits initialization with 65536
+  STA $8B ; hundred-thousands and ten-thousands
+  LDA #$55
+  STA $8D ; thousands and hundreds
+  LDA #$36
+  STA $8F ; tens and units
+  SED ; begin adding data bits...
+  JMP w2dbit0 ; TODO: make this a BRA somehow?
 WORD2DECP:
   ; treat value as unsigned in range 0-65535
   LDA #$20 ; space for sign column
@@ -768,59 +781,53 @@ w2dbit0: ; all variants of WORD2DEC get here eventually
   LSR $89
   ROR $88
   BCC w2dbit1 ; note, carry flag is set for first ADC of each bit handler!
-  LDA $8F  ; value is either 00 or 72
+  LDA $8F  ; value is either 00 or 36
   ADC #$00 ; (add 1) carry is impossible, don't worry about other columns
   STA $8F
 w2dbit1:
   LSR $89
   ROR $88
   BCC w2dbit2
-  LDA $8F  ; value is either 00-01 or 72-73
+  LDA $8F  ; value is either 00-01 or 36-37
   ADC #$01 ; (add 2) carry is impossible
   STA $8F
 w2dbit2:
   LSR $89
   ROR $88
   BCC w2dbit3
-  LDA $8F  ; value is either 00-03 or 72-75
+  LDA $8F  ; value is either 00-03 or 36-39
   ADC #$03 ; (add 4) carry is impossible
   STA $8F
 w2dbit3:
   LSR $89
   ROR $88
   BCC w2dbit4
-  LDA $8F  ; value is either 00-07 or 72-79
+  LDA $8F  ; value is either 00-07 or 36-43
   ADC #$07 ; (add 8) carry (to hundreds digit) is impossible
   STA $8F
 w2dbit4:
   LSR $89
   ROR $88
   BCC w2dbit5
-  LDA $8F  ; value is either 00-15 or 72-87
-  ADC #$15 ; (add 16) carry to hundreds digit is possible
+  LDA $8F  ; value is either 00-15 or 36-51
+  ADC #$15 ; (add 16) carry (to hundreds digit) is impossible
   STA $8F
-  LDA $8D  ; value is either 00 or 10
-  ADC #$00 ; carry the 1
-  STA $8D
 w2dbit5:
   LSR $89
   ROR $88
   BCC w2dbit6
-  LDA $8F  ; value is either 00-31 or 72-99
-  ADC #$31 ; (add 32) carry to hundreds digit is possible
+  LDA $8F  ; value is either 00-31 or 36-67
+  ADC #$31 ; (add 32) carry (to hundreds digit) is impossible
   STA $8F
-  LDA $8D  ; value is either 00 or 10-11
-  ADC #$00 
-  STA $8D
 w2dbit6:
   LSR $89
   ROR $88
   BCC w2dbit7
-  LDA $8F  ; value is either 00-63 or 72-99
+  LDA $8F  ; value is 00-99
   ADC #$63 ; (add 64) carry to hundreds digit is likely
   STA $8F
-  LDA $8D  ; value is either 00 or 10-11
-  ADC #$00 
+  LDA $8D  ; value is either 00 or 55
+  ADC #$00 ; carry the 1 from previous ADC
   STA $8D
 w2dbit7:
   LSR $89 ; most significant bit shifted out of upper input byte
@@ -829,7 +836,7 @@ w2dbit7:
   LDA $8F
   ADC #$27 ; add 128
   STA $8F
-  LDA $8D  ; value is either 00-01 or 10-11
+  LDA $8D  ; value is either 00-01 or 55-56
   ADC #$01 ; carry is impossible
   STA $8D
 w2dbit8:
@@ -838,7 +845,7 @@ w2dbit8:
   LDA $8F
   ADC #$55 ; add 256
   STA $8F
-  LDA $8D  ; value is either 00-02 or 10-13
+  LDA $8D  ; value is either 00-02 or 55-57
   ADC #$02 ; carry is impossible
   STA $8D
 w2dbit9:
@@ -847,7 +854,7 @@ w2dbit9:
   LDA $8F
   ADC #$11 ; add 512
   STA $8F
-  LDA $8D  ; value is either 00-05 or 10-15
+  LDA $8D  ; value is either 00-05 or 55-60
   ADC #$05 ; carry (to ten-thousands digit) is impossible
   STA $8D
 w2dbit10:
@@ -856,7 +863,7 @@ w2dbit10:
   LDA $8F
   ADC #$23 ; add 1024
   STA $8F
-  LDA $8D  ; value is 00-20
+  LDA $8D  ; value is either 00-10 or 55-65
   ADC #$10 ; carry (to ten-thousands digit) is impossible
   STA $8D
 w2dbit11:
@@ -865,7 +872,7 @@ w2dbit11:
   LDA $8F
   ADC #$47 ; add 2048
   STA $8F
-  LDA $8D  ; value is 00-31
+  LDA $8D  ; value is either 00-20 or 55-75
   ADC #$20 ; carry (to ten-thousands digit) is impossible
   STA $8D
 w2dbit12:
@@ -874,20 +881,23 @@ w2dbit12:
   LDA $8F
   ADC #$95 ; add 4096
   STA $8F
-  LDA $8D  ; value is 00-51
-  ADC #$40 ; carry (to ten-thousands digit) is impossible
+  LDA $8D  ; value is either 00-40 or 55-96
+  ADC #$40 ; carry to ten-thousands digit is possible
   STA $8D
+  LDA $8B
+  ADC #$00 ; carry the 1
+  STA $8B
 w2dbit13:
   LSR $88
   BCC w2dbit14
   LDA $8F
   ADC #$91 ; add 8192
   STA $8F
-  LDA $8D  ; value is 00-92
+  LDA $8D  ; value is 00-99
   ADC #$81 ; carry is likely
   STA $8D
   LDA $8B
-  ADC #$00 ; carry the 1
+  ADC #$00
   STA $8B
 w2dbit14:
   LSR $88
@@ -1009,7 +1019,6 @@ WORD2DECUA:
 WORD2DECUS:
 WORD2DECS:
 WORD2DECN:
-WORD2DECBP:
   RTS
 NUMLINE:
   ; Process the value already stored in $88-9 and display results on
