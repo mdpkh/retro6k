@@ -33,18 +33,15 @@
 /__pycache__
 
 #misc things to keep to myself
-/sdk/chicago.png
-/sdk/scs.svg
-/sdk/extractcharsvg.py
-/sdk/cropcharsvg.py
-/sdk/makecharpdf.py
-/sdk/vasm6502*.exe
-/sdk/vasm.bat
-/sdk/vasmhr.bat
-/sdk/install.bat
-/sdk/ati.bat
-/sdk/packhifont.py
-/sdk/colorcycle.c
+/**/chicago.png
+/**/scs.svg
+/**/extractcharsvg.py
+/**/cropcharsvg.py
+/**/makecharpdf.py
+/**/vasm6502*.exe
+/**/*.bat
+/**/packhifont.py
+/**/colorcycle.c
 /ver.cpp
 /updatever.py
 
