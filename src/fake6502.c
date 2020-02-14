@@ -961,12 +961,8 @@ void (*loopexternal)();
 
 void exec6502(uint32_t tickcount) {
     clockgoal6502 += tickcount;
-    if (clockgoal6502 >= 0x40000000) // ADDED BY MDPKH: avoid overflow causing emulator to stop after a while
-    {
-        clockgoal6502 -= 0x80000000;
-        clockticks6502 -= 0x80000000;
-    }
-    while (clockticks6502 < clockgoal6502) {
+    while ((clockticks6502 - clockgoal6502) & 0x80000000) {
+        // MDPKH: while condition changed to account for overflow / wraparound
         opcode = read6502(pc++);
         status |= FLAG_CONSTANT;
 
