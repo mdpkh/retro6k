@@ -378,9 +378,9 @@ BYTETOHEX:
   TAX
   AND #$0F ; extract low nybble
   ADC #$30 ; convert to numeric character
-  CMP #$3A
+  CMP #$3A ; N := (A in 30-39); C := (A in 3A-3F)
   BMI bytetohexb1
-  ADC #$07 ; if low nybble > 9, convert to letter
+  ADC #$06 ; if lo nybble > 9, convert to letter (C is set; effectively add 7)
 bytetohexb1:
   STA $87 ; write low nybble character
   TXA
@@ -391,9 +391,9 @@ bytetohexb1:
   LSR
   LSR ; shift nybble into place
   ADC #$30 ; convert to numeric character
-  CMP #$3A
+  CMP #$3A ; N := (A in 30-39); C := (A in 3A-3F)
   BMI bytetohexb2
-  ADC #$07 ; if high nybble > 9, convert to letter
+  ADC #$06 ; if hi nybble > 9, convert to letter (C is set; effectively add 7)
 bytetohexb2:
   STA $86 ; write high nybble character
   TXA ; restore Accumulator
