@@ -571,17 +571,17 @@ nlproccol3:
   RTS
 
 ASSERTFLAGS:
-  CLC
-  LDA $12
-  BEQ afb1
-  SEC
-afb1:
   CLV
   LDA $13
   BEQ afb2
   LDA #$60
   ADC #$60
 afb2:
+  CLC
+  LDA $12
+  BEQ afb1
+  SEC
+afb1:
   RTS
 
   .org $2D00
@@ -615,6 +615,7 @@ WORD2DECN:
   JMP w2dreturn5d ; skip the decimal logic and return result
   ; (jump is probably too long to make a BRA)
 WORD2DECS:
+  LDA $89 ; set N flag by high input byte
   BVS w2doverflow
   BMI WORD2DECN
   BPL WORD2DECP ; BRA
