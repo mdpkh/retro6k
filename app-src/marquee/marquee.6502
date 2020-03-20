@@ -1,0 +1,810 @@
+  .include ..\include\subroutines.6502
+RENDERSCALEX    =   $20 ; horizontal scale factor (range 1-6)
+RENDERSCALEY    =   $21 ; vertical scale factor (range 1-4)
+RENDERBOLDEN    =   $22 ; thickening of vertical strokes (after hscale)
+RENDERSLANT     =   $23 ; slant factor (256ths; range 0-128)
+RENDERINTERLS   =   $24 ; interletter spacing adjustment
+RENDERSLANTBIAS =   $25 ; fractional x intercept of slant line
+RENDERSLANTMAX  =   $27 ; x slant diff between highest and lowest rows of rendered text
+RENDERRQA       =   $28 ; rightmost requested index of assembled string bitmap
+RENDERRQB       =   $29 ; rightmost requested index of bolded string bitmap
+RENDERRQC       =   $2A ; rightmost requested index of hscaled string bitmap
+RENDERRQD       =   $2B ; rightmost requested index of slanted / final rendered bitmap
+RENDERFRONTA    =   $2C ; rightmost valid index of assembled string bitmap
+RENDERFRONTB    =   $2D ; rightmost valid index of bolded string bitmap
+RENDERFRONTC    =   $2E ; rightmost valid index of hscaled string bitmap
+RENDERFRONTD    =   $2F ; rightmost valid index of slanted / final rendered bitmap
+LETTERLEFT      =   $30 ; per-row left extent of hscaled letter
+STRINGRIGHT     =   $38 ; per-row right extent of assembled string
+SCRATCH         =   $40 ; quick use area, 32 bytes
+FRAMECOUNTER    =   $60
+CELLCOLORBYTE   =   $70
+KBDIN           = $0244
+FVMCDEST        = $03F8
+FVMCSRC         = $03F9
+RENDERSHORT     = $0600 ; assembled, hscaled rendered text (sliding 128px wide window)
+RENDERFINAL0    = $0680 ; rowgroup 0 ] final bitmap of rendered text
+RENDERFINAL1    = $06A0 ; rowgroup 1 ] (sliding 32px wide window)
+RENDERFINAL2    = $06C0 ; rowgroup 2 ] (slant render code relies on this block
+RENDERFINAL3    = $06E0 ; rowgroup 3 ]  ending at page boundary)
+RENDERLETTER    = $0728 ; individual letters (8x8px)
+RENDERWIDELET   = $0730 ; h-scaled individual lettters (48px wide)
+SCROLLDELAY     = $0760 ; how many frames to wait between scroll steps
+CURBLINKSTATE   = $0770 ; 0 or 1; cursor visibility
+MSGBUFCUR       = $077E ; cursor position within message buffer
+MSGBUFLEN       = $077F ; length of message buffer
+MSGBUF          = $0780 ; message buffer (128 bytes)
+BUFMASKA = $7F ; AND w assembled/bolded render buf idx or difference of indices
+BUFMASKC = $1F ; AND w vscaled/slanted(final) render buf idx or diff of indices
+  .org $1F4C ; this may need to be adjusted to allow room for header
+header:
+  .text "\x47\xA9\x02\x6A\xBB\x47\xF3\xA7" ; cartridge file format 1986c
+  .word pflags-header ; file offset (LE) to base address space page flags
+  .word $0000 ; upper bytes of 4-byte number
+  .word cartromstart-header ; file offset (LE) to base address space data start
+  .word $0000 ; upper bytes of 4-byte number
+extensions:
+  .text "\x00\x00\x00\x00" ; extensions format not yet defined
+pflags:
+  ; flags for pages $20xx-$BFxx
+  ; 00: floating (no memory installed at this address)
+  ; 01: ROM
+  ; 02: RAM
+  ; 03: NVM (persistent storage in cartridge)
+  ; 04: bank-switched flags
+  .blk $10,$01 ; (4K ROM @ $2xxx)
+  .blk $10,$00 ; (4K floating)
+  .blk $80,$00 ; (32K floating)
+headerend:
+  .org $2000 ; actual data contained on emulated cartridge starts here
+cartromstart:
+  .text "6k Marquee" ; must be 10 bytes
+  .text "\x47\xA9\x0C\x1E" ; cartridge signature, must be 47 A9 0C 1E
+  .word entry ; cartridge code entry point
+interruptroutine: ; this label must equal $2010
+  RTI
+entry:
+  ; copy font from Bank E
+  LDY #$E0 ; system font source page start
+  LDA #$10 ; video RAM font page start
+copyfontpageloop:
+  JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
+  ; enable fast video memory copy
+  CLC
+  STA FVMCDEST
+  STY FVMCSRC
+  LDX #$00
+copyfontbyteloop:
+  STA $00,X ; actual address and value written is overridden by fast video memory copy circuit
+  INX
+  STA $00,X
+  INX
+  STA $00,X
+  INX
+  STA $00,X
+  INX
+  BNE copyfontbyteloop
+  ; disable fast video memory copy
+  ; X is zero
+  STX FVMCDEST
+  INY ; increment source page
+  CLC
+  ADC #$01 ; increment destination page
+  CMP #$20 ; compare against stop page number
+  BNE copyfontpageloop
+initmsgbuf:
+  ; initialize message buffer
+  LDX #$FF
+initmsgbufloop1:
+  INX
+  LDA defaultmessagebuf,X
+  STA MSGBUF,X
+  BNE initmsgbufloop1
+  STX MSGBUFLEN
+  STX MSGBUFCUR
+  INX
+  LDY #$20
+initmsgbufloop2:
+  TYA
+  STA MSGBUF,X
+  INX
+  TXA
+  CMP #$80
+  BMI initmsgbufloop2
+  LDA #$00
+  STA CURBLINKSTATE
+initrendersettings:
+  ; initialize render settings with default
+  LDA #$04
+  STA RENDERSCALEX
+  STA RENDERSCALEY
+  LDA #$00
+  STA RENDERBOLDEN
+  STA RENDERINTERLS
+  LDA #$66
+  STA RENDERSLANT
+textentrymode:
+  ; initialize screen for text entry mode
+  JSR WAITVSCANA
+  LDX #$00
+teinitscreenloop:
+  LDA proginfo,X ; screen line 0: program info text
+  STA $0800,X
+  LDA #$20 ; blank for most of screen
+  STA $0820,X
+  STA $0840,X
+  STA $0860,X
+  STA $0880,X
+  STA $08A0,X
+  STA $08C0,X
+  STA $08E0,X
+  STA $0900,X
+  STA $0920,X
+  STA $0940,X
+  STA $0960,X
+  STA $0980,X
+  LDA messageprompt,X ; text entry prompt
+  STA $09A0,X
+  LDA MSGBUF,X ; contents of message buffer
+  STA $09C0,X
+  LDA MSGBUF+$20,X
+  STA $09E0,X
+  LDA MSGBUF+$40,X
+  STA $0A00,X
+  LDA MSGBUF+$60,X
+  STA $0A20,X
+  LDA #$0C ; foreground bits on (bottom row only), background bits off
+  STA $0A40,X ; rows 0/1, bit 0
+  LDA #$CC ; foreground bits on, background bits off
+  STA $0A60,X ; rows 2/3, bit 0
+  STA $0A80,X
+  STA $0AA0,X
+  STA $0AC0,X
+  STA $0AE0,X
+  STA $0B00,X
+  STA $0B20,X
+  STA $0B40,X ; rows 16/17, bit 0
+  STA $0B60,X ; rows 0/1, bit 1
+  STA $0B80,X
+  STA $0BA0,X
+  STA $0BC0,X
+  STA $0BE0,X
+  STA $0C00,X
+  STA $0C20,X
+  STA $0C40,X
+  STA $0C60,X ; rows 16/17, bit 1
+  STA $0C80,X ; rows 0/1, bit 2
+  STA $0CA0,X
+  STA $0CC0,X
+  STA $0CE0,X
+  STA $0D00,X
+  STA $0D20,X
+  STA $0D40,X
+  STA $0D60,X
+  STA $0D80,X ; rows 16/17, bit 2
+  STA $0DA0,X ; rows 0/1, bit 3
+  STA $0DC0,X
+  STA $0DE0,X
+  STA $0E00,X
+  STA $0E20,X
+  STA $0E40,X
+  STA $0E60,X
+  STA $0E80,X
+  STA $0EA0,X ; rows 16/17, bit 3
+  STA $0EC0,X ; rows 0/1, bit 4
+  STA $0EE0,X
+  STA $0F00,X
+  STA $0F20,X
+  STA $0F40,X
+  STA $0F60,X
+  STA $0F80,X
+  STA $0FA0,X
+  STA $0FC0,X ; rows 16/17, bit 4
+  LDA datasyscolors,X ; palette colors
+  STA $0FE0,X
+  INX
+  TXA
+  AND #$03
+  BNE teinitscreenloop
+  JSR WAITVSCANA
+  TXA
+  CMP #$20
+  BNE teinitscreenloop
+texteditmainloop:
+  LDA FRAMECOUNTER
+  CLC
+  ADC #$01
+  STA FRAMECOUNTER
+  AND #$0F
+  BNE temljmp1 ; only toggle cursor visibility every 16th frame
+  LDA CURBLINKSTATE
+  EOR #$01
+  STA CURBLINKSTATE
+  JSR paintcursor
+temljmp1:
+  LDA KBDIN ; check for keypress
+  BEQ temljmp2
+  CMP #$04 ; right cursor
+  BEQ tecurr
+  CMP #$06 ; left cursor
+  BEQ tecurl
+  CMP #$08 ; backspace
+  BEQ tebksp
+  CMP #$0C ; down cursor
+  BEQ tecurd
+  CMP #$0D ; enter/return
+  BNE 3 ; BEQ marqueemode
+  JMP marqueemode
+  CMP #$0E ; up cursor
+  BEQ tecuru
+  CMP #$7F ; delete
+  BEQ tedelr
+  ; got here, a graphic key has been pressed
+  PHA
+  LDA #$00
+  STA CURBLINKSTATE
+  JSR paintcursor
+  LDX MSGBUFCUR
+  JSR teinsert
+  LDX MSGBUFCUR
+  PLA
+  STA MSGBUF,X
+  STA $09C0,X
+  JMP tecurr
+temljmp2:
+  JSR WAITVSCANA
+  JMP texteditmainloop
+tecurr:
+  LDA MSGBUFCUR
+  CMP #$7E ; check if it can't move any more right
+  BCS temljmp2
+  CMP MSGBUFLEN
+  BCS temljmp2
+  ADC #$01
+  PHA
+  LDA #$00
+  STA CURBLINKSTATE
+  JSR paintcursor
+  PLA
+  STA MSGBUFCUR
+  JMP temljmp2
+tecurl:
+  LDA MSGBUFCUR
+  ; check if it can't move any more left
+  BEQ temljmp2
+  SEC
+  SBC #$01
+  PHA
+  LDA #$00
+  STA CURBLINKSTATE
+  JSR paintcursor
+  PLA
+  STA MSGBUFCUR
+  JMP temljmp2
+tecurd:
+  LDA #$00
+  STA CURBLINKSTATE
+  JSR paintcursor
+  LDA MSGBUFCUR
+  CLC
+  ADC #$20
+  CMP MSGBUFLEN
+  BCC tecurdjmp1
+  LDA MSGBUFLEN
+  CMP #$7F
+  BCC tecurdjmp1
+  LDA #$7E
+tecurdjmp1:
+  STA MSGBUFCUR
+  JMP temljmp2
+tecuru:
+  LDA #$00
+  STA CURBLINKSTATE
+  JSR paintcursor
+  LDA MSGBUFCUR
+  SEC
+  SBC #$20
+  BCS tecurujmp1
+  LDA #$00
+tecurujmp1:
+  STA MSGBUFCUR
+  JMP temljmp2
+tebksp:
+  LDA MSGBUFCUR
+  ; check if it can't move any more left
+  BEQ temljmp2
+  SEC
+  SBC #$01
+  PHA
+  LDA #$00
+  STA CURBLINKSTATE
+  JSR paintcursor
+  PLA
+  STA MSGBUFCUR
+tedelr:
+  ; shift all bytes from MSGBUF+MSGBUFCUR+1 to MSGBUF,127 left by one then update display
+  LDX MSGBUFCUR
+  CPX MSGBUFLEN
+  BCS temljmp2 ; do nothing if cursor is already at end
+tedelloop:
+  LDA MSGBUF+1,X
+  STA MSGBUF,X
+  BEQ tedeljmp1
+  INX
+  CPX #$7E
+  BCC tedelloop
+tedeljmp1:
+  LDX MSGBUFLEN
+  LDA #$20
+  STA MSGBUF,X
+  DEX
+  STX MSGBUFLEN
+  LDA #$00
+  STA MSGBUF,X
+  LDX MSGBUFCUR
+  JSR teupdatetoend
+  JMP temljmp2
+teinsert:
+  ; shift all bytes from MSGBUF,X to MSGBUF,126 right by one then update display
+  LDA MSGBUF,X
+  STA SCRATCH+0
+  INX
+teinsloop:
+  LDA MSGBUF,X
+  STA SCRATCH+1
+  LDA SCRATCH+0
+  STA MSGBUF,X
+  CPX MSGBUFLEN
+  BCS teinsjmp1
+  INX
+  CPX #$7F
+  BCS teinsjmp1
+  LDA MSGBUF,X
+  STA SCRATCH+0
+  LDA SCRATCH+1
+  STA MSGBUF,X
+  CPX MSGBUFLEN
+  BCS teinsjmp1
+  INX
+  CPX #$7F
+  BCC teinsloop
+teinsjmp1:
+  LDX MSGBUFLEN
+  LDA #$00
+  CPX #$7F
+  BCS teinsjmp2
+  INX
+teinsjmp2:
+  STA MSGBUF,X
+  STX MSGBUFLEN
+  LDX MSGBUFCUR
+  ; JMP teupdatetoend
+teupdatetoend:
+  JSR WAITVSCANA
+teupdatetoendloop:
+  LDA MSGBUF,X
+  STA $09C0,X
+  INX
+  CPX #$80
+  BCC teupdatetoendloop
+  RTS
+paintcursor:
+  LDY #$CC ; cell color byte with no cursor
+  LDA CURBLINKSTATE
+  BEQ paintcurjmp2
+  LDA MSGBUFCUR
+  AND #$20 ; even or odd row?
+  BEQ paintcurjmp1
+  LDA #$AA
+paintcurjmp1: ; A is now either $AA (odd row) or $00 (even row)
+  EOR #$6C    ;  "           "  $C6 (odd row) or $6C (even row)
+  TAY
+paintcurjmp2: ; now Y holds correct byte to write to video memory
+  LDA MSGBUFCUR
+  AND #$5F ; discard row ones bit
+  CMP #$40 ;
+  BCC paintcurjmp3 ; for first two rows, skip next operation
+  SBC #$20 ; shift 40-5f to 20-3f
+paintcurjmp3:
+  TAX ; computed offset is ready to be used in X register
+  JSR WAITVSCANA
+  TYA ; recall cell color byte
+  STA $0B20,X ; save same byte to each color plane
+  STA $0C40,X ; (we can do this because the colors involved are 0 or 31
+  STA $0D60,X ; so the bits are the same in each plane)
+  STA $0E80,X
+  STA $0FA0,X
+  RTS
+
+marqueemode:
+  ;set up for scrolling before going into marquee loop
+  LDA #$FF ; set all the render pointers to -1
+  STA RENDERFRONTA
+  STA RENDERFRONTB
+  STA RENDERFRONTC
+  STA RENDERFRONTD
+  STA RENDERRQA
+  STA RENDERRQB
+  STA RENDERRQC
+  STA RENDERRQD ; important that this always be odd
+  ; calculate RENDERSLANTMAX = 31 * RENDERSLANT / 256
+  LDX #$1F
+  LDA #$80
+  STA SCRATCH+0
+  LDA #$00
+  STA SCRATCH+1
+  CLC
+mslantmaxcalcloop:
+  LDA SCRATCH+0
+  ADC RENDERSLANT
+  STA SCRATCH+0
+  LDA SCRATCH+1
+  ADC #$00
+  STA SCRATCH+1
+  DEX
+  BNE mslantmaxcalcloop
+  ;LDA SCRATCH+1 ; value should still be there
+  STA RENDERSLANTMAX
+  ; calculate RENDERSLANTBIAS = (!(SCRATCH+1)) / 2 + $40
+  ;                           + RENDERSLANT * (16 - 3 * RENDERSCALEY)
+  ;                           (mod 256)
+  LDA SCRATCH+1
+  EOR #$FF
+  LSR A
+  ADC #$40
+  TAY
+  LDA RENDERSCALEY
+  ASL A
+  CLC
+  ADC RENDERSCALEY
+  EOR #$FF
+  CLC
+  ADC #$11
+  TAX
+  TYA
+mslantbiascalcloop:
+  SEC
+  SBC RENDERSLANT
+  DEX
+  BNE mslantbiascalcloop
+  STA RENDERSLANTBIAS
+  LDX #$00
+  LDY #$00
+minitfontloop:
+  JSR WAITVSCANA ; note: sets carry
+  LDA datapixels,X
+  STA $1000,Y
+  STA $1002,Y
+  STA $1004,Y
+  STA $1006,Y
+  LDA datapixels+$20,X
+  STA $1008,Y
+  STA $100A,Y
+  STA $100C,Y
+  STA $100E,Y
+  INX
+  LDA datapixels,X
+  STA $1001,Y
+  STA $1003,Y
+  STA $1005,Y
+  STA $1007,Y
+  LDA datapixels+$20,X
+  STA $1009,Y
+  STA $100B,Y
+  STA $100D,Y
+  STA $100F,Y
+  TYA
+  ADC #$0F
+  TAY
+  INX
+  CPX #$20
+  BCC minitfontloop
+  LDX #$00
+minitscreenloop:
+  ; top row of screen: leave as-is
+  LDA #$00 ; background quartercells for text canvas area (most of screen)
+  STA $0820,X
+  STA $0840,X
+  STA $0860,X
+  STA $0880,X
+  STA $08A0,X
+  STA $08C0,X
+  STA $08E0,X
+  STA $0900,X
+  STA $0920,X
+  STA $0940,X
+  STA $0960,X
+  STA $0980,X
+  STA $09A0,X
+  STA $09C0,X
+  STA $09E0,X
+  STA $0A00,X
+  LDA #$20 ; blank for bottom row of screen
+  STA $0A20,X
+  INX
+  TXA
+  AND #$0F
+  BNE minitscreenloop
+  JSR WAITVSCANA
+  TXA
+  CMP #$20
+  BNE minitscreenloop
+  LDA #$14
+  STA SCROLLDELAY
+  JMP marqueeloop
+
+proginfo:  .align 5
+  .text "6k Marquee      by Geeda for Sis"
+messageprompt:
+  .text "Message entry\x1b                  "
+colorpickerprompt:
+  .text "Color selection\x1b                "
+paintmodeprompt:
+  .text "Color paint mode                "
+defaultmessagebuf:
+  .text "Enter text here and it will scroll across the screen\x11\x00"
+datasyscolors:  .align 5
+  .byte 0,112,135,4,76,252,164,108
+  .byte 222,70,110,239,18,242,175,48
+  .byte 11,251,33,185,155,16,17,249
+  .byte 65,29,189,233,30,255,101,39
+datapixels:  .align 6
+  .byte $00,$00,$AA,$00,$00,$00,$AA,$00,$00,$AA,$AA,$AA,$00,$AA,$AA,$AA
+  .byte $00,$00,$AA,$00,$00,$00,$AA,$00,$00,$AA,$AA,$AA,$00,$AA,$AA,$AA
+  .byte $55,$55,$55,$55,$FF,$55,$FF,$55,$55,$55,$55,$55,$FF,$55,$FF,$55
+  .byte $55,$FF,$55,$FF,$FF,$FF,$FF,$FF,$55,$FF,$55,$FF,$FF,$FF,$FF,$FF
+
+  .org $2600
+  ; can this fit in 512 bytes so it can be relocated into system RAM?
+marqueeloop:
+  ; prepare next column
+  INC RENDERRQD ; advance render request by 2 columns
+  INC RENDERRQD
+  JSR renderdtest ; perform render operation D in final buffer if necessary
+  LDA RENDERRQD
+  AND #$1E
+  TAY
+  LDA RENDERFINAL0,Y
+  LDX #$00
+mformatbitsloop0
+  LSR A
+  ROR SCRATCH+0,X
+  LSR A
+  ROR SCRATCH+0,X
+  INX
+  CPX #$04
+  BNE mformatbitsj1
+  LDA RENDERFINAL1,Y
+mformatbitsj1:
+  CPX #$08
+  BNE mformatbitsj2
+  LDA RENDERFINAL2,Y
+mformatbitsj2:
+  CPX #$0C
+  BNE mformatbitsj3
+  LDA RENDERFINAL3,Y
+mformatbitsj3:
+  CPX #$10
+  BCC mformatbitsloop0
+  LDA RENDERFINAL0+1,Y
+  LDX #$00
+mformatbitsloop1
+  LSR A
+  ROR SCRATCH+0,X
+  LSR A
+  STA SCRATCH+16
+  LDA SCRATCH+0,X
+  ROR A
+  LSR A
+  LSR A
+  LSR A
+  LSR A
+  STA SCRATCH+0,X
+  LDA SCRATCH+16
+  INX
+  CPX #$04
+  BNE mformatbitsj5
+  LDA RENDERFINAL1+1,Y
+mformatbitsj5:
+  CPX #$08
+  BNE mformatbitsj6
+  LDA RENDERFINAL2+1,Y
+mformatbitsj6:
+  CPX #$0C
+  BNE mformatbitsj7
+  LDA RENDERFINAL3+1,Y
+mformatbitsj7:
+  CPX #$10
+  BCC mformatbitsloop1
+  ; minor delay
+  LDX SCROLLDELAY
+mdelayloop:
+  JSR WAITVSCANA
+  DEX
+  BNE mdelayloop
+  ;scroll screen one column left
+  ; (TODO: jump to scroll1y..scroll4y as needed based on text height)
+scroll4y:
+  LDX #$00
+scrollcolumnloop4:
+  LDA $0821,X
+  STA $0820,X
+  LDA $0841,X
+  STA $0840,X
+  LDA $09E1,X
+  STA $09E0,X
+  LDA $0A01,X
+  STA $0A00,X
+  INX
+  CPX #$1F
+  BCC scrollcolumnloop4
+  LDA SCRATCH+0
+  STA $083F
+  LDA SCRATCH+1
+  STA $085F
+  LDA SCRATCH+14
+  STA $09FF
+  LDA SCRATCH+15
+  STA $0A1F
+scroll3y:
+  LDX #$00
+scrollcolumnloop3:
+  LDA $0861,X
+  STA $0860,X
+  LDA $0881,X
+  STA $0880,X
+  LDA $09A1,X
+  STA $09A0,X
+  LDA $09C1,X
+  STA $09C0,X
+  INX
+  CPX #$0A
+  BNE 3 ; just enough to skip following JSR
+  JSR WAITVSCANA
+  CPX #$1F
+  BCC scrollcolumnloop3
+  LDA SCRATCH+2
+  STA $087F
+  LDA SCRATCH+3
+  STA $089F
+  LDA SCRATCH+12
+  STA $09BF
+  LDA SCRATCH+13
+  STA $09DF
+scroll2y:
+  LDX #$00
+scrollcolumnloop2:
+  LDA $08A1,X
+  STA $08A0,X
+  LDA $08C1,X
+  STA $08C0,X
+  LDA $0961,X
+  STA $0960,X
+  LDA $0981,X
+  STA $0980,X
+  INX
+  CPX #$15
+  BNE 3 ; just enough to skip following JSR
+  JSR WAITVSCANA
+  CPX #$1F
+  BCC scrollcolumnloop2
+  LDA SCRATCH+4
+  STA $08BF
+  LDA SCRATCH+5
+  STA $08DF
+  LDA SCRATCH+10
+  STA $097F
+  LDA SCRATCH+11
+  STA $099F
+scroll1y:
+  LDX #$00
+scrollcolumnloop1:
+  LDA $08E1,X
+  STA $08E0,X
+  LDA $0901,X
+  STA $0900,X
+  LDA $0921,X
+  STA $0920,X
+  LDA $0941,X
+  STA $0940,X
+  INX
+  CPX #$1F
+  BCC scrollcolumnloop1
+  LDA SCRATCH+6
+  STA $08FF
+  LDA SCRATCH+7
+  STA $091F
+  LDA SCRATCH+8
+  STA $093F
+  LDA SCRATCH+9
+  STA $095F
+  JMP marqueeloop
+
+rendercloop: ; this loop generates renderfinal buffer by yscaling rendershort buffer
+  LDA RENDERFRONTC
+  CLC
+  ADC #$01
+  STA RENDERFRONTC
+  ; TODO: actually do the scaling from rendershort
+  ; for now, placeholder bitmap generation
+  TAY
+  AND #$1F
+  TAX
+  TYA
+  STA RENDERFINAL0,X
+  STA RENDERFINAL1,X
+  STA RENDERFINAL2,X
+  STA RENDERFINAL3,X
+renderctest:
+  LDA RENDERFRONTC
+  SEC
+  SBC RENDERRQC
+  AND #$10
+  BNE rendercloop
+  RTS
+
+renderdloop: ; this loop applies slant in-place in renderfinal buffers
+  LDA RENDERFRONTD
+  CLC
+  ADC #$01
+  STA RENDERFRONTD
+  ADC RENDERSLANTMAX
+  STA RENDERRQC
+  JSR renderctest ; run render c loop if necessary
+  ; actually apply slant
+DXW = SCRATCH+16 ; current row x shift amount, whole
+DXF = SCRATCH+17 ; current row x shift amount, fraction
+BMASK = SCRATCH+18
+BUILDBYTE = SCRATCH+19
+BUFPTR = SCRATCH+20
+  ; initialize slant delta-x
+  LDA RENDERSLANTBIAS
+  STA DXF
+  LDA #$00
+  STA DXW
+  ; initialize buffer pointer
+  LDA #<RENDERFINAL0
+  STA BUFPTR
+  LDA #>RENDERFINAL0
+  STA BUFPTR+1
+renderdslantloop1:  ; run this loop once per rowgroup
+  LDA #$01
+  STA BMASK
+  LDA #$00
+  STA BUILDBYTE
+renderdslantloop0:  ; run this loop once per row
+  LDA RENDERFRONTD
+  CLC
+  ADC DXW
+  AND #$1F
+  TAY
+  LDA (BUFPTR),Y
+  AND BMASK
+  ORA BUILDBYTE
+  STA BUILDBYTE
+  LDA DXF
+  CLC
+  ADC RENDERSLANT
+  STA DXF
+  LDA DXW
+  ADC #$00
+  STA DXW
+  ASL BMASK
+  BCC renderdslantloop0
+  LDA RENDERFRONTD
+  AND #$1F
+  TAY
+  LDA BUILDBYTE
+  STA (BUFPTR),Y
+  LDA BUFPTR
+  CLC
+  ADC #RENDERFINAL1-RENDERFINAL0
+  STA BUFPTR
+  BNE renderdslantloop1
+renderdtest:
+  LDA RENDERFRONTD
+  SEC
+  SBC RENDERRQD
+  AND #$10
+  BNE renderdloop
+  RTS
