@@ -1559,11 +1559,15 @@ Writing to addresses \texttt{03F8\&03F9} enables, configures, or disables Fast V
 
 \subsection{Video Interrupt Flags}
 
-To cause the program to be interrupted on various video triggers, such as the beginning of the vertical retrace, set the Video Interrupt Flags by writing to address \texttt{03FC}. This feature is not yet implemented, and the details of the flags to set have not yet been determined.
+To cause the program to be interrupted on various video triggers, such as the beginning of the vertical retrace, set the Video Interrupt Flags by writing to address \texttt{03FA}. This feature is not yet implemented, and the details of the flags to set have not yet been determined.
+
+\subsection{Debug Log Selective Suppression (Emulator Only)}
+
+To turn on suppression of log events while the CPU program counter is on a specific page, write the number of that page to \texttt{03FD}. Suppression of logging for Bank F ROM (pages \texttt{F0-F}, addresses \texttt{F000-FFF}) is on by default at emulator startup. To turn off suppression of log events while the program counter is on a specific page, write the number of that page to \texttt{03FC}. While the program counter is on a page marked for suppression, instruction, processor state, and stack lines are not written to the log. Memory accesses that refer to I/O or other addresses that don't actually map to memory are also not logged. Consecutive scanline markers are collapsed.
 
 \subsection{Debug Break (Emulator Only)}
 
-To pause program execution and display the Debug Log in the emulator, write a nonzero value to address \texttt{03FF}. This behavior may be disabled by the user\footnote{User preferences such as disabling debug breaks are not yet implemented, as of emulator version \oldstylenums{0.1992}d.} and is not available on a physical Retro 6k computer.
+To pause program execution and display the Debug Log in the emulator, write a nonzero value to address \texttt{03FF}. This behavior may be disabled by the user\footnote{User preferences such as disabling debug breaks are not yet implemented, as of emulator version \oldstylenums{0.1992}d.}.
 
 \section{Video Memory}
 \label{sec:videomem}

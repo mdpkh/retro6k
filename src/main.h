@@ -55,6 +55,10 @@ enum class pageflags : char {
 	PF_TRAM = 0x02,
 	PF_TNONVOL = 0x03,
 	PF_BANKSWITCHED = 0x04,
+	PF_IO = 0x08,
+	PF_INONLY = PF_IO | PF_TROM,
+	PF_OUTONLY = PF_IO | PF_TRAM,
+	PF_DONTLOG = 0x80,
 };
 enum class voicetype {
 	VT_SQUARE = 0x0,

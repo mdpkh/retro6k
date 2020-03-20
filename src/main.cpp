@@ -284,13 +284,26 @@ inline void DisplayHexWord(char* dest, short val)
 
 inline void DisplayMemType(char* dest, pageflags pf)
 {
-	const char typewords[12] = {
+	const char typewords[48] = {
 		'N',0x7f, 'C',
 		'R', 'O', 'M',
 		'R', 'A', 'M',
 		'N', 'V', 'M',
+		'b', 'N', 'C',
+		'b', 'R', 'O',
+		'b', 'R', 'A',
+		'b', 'N', 'V',
+		'I', '/', 'O',
+		'I', 'n',0x7f,
+		'O', 'u', 't',
+		'I', '/', 'O',
+		'b', 'I', 'O',
+		'b', 'I', 'n',
+		'b', 'O', 'u',
+		'b', 'I', 'O',
 	};
-	char* src = (char*)typewords + 3ll * ((char)pf & (char)pageflags::PF_TMASK);
+	char mtypeidx = (char)pf & 0x0f;
+	char* src = (char*)typewords + 3 * mtypeidx;
 	*dest = *src;
 	*++dest = *++src;
 	*++dest = *++src;
@@ -1961,9 +1974,13 @@ int InitMemory()
 	}
 	for (int p = 0x20; p < 0x100; ++p)
 		syspflags[p] = pageflags::PF_TFLOATING;
+	syspflags[0x02] = pageflags::PF_INONLY;
+	syspflags[0x03] = pageflags::PF_OUTONLY;
 	floatgen.seed(seedgen());
 	//InitVideoMem(); // no cheating!
 	InstallROM();
+	for (int p = 0xf0; p < 0x100; ++p)
+		syspflags[p] = syspflags[p] | pageflags::PF_DONTLOG;
 	return 0;
 }
 
@@ -2324,7 +2341,7 @@ void LogRead(uint16_t address, uint8_t value)
 		dlogentry* newentry = ExtendLog(dletype::LT_READ);
 		newentry->mementry.address = address;
 		newentry->mementry.value = value;
-		newentry->mementry.memtype = syspflags[address >> 8] & pageflags::PF_TMASK;
+		newentry->mementry.memtype = syspflags[address >> 8];
 	}
 }
 
@@ -2382,7 +2399,7 @@ void LogWrite(uint16_t address, uint8_t value)
 	dlogentry* newentry = ExtendLog(dletype::LT_WRITE);
 	newentry->mementry.address = address;
 	newentry->mementry.value = value;
-	newentry->mementry.memtype = syspflags[address >> 8] & pageflags::PF_TMASK;
+	newentry->mementry.memtype = syspflags[address >> 8];
 }
 
 void PaintCell(unsigned char col, unsigned char row, unsigned char glyph, unsigned char* att)
@@ -2678,9 +2695,9 @@ inline uint8_t bare_read6502(uint16_t address)
 		}
 	}
 	if ((syspflags[address >> 8] & pageflags::PF_TMASK) == pageflags::PF_TFLOATING
-		|| (address & 0xff00) == 0x0300)
+		|| (syspflags[address >> 8] & (pageflags::PF_IO | pageflags::PF_TMASK)) == pageflags::PF_OUTONLY)
 	{
-		return dis(floatgen);
+		return dis(floatgen); // TODO: more realistic open-bus behavior?
 	}
 	return sysram[address];
 }
