@@ -69,6 +69,7 @@ pageflags* syspflags;
 bool cartridgeinserted = false;
 bool scanlinedirty[576];
 bool videobusy;
+bool suppresslogging;
 unsigned char videostate;
 unsigned char keypressregister;
 unsigned short soundfreqregister[4];
@@ -714,7 +715,7 @@ void DoDebugger() {
 				constexpr unsigned char CPUFLAG_NEGATIVE  = 0x80;
 				switch (entry->entrytype)
 				{
-					char line[37];
+					char line[45];
 				case dletype::LT_START:
 					strcpy_s(line, 12, "<log start>");
 					tx0 = (winpos.w - TextWidth(line)) >> 1;
@@ -820,6 +821,40 @@ void DoDebugger() {
 					line[16] = '0' + dr.quot;
 					tx0 = (winpos.w - TextWidth(line)) >> 1;
 					DrawText(line, tx0, y, 0xd5, 0xff, winbuffer);
+					break;
+				case dletype::LT_BORING:
+					if (entry->boringentry.complete)
+					{
+						strcpy_s(line, 45, "<selective suppression for --------- cycles>");
+						{
+							unsigned long clockdiff = entry->boringentry.exitclock - entry->boringentry.entryclock;
+							dr = div(clockdiff, 10);
+							line[35] = '0' + dr.rem;
+							dr = div(dr.quot, 10);
+							line[34] = '0' + dr.rem;
+							dr = div(dr.quot, 10);
+							line[33] = '0' + dr.rem;
+							dr = div(dr.quot, 10);
+							line[32] = '0' + dr.rem;
+							dr = div(dr.quot, 10);
+							line[31] = '0' + dr.rem;
+							dr = div(dr.quot, 10);
+							line[30] = '0' + dr.rem;
+							dr = div(dr.quot, 10);
+							line[29] = '0' + dr.rem;
+							dr = div(dr.quot, 10);
+							line[28] = '0' + dr.rem;
+							line[27] = '0' + dr.quot;
+						}
+						for (int i = 27; i < 35 && line[i] == '0'; ++i)
+							line[i] = 0x7f;
+					}
+					else
+					{
+						strcpy_s(line, 31, "<selective suppression active>");
+					}
+					tx0 = (winpos.w - TextWidth(line)) >> 1;
+					DrawText(line, tx0, y, 0x07, 0xff, winbuffer);
 					break;
 				default:
 					strcpy_s(line, 28, "<unknown log entry type -->");
@@ -1879,6 +1914,12 @@ void GenerateStereoAudio(void* userdata, Uint8* stream, int len) //callback to f
 	}
 }
 
+extern "C" long GetClock()
+{
+	extern uint32_t clockticks6502;
+	return clockticks6502;
+}
+
 extern "C" unsigned char GetSP()
 {
 	extern uint8_t sp;
@@ -2300,6 +2341,9 @@ void LogFVMC(uint16_t dest, uint16_t src, uint8_t value)
 
 void LogRead(uint16_t address, uint8_t value)
 {
+	if (suppresslogging && ((bool)(syspflags[address >> 8] & pageflags::PF_IO)
+		|| ((syspflags[address >> 8] & pageflags::PF_TMASK) == pageflags::PF_TFLOATING)))
+		return;
 	if (!partialinst)
 		goto logmementry;
 	if (debuglogexpectargs == -1)
@@ -2345,6 +2389,8 @@ void LogRead(uint16_t address, uint8_t value)
 	else
 	{
 	logmementry:
+		if (suppresslogging && (bool)(syspflags[address >> 8] & pageflags::PF_DONTLOG))
+			return;
 		dlogentry* newentry = ExtendLog(dletype::LT_READ);
 		newentry->mementry.address = address;
 		newentry->mementry.value = value;
@@ -2355,16 +2401,24 @@ void LogRead(uint16_t address, uint8_t value)
 void LogReset()
 {
 	ExtendLog(dletype::LT_RESET);
+	suppresslogging = false;
 }
 
 void LogScanline(int scanline)
 {
+	if (debuglog[(debuglogend - 1) & dlogidxmask].entrytype == dletype::LT_SCANLINE)
+	{
+		debuglog[(debuglogend - 1) & dlogidxmask].scanline = scanline;
+		return;
+	}
 	ExtendLog(dletype::LT_SCANLINE)->scanline = scanline;
 }
 
 void LogStack(unsigned char sp)
 {
 	dlogentry* newentry = ExtendLog(dletype::LT_STACK);
+	if (suppresslogging)
+		return;
 	for (unsigned i = 0, j = sp + 1; i < 7; ++i, ++j, j &= 0xff)
 	{
 		newentry->stackentry.stack[i] = sysram[j | 0x100];
@@ -2378,7 +2432,25 @@ extern "C" void LogStep()
 	extern uint32_t clockticks6502;
 	extern uint16_t pc;
 	extern uint8_t sp, a, x, y, status;
-	static dlogentry* laststateentry = nullptr, * lastinstentry = nullptr;
+	static dlogentry* laststateentry = nullptr, * lastinstentry = nullptr, * lastboringentry = nullptr;
+	bool newsuppresslogging = (bool)(syspflags[pc >> 8] & pageflags::PF_DONTLOG);
+	if (newsuppresslogging && !suppresslogging)
+	{
+		if (laststateentry && lastinstentry)
+			lastinstentry->instentry.cycles = clockticks6502 - laststateentry->stateentry.ticks;
+		lastboringentry = ExtendLog(dletype::LT_BORING);
+		lastboringentry->boringentry.entryclock = clockticks6502;
+		lastboringentry->boringentry.complete = false;
+		lastinstentry = nullptr;
+	}
+	else if (!newsuppresslogging && suppresslogging)
+	{
+		lastboringentry->boringentry.exitclock = clockticks6502;
+		lastboringentry->boringentry.complete = true;
+	}
+	suppresslogging = newsuppresslogging;
+	if (suppresslogging)
+		return;
 	if (partialinst && partialinst->entrytype == dletype::LT_PARTIALINST)
 		partialinst->entrytype = dletype::LT_INST;
 	dlogentry* newentry = ExtendLog(dletype::LT_STATE);
@@ -2401,6 +2473,9 @@ extern "C" void LogStep()
 void LogWrite(uint16_t address, uint8_t value)
 {
 	dlogentry* last = debuglog + ((debuglogend - 1) & dlogidxmask);
+	if (suppresslogging && ((bool)(syspflags[address >> 8] & pageflags::PF_IO)
+		|| ((syspflags[address >> 8] & pageflags::PF_TMASK) == pageflags::PF_TFLOATING)))
+		return;
 	if (last->entrytype == dletype::LT_PARTIALINST)
 		last->entrytype = dletype::LT_INST;
 	dlogentry* newentry = ExtendLog(dletype::LT_WRITE);
@@ -3122,6 +3197,12 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 			break;
 		case 0xfa:
 			// TODO: set video flags
+			break;
+		case 0xfc:
+			syspflags[value] = syspflags[value] & !pageflags::PF_DONTLOG;
+			break;
+		case 0xfd:
+			syspflags[value] = syspflags[value] | pageflags::PF_DONTLOG;
 			break;
 		case 0xfe:
 			stackbase = GetSP() + value;

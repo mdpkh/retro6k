@@ -46,6 +46,7 @@ enum class dletype : char {
 	LT_INST,
 	LT_STACK,
 	LT_SCANLINE,
+	LT_BORING,
 	LT_END
 };
 enum class pageflags : char {
@@ -71,6 +72,10 @@ pageflags operator& (pageflags left, pageflags right) // because it's a bitfield
 pageflags operator| (pageflags left, pageflags right) // because it's a bitfield-like enum
 {
 	return (pageflags)((char)left | (char)right);
+}
+pageflags operator! (pageflags right) // because it's a bitfield-like enum
+{
+	return (pageflags)(!(char)right);
 }
 typedef struct {
 	dletype entrytype;
@@ -106,6 +111,11 @@ typedef struct {
 			uint8_t value;
 			pageflags memtype;
 		} fvmcentry;
+		struct {
+			uint32_t entryclock;
+			uint32_t exitclock;
+			bool complete;
+		} boringentry;
 	};
 } dlogentry;
 enum class filetype : unsigned {
@@ -532,6 +542,7 @@ void EjectCartridge();
 dlogentry* ExtendLog(dletype etype);
 void FillRoundedRect(SDL_Surface* dst, const SDL_Rect& r, unsigned c);
 void GenerateStereoAudio(void* userdata, Uint8* stream, int len);
+extern "C" long GetClock();
 extern "C" unsigned char GetSP();
 void InstallROM();
 bool LoadCartridge(const char* infilename);
