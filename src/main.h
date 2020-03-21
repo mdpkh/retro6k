@@ -532,6 +532,7 @@ void EjectCartridge();
 dlogentry* ExtendLog(dletype etype);
 void FillRoundedRect(SDL_Surface* dst, const SDL_Rect& r, unsigned c);
 void GenerateStereoAudio(void* userdata, Uint8* stream, int len);
+extern "C" unsigned char GetSP();
 void InstallROM();
 bool LoadCartridge(const char* infilename);
 void LoadConfig();

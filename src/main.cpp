@@ -89,6 +89,7 @@ dlogentry debuglog[2 << dlogbits];
 int debuglogstart = 0;
 int debuglogend = 1;
 int debuglogexpectargs = 0;
+unsigned char stackbase;
 dlogentry* partialinst = nullptr;
 std::random_device seedgen;
 std::mt19937 floatgen;
@@ -303,7 +304,7 @@ inline void DisplayMemType(char* dest, pageflags pf)
 		'b', 'I', 'O',
 	};
 	char mtypeidx = (char)pf & 0x0f;
-	char* src = (char*)typewords + 3 * mtypeidx;
+	char* src = (char*)typewords + 3ll * mtypeidx;
 	*dest = *src;
 	*++dest = *++src;
 	*++dest = *++src;
@@ -1878,6 +1879,12 @@ void GenerateStereoAudio(void* userdata, Uint8* stream, int len) //callback to f
 	}
 }
 
+extern "C" unsigned char GetSP()
+{
+	extern uint8_t sp;
+	return sp;
+}
+
 int InitEmulator()
 {
 	for (int y = 0; y < 18; ++y)
@@ -2358,11 +2365,11 @@ void LogScanline(int scanline)
 void LogStack(unsigned char sp)
 {
 	dlogentry* newentry = ExtendLog(dletype::LT_STACK);
-	for (unsigned i = 0, j = (sp + 1) | 0x100; i < 7 && j < 0x0200; ++i, ++j)
+	for (unsigned i = 0, j = sp + 1; i < 7; ++i, ++j, j &= 0xff)
 	{
-		newentry->stackentry.stack[i] = sysram[j];
+		newentry->stackentry.stack[i] = sysram[j | 0x100];
 	}
-	newentry->stackentry.nstack = 0xfd - sp;
+	newentry->stackentry.nstack = stackbase - sp;
 	//DoDebugger();
 }
 
@@ -3113,8 +3120,11 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 		case 0xf9:
 			fvmcsrc = value << 8;
 			break;
-		case 0xfc:
+		case 0xfa:
 			// TODO: set video flags
+			break;
+		case 0xfe:
+			stackbase = GetSP() + value;
 			break;
 		case 0xff:
 			if (value)
@@ -3212,6 +3222,7 @@ int main(int argc, char** argv)
 				{
 					LogReset();
 					reset6502();
+					stackbase = GetSP();
 					resetcounter = 8955;
 					LogStep();
 				}
