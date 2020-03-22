@@ -4,7 +4,8 @@ RENDERSCALEY    =   $21 ; vertical scale factor (range 1-4)
 RENDERBOLDEN    =   $22 ; thickening of vertical strokes (after hscale)
 RENDERSLANT     =   $23 ; slant factor (256ths; range 0-128)
 RENDERINTERLS   =   $24 ; interletter spacing adjustment
-RENDERSLANTBIAS =   $25 ; fractional x intercept of slant line
+RENDERSLANTBIASF=   $25 ; fractional component of x intercept of slant line
+RENDERSLANTBIASW=   $26 ; whole component of x intercept of slant line
 RENDERSLANTMAX  =   $27 ; x slant diff between highest and lowest rows of rendered text
 RENDERRQA       =   $28 ; rightmost requested index of assembled string bitmap
 RENDERRQB       =   $29 ; rightmost requested index of bolded string bitmap
@@ -115,13 +116,14 @@ initmsgbufloop2:
   STA CURBLINKSTATE
 initrendersettings:
   ; initialize render settings with default
-  LDA #$04
+  LDA #$03
   STA RENDERSCALEX
   STA RENDERSCALEY
-  LDA #$00
+  LDA #$02
   STA RENDERBOLDEN
+  LDA #$06
   STA RENDERINTERLS
-  LDA #$66
+  LDA #$80
   STA RENDERSLANT
 textentrymode:
   ; initialize screen for text entry mode
@@ -427,15 +429,20 @@ marqueemode:
   STA RENDERRQB
   STA RENDERRQC
   STA RENDERRQD ; important that this always be odd
-  ; calculate RENDERSLANTMAX = 31 * RENDERSLANT / 256
-  LDX #$1F
+  ; calculate RENDERSLANTMAX = ((8 * RENDERSCALEY - 1) * RENDERSLANT + 128) / 256 + 1
+  LDA RENDERSCALEY
+  ASL A
+  ASL A
+  ASL A
+  TAX
+  DEX
   LDA #$80
   STA SCRATCH+0
   LDA #$00
   STA SCRATCH+1
-  CLC
 mslantmaxcalcloop:
   LDA SCRATCH+0
+  CLC
   ADC RENDERSLANT
   STA SCRATCH+0
   LDA SCRATCH+1
@@ -443,31 +450,34 @@ mslantmaxcalcloop:
   STA SCRATCH+1
   DEX
   BNE mslantmaxcalcloop
-  ;LDA SCRATCH+1 ; value should still be there
+  CLC
+  ADC #$01
   STA RENDERSLANTMAX
-  ; calculate RENDERSLANTBIAS = (!(SCRATCH+1)) / 2 + $40
-  ;                           + RENDERSLANT * (16 - 3 * RENDERSCALEY)
-  ;                           (mod 256)
-  LDA SCRATCH+1
+  ; calculate RENDERSLANTBIAS = (!(SCRATCH+0)) / 2 + $40
+  ;                           - (4 * (4 - RENDERSCALEY)) * RENDERSLANT
+  LDA #$00
+  STA RENDERSLANTBIASW
+  LDA #$04
+  SEC
+  SBC RENDERSCALEY
+  ASL
+  ASL
+  TAY
+  LDA SCRATCH+0
   EOR #$FF
   LSR A
   ADC #$40
-  TAY
-  LDA RENDERSCALEY
-  ASL A
-  CLC
-  ADC RENDERSCALEY
-  EOR #$FF
-  CLC
-  ADC #$11
-  TAX
-  TYA
+  STA RENDERSLANTBIASF
 mslantbiascalcloop:
+  LDA RENDERSLANTBIASF
   SEC
   SBC RENDERSLANT
+  STA RENDERSLANTBIASF
+  LDA RENDERSLANTBIASW
+  SBC #$00
+  STA RENDERSLANTBIASW
   DEX
   BNE mslantbiascalcloop
-  STA RENDERSLANTBIAS
   LDX #$00
   LDY #$00
 minitfontloop:
@@ -554,8 +564,7 @@ datapixels:  .align 6
   .byte $55,$55,$55,$55,$FF,$55,$FF,$55,$55,$55,$55,$55,$FF,$55,$FF,$55
   .byte $55,$FF,$55,$FF,$FF,$FF,$FF,$FF,$55,$FF,$55,$FF,$FF,$FF,$FF,$FF
 
-  .org $2600
-  ; can this fit in 512 bytes so it can be relocated into system RAM?
+  .org $2800
 marqueeloop:
   ; prepare next column
   INC RENDERRQD ; advance render request by 2 columns
@@ -622,7 +631,7 @@ mdelayloop:
   JSR WAITVSCANA
   DEX
   BNE mdelayloop
-  ;scroll screen one column left
+  ; scroll screen one column left
   ; (TODO: jump to scroll1y..scroll4y as needed based on text height)
 scroll4y:
   LDX #$00
@@ -720,35 +729,123 @@ scrollcolumnloop1:
   STA $095F
   JMP marqueeloop
 
+  .org $2A00
+renderaloop: ; this loop assembles characters in rendershort buffer
+  LDA RENDERFRONTA
+  CLC
+  ADC #$01
+  STA RENDERFRONTA
+  ; for now, placeholder bitmap generation
+  TAY
+  AND #$7F
+  TAX
+  TYA
+  STA RENDERSHORT,X
+renderatest:
+  LDA RENDERFRONTA
+  SEC
+  SBC RENDERRQA
+  BMI renderaloop
+  RTS
+
+  .org $2B00
+renderbloop: ; this loop applies bolden in-place in rendershort buffer
+  LDA RENDERFRONTB
+  CLC
+  ADC #$01
+  STA RENDERFRONTB
+  CLC
+  ADC RENDERBOLDEN
+  STA RENDERRQA
+  JSR renderatest
+  
+renderbtest:
+  LDA RENDERFRONTB
+  SEC
+  SBC RENDERRQB
+  BMI renderbloop
+  RTS
+
+  .org $2C00
 rendercloop: ; this loop generates renderfinal buffer by yscaling rendershort buffer
   LDA RENDERFRONTC
   CLC
   ADC #$01
   STA RENDERFRONTC
-  ; TODO: actually do the scaling from rendershort
-  ; for now, placeholder bitmap generation
-  TAY
+  STA RENDERRQB
+  JSR renderbtest
+  LDA RENDERRQB
+  AND #$7F
+  TAX
+  LDA RENDERSHORT,X
+  STA SCRATCH+16 ; source byte
+  LDA RENDERFRONTC
   AND #$1F
   TAX
-  TYA
-  STA RENDERFINAL0,X
+  LDA #$08
+  STA SCRATCH+17 ; source bit counter
+renderyscaleloop1:
+  LDA #00
+  LSR SCRATCH+16 ; pull a source bit into carry flag
+  ADC #00 ; capture carry flag
+  STA SCRATCH+18 ; save carry flag
+  LDY RENDERSCALEY
+renderyscaleloop0:
+  CLC
+  LDA #$FF
+  ADC SCRATCH+18 ; restore carry flag
+  ROR RENDERFINAL3,X
+  ROR RENDERFINAL2,X
+  ROR RENDERFINAL1,X
+  ROR RENDERFINAL0,X
+  DEY
+  BNE renderyscaleloop0
+  DEC SCRATCH+17
+  BNE renderyscaleloop1
+  ; scale complete, but it's bottom-aligned with possible junk in top rows
+  ; center the text vertically, and blank the junk
+  LDA RENDERSCALEY
+  CMP #$04
+  BEQ renderctest ; if scaley = 4, this column is done
+  LDA #$00
+  STA RENDERFINAL0,X ; blank top rowgroup
+  LDA RENDERSCALEY
+  CMP #$03
+  BEQ rendercj1 ; if scaley = 3, skip the following
+  LDA RENDERFINAL2,X
   STA RENDERFINAL1,X
-  STA RENDERFINAL2,X
-  STA RENDERFINAL3,X
+  LDA RENDERFINAL3,X
+  STA RENDERFINAL2,X ; shift bottom two rowgroups up
+  LDA #$00
+  STA RENDERFINAL3,X ; blank the bottom rowgroup
+rendercj1:
+  ; now text occupies rowgroup 2, rowgroups 1-2, or rowgroups 1-3
+  LDA RENDERSCALEY
+  CMP #$02
+  BEQ renderctest ; if scaley = 2, this column is done
+  ; if scaley = 1 or 3, shift the rendered text up 4 rows
+  LDY #$04
+rendercloop0: ; do this 4 times:
+  LSR RENDERFINAL3,X ; ] shift the rendered text in rowgroups 0-3 up one row
+  ROR RENDERFINAL2,X ; ]
+  ROR RENDERFINAL1,X ; ]
+  ROR RENDERFINAL0,X ; ]
+  DEY
+  BNE rendercloop0
 renderctest:
   LDA RENDERFRONTC
   SEC
   SBC RENDERRQC
-  AND #$10
-  BNE rendercloop
+  BMI rendercloop
   RTS
 
+  .org $2D00
 renderdloop: ; this loop applies slant in-place in renderfinal buffers
   LDA RENDERFRONTD
   CLC
   ADC #$01
   STA RENDERFRONTD
-  ADC RENDERSLANTMAX
+  ADC #$10 ; should be RENDERSLANTMAX
   STA RENDERRQC
   JSR renderctest ; run render c loop if necessary
   ; actually apply slant
@@ -758,9 +855,9 @@ BMASK = SCRATCH+18
 BUILDBYTE = SCRATCH+19
 BUFPTR = SCRATCH+20
   ; initialize slant delta-x
-  LDA RENDERSLANTBIAS
+  LDA RENDERSLANTBIASF
   STA DXF
-  LDA #$00
+  LDA #$00 ; should be RENDERSLANTBIASW
   STA DXW
   ; initialize buffer pointer
   LDA #<RENDERFINAL0
@@ -805,6 +902,5 @@ renderdtest:
   LDA RENDERFRONTD
   SEC
   SBC RENDERRQD
-  AND #$10
-  BNE renderdloop
+  BMI renderdloop
   RTS
