@@ -69,8 +69,8 @@ interruptroutine: ; this label must equal $2010
   RTI
 entry:
   ; copy font from Bank E
-  LDY #$E0 ; system font source page start
-  LDA #$10 ; video RAM font page start
+  LDY #$E1 ; system font source page start
+  LDA #$11 ; video RAM font page start
 copyfontpageloop:
   JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
   ; enable fast video memory copy
@@ -96,6 +96,37 @@ copyfontbyteloop:
   ADC #$01 ; increment destination page
   CMP #$20 ; compare against stop page number
   BNE copyfontpageloop
+  LDX #$00
+  LDY #$00
+initpixfontloop:
+  JSR WAITVSCANA ; note: sets carry
+  LDA datapixels,X
+  STA $1000,Y
+  STA $1002,Y
+  STA $1004,Y
+  STA $1006,Y
+  LDA datapixels+$20,X
+  STA $1008,Y
+  STA $100A,Y
+  STA $100C,Y
+  STA $100E,Y
+  INX
+  LDA datapixels,X
+  STA $1001,Y
+  STA $1003,Y
+  STA $1005,Y
+  STA $1007,Y
+  LDA datapixels+$20,X
+  STA $1009,Y
+  STA $100B,Y
+  STA $100D,Y
+  STA $100F,Y
+  TYA
+  ADC #$0F
+  TAY
+  INX
+  CPX #$20
+  BCC initpixfontloop
 initmsgbuf:
   ; initialize message buffer
   LDX #$FF
@@ -490,37 +521,6 @@ mslantbiascalcloop:
   STA RENDERSLANTBIASW
   DEX
   BNE mslantbiascalcloop
-  LDX #$00
-  LDY #$00
-minitfontloop:
-  JSR WAITVSCANA ; note: sets carry
-  LDA datapixels,X
-  STA $1000,Y
-  STA $1002,Y
-  STA $1004,Y
-  STA $1006,Y
-  LDA datapixels+$20,X
-  STA $1008,Y
-  STA $100A,Y
-  STA $100C,Y
-  STA $100E,Y
-  INX
-  LDA datapixels,X
-  STA $1001,Y
-  STA $1003,Y
-  STA $1005,Y
-  STA $1007,Y
-  LDA datapixels+$20,X
-  STA $1009,Y
-  STA $100B,Y
-  STA $100D,Y
-  STA $100F,Y
-  TYA
-  ADC #$0F
-  TAY
-  INX
-  CPX #$20
-  BCC minitfontloop
   LDX #$00
 minitscreenloop:
   ; top row of screen: leave as-is
