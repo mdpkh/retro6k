@@ -2530,11 +2530,11 @@ inline void PaintCell(unsigned char col, unsigned char row)
 	unsigned char glyph = sysram[0x0800 | row << 5 | col];
 	unsigned char att[4];
 	unsigned char tatt[5];
-	tatt[0] = sysram[0x0A40 + ((row & 0x1e) << 4) + col] >> (4 * (~row & 0x1));
-	tatt[1] = sysram[0x0B60 + ((row & 0x1e) << 4) + col] >> (4 * (~row & 0x1));
-	tatt[2] = sysram[0x0C80 + ((row & 0x1e) << 4) + col] >> (4 * (~row & 0x1));
-	tatt[3] = sysram[0x0DA0 + ((row & 0x1e) << 4) + col] >> (4 * (~row & 0x1));
-	tatt[4] = sysram[0x0EC0 + ((row & 0x1e) << 4) + col] >> (4 * (~row & 0x1));
+	tatt[0] = sysram[0x0A40 + ((row & 0x1e) << 4) + col] >> (4 * (row & 0x1));
+	tatt[1] = sysram[0x0B60 + ((row & 0x1e) << 4) + col] >> (4 * (row & 0x1));
+	tatt[2] = sysram[0x0C80 + ((row & 0x1e) << 4) + col] >> (4 * (row & 0x1));
+	tatt[3] = sysram[0x0DA0 + ((row & 0x1e) << 4) + col] >> (4 * (row & 0x1));
+	tatt[4] = sysram[0x0EC0 + ((row & 0x1e) << 4) + col] >> (4 * (row & 0x1));
 	att[0] = (tatt[0] & 0x1) | (tatt[1] & 0x1) << 1 | (tatt[2] & 0x1) << 2 | (tatt[3] & 0x1) << 3 | (tatt[4] & 0x1) << 4;
 	att[1] = (tatt[0] & 0x2) >> 1 | (tatt[1] & 0x2) | (tatt[2] & 0x2) << 1 | (tatt[3] & 0x2) << 2 | (tatt[4] & 0x2) << 3;
 	att[2] = (tatt[0] & 0x4) >> 2 | (tatt[1] & 0x4) >> 1 | (tatt[2] & 0x4) | (tatt[3] & 0x4) << 1 | (tatt[4] & 0x4) << 2;
@@ -2876,16 +2876,16 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 				int x = i & 0x1f;
 				int y = (i & 0x1e0) >> 4;
 				unsigned char att[4];
-				att[0] = (*checkptr[0] & 0x10) >> 4 | (*checkptr[1] & 0x10) >> 3 | (*checkptr[2] & 0x10) >> 2 | (*checkptr[3] & 0x10) >> 1 | (*checkptr[4] & 0x10);
-				att[1] = (*checkptr[0] & 0x20) >> 5 | (*checkptr[1] & 0x20) >> 4 | (*checkptr[2] & 0x20) >> 3 | (*checkptr[3] & 0x20) >> 2 | (*checkptr[4] & 0x20) >> 1;
-				att[2] = (*checkptr[0] & 0x40) >> 6 | (*checkptr[1] & 0x40) >> 5 | (*checkptr[2] & 0x40) >> 4 | (*checkptr[3] & 0x40) >> 3 | (*checkptr[4] & 0x40) >> 2;
-				att[3] = (*checkptr[0] & 0x80) >> 7 | (*checkptr[1] & 0x80) >> 6 | (*checkptr[2] & 0x80) >> 5 | (*checkptr[3] & 0x80) >> 4 | (*checkptr[4] & 0x80) >> 3;
-				if (att[0] == a || att[1] == a || att[2] == a || att[3] == a)
-					PaintCell(x, y);
 				att[0] = (*checkptr[0] & 0x1) | (*checkptr[1] & 0x1) << 1 | (*checkptr[2] & 0x1) << 2 | (*checkptr[3] & 0x1) << 3 | (*checkptr[4] & 0x1) << 4;
 				att[1] = (*checkptr[0] & 0x2) >> 1 | (*checkptr[1] & 0x2) | (*checkptr[2] & 0x2) << 1 | (*checkptr[3] & 0x2) << 2 | (*checkptr[4] & 0x2) << 3;
 				att[2] = (*checkptr[0] & 0x4) >> 2 | (*checkptr[1] & 0x4) >> 1 | (*checkptr[2] & 0x4) | (*checkptr[3] & 0x4) << 1 | (*checkptr[4] & 0x4) << 2;
 				att[3] = (*checkptr[0] & 0x8) >> 3 | (*checkptr[1] & 0x8) >> 2 | (*checkptr[2] & 0x8) >> 1 | (*checkptr[3] & 0x8) | (*checkptr[4] & 0x8) << 1;
+				if (att[0] == a || att[1] == a || att[2] == a || att[3] == a)
+					PaintCell(x, y);
+				att[0] = (*checkptr[0] & 0x10) >> 4 | (*checkptr[1] & 0x10) >> 3 | (*checkptr[2] & 0x10) >> 2 | (*checkptr[3] & 0x10) >> 1 | (*checkptr[4] & 0x10);
+				att[1] = (*checkptr[0] & 0x20) >> 5 | (*checkptr[1] & 0x20) >> 4 | (*checkptr[2] & 0x20) >> 3 | (*checkptr[3] & 0x20) >> 2 | (*checkptr[4] & 0x20) >> 1;
+				att[2] = (*checkptr[0] & 0x40) >> 6 | (*checkptr[1] & 0x40) >> 5 | (*checkptr[2] & 0x40) >> 4 | (*checkptr[3] & 0x40) >> 3 | (*checkptr[4] & 0x40) >> 2;
+				att[3] = (*checkptr[0] & 0x80) >> 7 | (*checkptr[1] & 0x80) >> 6 | (*checkptr[2] & 0x80) >> 5 | (*checkptr[3] & 0x80) >> 4 | (*checkptr[4] & 0x80) >> 3;
 				if (att[0] == a || att[1] == a || att[2] == a || att[3] == a)
 					PaintCell(x, y | 0x1);
 				++checkptr[0];

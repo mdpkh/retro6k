@@ -43,21 +43,21 @@ entry: ; system power-on or reset
   STA $0A15
   LDX #$00
 cartidcolloop:
-  LDA #$0F
+  LDA #$F0
   STA $0B2A,X
   STA $0C4A,X
   STA $0D6A,X
-  LDA #$05
+  LDA #$50
   STA $0E8A,X
   STA $0FAA,X
-  LDA #$35
+  LDA #$53
   STA $0B4A,X
   STA $0C6A,X
   STA $0D8A,X
-  LDA #$0A
+  LDA #$A0
   STA $0EAA,X
   STA $0FCA,X
-  LDA #$20
+  LDA #$02
   STA $09EA,X
   STA $0A2A,X
   INX
@@ -206,7 +206,7 @@ initscreenloop:
   STA $09E0,X
   STA $0A00,X
   STA $0A20,X
-  LDA #$CF ; screen lines 0-17 attribute bit 0: 0/1 0/1 1/1 1/1
+  LDA #$FC ; screen lines 0-17 attribute bit 0: 0/1 0/1 1/1 1/1
   STA $0A40,X
   STA $0A60,X
   STA $0A80,X
@@ -240,7 +240,7 @@ initscreenloop:
   STA $0DA0,X
   STA $0DC0,X
   STA $0DE0,X
-  LDA #$C0 ; screen lines 6&7 attribute bit 3: 0/0 0/0 1/0 1/0
+  LDA #$C0 ; screen lines 6&7 attribute bit 3: 0/0 0/0 0/1 0/1
   STA $0E00,X
   LDA #$00 ; screen lines 8-17 attribute bit 3: 0/0 0/0 0/0 0/0
   STA $0E20,X
@@ -252,7 +252,7 @@ initscreenloop:
   STA $0EC0,X
   STA $0EE0,X
   STA $0F00,X
-  LDA #$0C ; screen lines 6&7 attribute bit 4: 0/0 0/0 0/1 0/1
+  LDA #$0C ; screen lines 6&7 attribute bit 4: 0/0 0/0 1/0 1/0
   STA $0F20,X
   LDA #$00 ; screen lines 8-17 attribute bit 4: 0/0 0/0 0/0 0/0
   STA $0F40,X
@@ -584,7 +584,7 @@ datasystext5:
 datasystext6:
   .text "   Please insert a cartridge>   "
 datasystext7:
-  .text "     F\267\270\271ware version 1985c     "
+  .text "     F\267\270\271ware version 1985d     "
 datasystext8:
   .text "\0142019\14020 Maggie David \206\207\210 Haynes"
 datasyscolors:

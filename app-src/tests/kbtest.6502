@@ -1,7 +1,7 @@
 VIDEOSTATE = $02FC
 FVMCDEST = $03F8
 FVMCSRC = $03F9
-  .include subroutines.s
+  .include "..\\include\\subroutines.6502"
   .org $1F4C ; this may need to be adjusted to allow room for header
 header:
   .text "\x47\xA9\x02\x6A\xBB\x47\xF3\xA7" ; cartridge file format 1986c
@@ -58,13 +58,13 @@ copyfontbyteloop:
   BNE copyfontpageloop
   ; initialize colors on output area of screen
   JSR WAITVSCANX
-  LDA #$73 ; top left corner
+  LDA #$37 ; top left corner
   STA $0A8D
   STA $0BAD
   STA $0CCD
   STA $0DED
   STA $0F0D
-  LDA #$5C ; top edge & top content row
+  LDA #$C5 ; top edge & top content row
   STA $0A8E
   STA $0A8F
   STA $0A90
@@ -85,19 +85,19 @@ copyfontbyteloop:
   STA $0F0F
   STA $0F10
   STA $0F11
-  LDA #$DC ; top right corner
+  LDA #$CD ; top right corner
   STA $0A92
   STA $0BB2
   STA $0CD2
   STA $0DF2
   STA $0F12
-  LDA #$3B ; bottom left corner
+  LDA #$B3 ; bottom left corner
   STA $0AAD
   STA $0BCD
   STA $0CED
   STA $0E0D
   STA $0F2D
-  LDA #$CA ; bottom content row & bottom edge
+  LDA #$AC ; bottom content row & bottom edge
   STA $0AAE
   STA $0AAF
   STA $0AB0
@@ -118,7 +118,7 @@ copyfontbyteloop:
   STA $0F2F
   STA $0F30
   STA $0F31
-  LDA #$CE ; bottom right corner
+  LDA #$EC ; bottom right corner
   STA $0AB2
   STA $0BD2
   STA $0CF2

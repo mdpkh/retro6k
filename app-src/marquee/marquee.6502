@@ -160,7 +160,7 @@ teinitscreenloop:
   STA $0A00,X
   LDA MSGBUF+$60,X
   STA $0A20,X
-  LDA #$0C ; foreground bits on (bottom row only), background bits off
+  LDA #$C0 ; foreground bits on (bottom row only), background bits off
   STA $0A40,X ; rows 0/1, bit 0
   LDA #$CC ; foreground bits on, background bits off
   STA $0A60,X ; rows 2/3, bit 0
@@ -410,7 +410,7 @@ paintcursor:
   BEQ paintcurjmp1
   LDA #$AA
 paintcurjmp1: ; A is now either $AA (odd row) or $00 (even row)
-  EOR #$6C    ;  "           "  $C6 (odd row) or $6C (even row)
+  EOR #$C6    ;  "           "  $6C (odd row) or $C6 (even row)
   TAY
 paintcurjmp2: ; now Y holds correct byte to write to video memory
   LDA MSGBUFCUR
