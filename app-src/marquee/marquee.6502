@@ -18,9 +18,12 @@ RENDERFRONTD    =   $2F ; rightmost valid index of slanted / final rendered bitm
 LETTERLEFT      =   $30 ; per-row left extent of hscaled letter
 STRINGRIGHT     =   $38 ; per-row right extent of assembled string
 SCRATCH         =   $40 ; quick use area, 32 bytes
-FRAMECOUNTER    =   $60
-CELLCOLORBYTE   =   $70
-KBDIN           = $0244
+FRAMECOUNTER    =   $60 ; for cursor blink timing
+CELLCOLORBYTE   =   $61 ; for storing compiled attribute bytes
+SCREENPTR       =   $6C ; general-purpose movable pointer into video memory
+FIELDSEL        =   $6F ; field selection state
+FIELDVAL        =   $70 ; displayed field values (at least 6 bytes)
+KBDIN           = $0244 
 FVMCDEST        = $03F8
 FVMCSRC         = $03F9
 RENDERSHORT     = $0600 ; assembled, hscaled rendered text (sliding 128px wide window)
@@ -53,8 +56,8 @@ pflags:
   ; 02: RAM
   ; 03: NVM (persistent storage in cartridge)
   ; 04: bank-switched flags
-  .blk $10,$01 ; (4K ROM @ $2xxx)
-  .blk $10,$00 ; (4K floating)
+  .blk $20,$01 ; (8K ROM @ $2000-$3FFF)
+;  .blk $10,$00 ; (4K floating)
   .blk $80,$00 ; (32K floating)
 headerend:
   .org $2000 ; actual data contained on emulated cartridge starts here
@@ -121,10 +124,12 @@ initrendersettings:
   STA RENDERSCALEY
   LDA #$02
   STA RENDERBOLDEN
-  LDA #$06
+  LDA #$04
   STA RENDERINTERLS
-  LDA #$80
+  LDA #$35
   STA RENDERSLANT
+  LDA #$13
+  STA SCROLLDELAY
 textentrymode:
   ; initialize screen for text entry mode
   JSR WAITVSCANA
@@ -226,15 +231,21 @@ texteditmainloop:
 temljmp1:
   LDA KBDIN ; check for keypress
   BEQ temljmp2
+  CMP #$03 ; ctrl+c
+  ;BNE 3 ; BEQ paintmode
+  ;JMP paintmode
   CMP #$04 ; right cursor
   BEQ tecurr
   CMP #$06 ; left cursor
   BEQ tecurl
   CMP #$08 ; backspace
   BEQ tebksp
+  CMP #$0B ; ctrl+k
+  BNE 3 ; BEQ textformatmode
+  JMP textformatmode
   CMP #$0C ; down cursor
   BEQ tecurd
-  CMP #$0D ; enter/return
+  CMP #$0D ; enter/return/ctrl+m
   BNE 3 ; BEQ marqueemode
   JMP marqueemode
   CMP #$0E ; up cursor
@@ -418,6 +429,7 @@ paintcurjmp3:
   STA $0FA0,X
   RTS
 
+  .org $2800
 marqueemode:
   ;set up for scrolling before going into marquee loop
   LDA #$FF ; set all the render pointers to -1
@@ -539,20 +551,194 @@ minitscreenloop:
   TXA
   CMP #$20
   BNE minitscreenloop
-  LDA #$14
-  STA SCROLLDELAY
   JMP marqueeloop
 
+  .org $2900
+textformatmode:
+  LDX #$00
+tfinitscreenloop1
+  JSR WAITVSCANA
+tfinitscreenloop0:
+  LDA formatfields+$00,X
+  STA $0880,X
+  LDA formatfields+$10,X
+  STA $08C0,X
+  LDA formatfields+$20,X
+  STA $0900,X
+  LDA formatfields+$30,X
+  STA $0940,X
+  LDA formatfields+$40,X
+  STA $0980,X
+  LDA formatfields+$50,X
+  STA $09C0,X
+  LDA #$05 ; upper half cell block
+  STA $0860,X
+  LDA #$00 ; blank cell block
+  STA $8A0,X
+  STA $8E0,X
+  STA $920,X
+  STA $960,X
+  STA $9A0,X
+  LDA #$0A ; lower half cell block
+  STA $09E0,X
+  LDA textformatmodelabel,X
+  STA $0A20,X
+  LDA #$CC ; foreground bits on, background bits off
+  STA $0A60,X ; rows 2/3, bit 0
+  STA $0A80,X
+  STA $0AA0,X
+  STA $0AC0,X
+  STA $0AE0,X
+  STA $0B00,X
+  STA $0B20,X ; rows 14/15, bit 0
+  STA $0B80,X ; rows 2/3, bit 1
+  STA $0BA0,X
+  STA $0BC0,X
+  STA $0BE0,X
+  STA $0C00,X
+  STA $0C20,X
+  STA $0C40,X ; rows 14/15, bit 1
+  STA $0CA0,X ; rows 2/3, bit 2
+  STA $0CC0,X
+  STA $0CE0,X
+  STA $0D00,X
+  STA $0D20,X
+  STA $0D40,X
+  STA $0D60,X ; rows 14/15, bit 2
+  STA $0DC0,X ; rows 2/3, bit 3
+  STA $0DE0,X
+  STA $0E00,X
+  STA $0E20,X
+  STA $0E40,X
+  STA $0E60,X
+  STA $0E80,X ; rows 14/15, bit 3
+  STA $0EE0,X ; rows 2/3, bit 4
+  STA $0F00,X
+  STA $0F20,X
+  STA $0F40,X
+  STA $0F60,X
+  STA $0F80,X
+  STA $0FA0,X ; rows 14/15, bit 4
+  INX
+  CPX #$08
+  BEQ tfinitscreenloop1
+  CPX #$10
+  BCC tfinitscreenloop0
+  LDA RENDERSCALEX
+  STA FIELDVAL+0
+  ASL A
+  CLC
+  ADC RENDERBOLDEN
+  STA FIELDVAL+3
+  LDA RENDERSCALEY
+  STA FIELDVAL+1
+  LDA RENDERSLANT
+  STA FIELDVAL+2
+  LDA RENDERINTERLS
+  SEC
+  SBC RENDERBOLDEN
+  STA FIELDVAL+4
+  LDX SCROLLDELAY
+  CPX #delayscale-invdelayscale
+  BCC 2 ; if x >= length of invdelayscale label, do following
+  LDX #delayscale-invdelayscale-1
+  LDA invdelayscale,X
+  STA FIELDVAL+5
+  LDA #$8C
+  STA SCREENPTR+0
+  LDA #$08
+  STA SCREENPTR+1
+  LDX #$00
+tfinitscreenloop2:
+  LDY #$00
+  TXA
+  PHA
+  LDA FIELDVAL,X
+  JSR byte2decnlz
+  JSR WAITVSCANA
+tfinitscreenloop3:
+  LDA $8D,Y
+  STA (SCREENPTR),Y
+  INY
+  CPY #$03
+  BCC tfinitscreenloop3
+  CLC
+  LDA SCREENPTR+0
+  ADC #$40
+  STA SCREENPTR+0
+  LDA SCREENPTR+1
+  ADC #$00
+  STA SCREENPTR+1
+  PLA
+  TAX
+  INX
+  CPX #$06
+  BCC tfinitscreenloop2
+textformatmainloop:
+  LDA KBDIN ; check for keypress
+  BEQ tfmljmp2
+  CMP #$03 ; ctrl+c
+  ;BNE 3 ; BEQ paintmode
+  ;JMP paintmode
+  CMP #$04 ; right cursor
+  BEQ tfmljmp2
+  CMP #$06 ; left cursor
+  BEQ tfmljmp2
+  CMP #$0C ; down cursor
+  BEQ tfmljmp2
+  CMP #$0D ; enter/return/ctrl+m
+  BNE 3 ; BEQ marqueemode
+  JMP marqueemode
+  CMP #$0E ; up cursor
+  BEQ tfmljmp2
+  ; got here, a graphic key has been pressed
+tfmljmp2:
+  JMP textformatmainloop
+
+byte2decnlz:
+  JSR BYTE2DECP
+  TXA
+  CLC
+  ADC #$03
+  BEQ byte2decnlzquit
+  TAX
+  LDA #$20
+byte2decnlzloop:
+  STA $8C,X
+  DEX
+  BNE byte2decnlzloop
+byte2decnlzquit:
+  RTS
+
+  .org $3500
 proginfo:  .align 5
   .text "6k Marquee      by Geeda for Sis"
 messageprompt:
   .text "Message entry\x1b                  "
 colorpickerprompt:
   .text "Color selection\x1b                "
-paintmodeprompt:
+paintmodelabel:
   .text "Color paint mode                "
+textformatmodelabel:
+  .text "Text formatting                 "
 defaultmessagebuf:
   .text "Enter text here and it will scroll across the screen\x11\x00"
+formatfields:  .align 4
+  .text "Horz Scale  \x95\x95\x95 "
+  .text "Vert Scale  \x95\x95\x95 "
+  .text "Slant       \x95\x95\x95 "
+  .text "Weight      \x95\x95\x95 "
+  .text "Spacing     \x95\x95\x95 "
+  .text "Speed       \x95\x95\x95 "
+invdelayscale:  .align 6
+  .byte 16,16,15,14,13,12,11,11,10,10,9,9,8,8,8,7
+  .byte 7,7,7,6,6,6,6,5,5,5,5,5,5,4,4,4
+  .byte 4,4,4,4,4,3,3,3,3,3,3,3,3,3,2,2
+  .byte 2,2,2,2,2,2,2,2,2,1,1,1,1,1,1,1
+  .blk 32,1
+  .blk 15,0
+delayscale:
+  .byte 110,63,50,40,32,25,20,16,13,10,8,6,5,4,3,2,1
 datasyscolors:  .align 5
   .byte 0,112,135,4,76,252,164,108
   .byte 222,70,110,239,18,242,175,48
@@ -564,7 +750,7 @@ datapixels:  .align 6
   .byte $55,$55,$55,$55,$FF,$55,$FF,$55,$55,$55,$55,$55,$FF,$55,$FF,$55
   .byte $55,$FF,$55,$FF,$FF,$FF,$FF,$FF,$55,$FF,$55,$FF,$FF,$FF,$FF,$FF
 
-  .org $2800
+  .org $3800
 marqueeloop:
   ; prepare next column
   INC RENDERRQD ; advance render request by 2 columns
@@ -628,6 +814,18 @@ mformatbitsj7:
   ; minor delay
   LDX SCROLLDELAY
 mdelayloop:
+  LDA KBDIN ; check for keypress
+  BEQ mjmp2
+  CMP #$03 ; ctrl+c
+  ;BNE 3 ; BEQ paintmode
+  ;JMP paintmode
+  CMP #$0B ; ctrl+k
+  BNE 3 ; BEQ textformatmode
+  JMP textformatmode
+  CMP #$0D ; enter/return/ctrl+m
+  BNE 3 ; BEQ textentrymode
+  JMP textentrymode
+mjmp2:
   JSR WAITVSCANA
   DEX
   BNE mdelayloop
@@ -729,7 +927,7 @@ scrollcolumnloop1:
   STA $095F
   JMP marqueeloop
 
-  .org $2A00
+  .org $3A00
 renderaloop: ; this loop assembles characters in rendershort buffer
   LDA RENDERFRONTA
   CLC
@@ -748,7 +946,7 @@ renderatest:
   BMI renderaloop
   RTS
 
-  .org $2B00
+  .org $3B00
 renderbloop: ; this loop applies bolden in-place in rendershort buffer
   LDA RENDERFRONTB
   CLC
@@ -766,7 +964,7 @@ renderbtest:
   BMI renderbloop
   RTS
 
-  .org $2C00
+  .org $3C00
 rendercloop: ; this loop generates renderfinal buffer by yscaling rendershort buffer
   LDA RENDERFRONTC
   CLC
@@ -839,13 +1037,13 @@ renderctest:
   BMI rendercloop
   RTS
 
-  .org $2D00
+  .org $3D00
 renderdloop: ; this loop applies slant in-place in renderfinal buffers
   LDA RENDERFRONTD
   CLC
   ADC #$01
   STA RENDERFRONTD
-  ADC #$10 ; should be RENDERSLANTMAX
+  ADC RENDERSLANTMAX
   STA RENDERRQC
   JSR renderctest ; run render c loop if necessary
   ; actually apply slant
