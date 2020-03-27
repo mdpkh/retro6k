@@ -1030,6 +1030,12 @@ formatfields:  .align 4
   .text " Weight     \x95\x95\x95 "
   .text " Spacing    \x95\x95\x95 "
   .text " Speed      \x95\x95\x95 "
+defaultbgcolors:
+  .byte 4,4,4,4,4,7,4,7,7,7,7,10,7,10,10,10,10,12
+  .byte 10,12,12,12,12,22,12,22,22,22,22,24,22,24,24,24,24,24
+defaultfgcolors:
+  .byte 29,29,17,29,17,17,17,17,20,17,20,20,20,20,26,20,26,26
+  .byte 26,26,5,26,5,5,5,5,8,5,8,8,8,8,29,8,29,29
 tffieldminnative:
   .byte 1,1,0,0,0,1
 tffieldmaxnative:
