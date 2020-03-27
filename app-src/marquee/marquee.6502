@@ -19,9 +19,10 @@ LETTERLEFT      =   $30 ; per-row left extent of hscaled letter
 STRINGRIGHT     =   $38 ; per-row right extent of assembled string
 SCRATCH         =   $40 ; quick use area, 32 bytes
 FRAMECOUNTER    =   $60 ; for cursor blink timing
-CELLCOLORBYTE   =   $61 ; for storing compiled attribute bytes
+CELLCOLORBYTE   =   $61 ; for working storage of a single compiled attribute byte
 FIELDMIN        =   $64 ; minimum field values (as presented to user, at least 6 bytes)
-SCREENPTR       =   $6C ; general-purpose movable pointer into video memory
+GENERALPTR      =   $6A ; general-purpose movable pointer
+SCREENPTR       =   $6C ; general-purpose movable pointer (such as into video memory)
 NATURALWEIGHT   =   $6E ; width of scaled vertical strokes before boldening
 FIELDSEL        =   $6F ; field selection state (text format mode, range 0-5)
 FIELDVAL        =   $70 ; displayed field values (at least 6 bytes)
@@ -29,6 +30,7 @@ FIELDMAX        =   $78 ; maximum field values (as presented to user, at least 6
 KBDIN           = $0244 
 FVMCDEST        = $03F8
 FVMCSRC         = $03F9
+USERCOLORS      = $0400 ; compiled user-selected attributes for all rows (45 bytes)
 RENDERSHORT     = $0600 ; assembled, hscaled rendered text (sliding 128px wide window)
 RENDERFINAL0    = $0680 ; rowgroup 0 ] final bitmap of rendered text
 RENDERFINAL1    = $06A0 ; rowgroup 1 ] (sliding 32px wide window)
@@ -470,6 +472,35 @@ paintcurjmp3:
   .org $2800
 marqueemode:
   ;set up for scrolling before going into marquee loop
+  ; initialize screen colors
+  LDA #$40
+  STA SCREENPTR+0
+  LDA #$0A
+  STA SCREENPTR+1
+  LDX #$00
+mattloop2:
+  JSR WAITVSCANA
+mattloop1:
+  LDY #$00
+  LDA USERCOLORS,X
+mattloop0:
+  STA (SCREENPTR),Y
+  INY
+  CPY #$20
+  BCC mattloop0
+  LDA SCREENPTR+0
+  CLC
+  ADC #$20
+  STA SCREENPTR+0
+  LDA SCREENPTR+1
+  ADC #$00
+  STA SCREENPTR+1
+  INX
+  TXA
+  AND #$03
+  BEQ mattloop2
+  CPX #$2D
+  BCC mattloop1
   LDA #$FF ; set all the render pointers to -1
   STA RENDERFRONTA
   STA RENDERFRONTB
@@ -598,37 +629,44 @@ tfinitscreenloop0:
   STA $0AC0,X
   STA $0AE0,X
   STA $0B00,X
-  STA $0B20,X ; rows 14/15, bit 0
+  STA $0B20,X
+  STA $0B40,X ; rows 16/17, bit 0
   STA $0B80,X ; rows 2/3, bit 1
   STA $0BA0,X
   STA $0BC0,X
   STA $0BE0,X
   STA $0C00,X
   STA $0C20,X
-  STA $0C40,X ; rows 14/15, bit 1
+  STA $0C40,X
+  STA $0C60,X ; rows 16/17, bit 1
   STA $0CA0,X ; rows 2/3, bit 2
   STA $0CC0,X
   STA $0CE0,X
   STA $0D00,X
   STA $0D20,X
   STA $0D40,X
-  STA $0D60,X ; rows 14/15, bit 2
+  STA $0D60,X 
+  STA $0D80,X ; rows 16/17, bit 2
   STA $0DC0,X ; rows 2/3, bit 3
   STA $0DE0,X
   STA $0E00,X
   STA $0E20,X
   STA $0E40,X
   STA $0E60,X
-  STA $0E80,X ; rows 14/15, bit 3
+  STA $0E80,X
+  STA $0EA0,X ; rows 16/17, bit 3
   STA $0EE0,X ; rows 2/3, bit 4
   STA $0F00,X
   STA $0F20,X
   STA $0F40,X
   STA $0F60,X
   STA $0F80,X
-  STA $0FA0,X ; rows 14/15, bit 4
+  STA $0FA0,X
+  STA $0FC0,X ; rows 16/17, bit 4
   INX
-  CPX #$08
+  CPX #$05
+  BEQ tfinitscreenloop1
+  CPX #$0B
   BEQ tfinitscreenloop1
   CPX #$10
   BCC tfinitscreenloop0
