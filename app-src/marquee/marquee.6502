@@ -747,7 +747,7 @@ tfinitscreenloop3:
   JSR tffieldcursoron
 textformatmainloop:
   LDA KBDIN ; check for keypress
-  BEQ tfmljmp2
+  BEQ textformatmainloop
   CMP #$01 ; esc
   BEQ tfreloadvalues
   CMP #$03 ; ctrl+c
@@ -769,7 +769,7 @@ textformatmainloop:
   BEQ tffieldinc
   CMP #$60 ; minus
   BEQ tffielddec
-  ; got here, a graphic key has been pressed
+  ; got here, some other key has been pressed
 tfmljmp2:
   JMP textformatmainloop
 tfcurdown:
@@ -810,7 +810,7 @@ tffielddec:
   ;SEC
   SBC #$01
   STA FIELDVAL,X
-  JMP tffieldupdate
+  BCS tffieldupdate ; BRA (Carry set by SBC because no borrow occurred)
 tffieldinc:
   LDX FIELDSEL
   LDA FIELDVAL,X
@@ -851,7 +851,77 @@ tffieldupdateptrlooptest:
   INY
   LDA $8F
   STA (SCREENPTR),Y
-  ;STA $03FF
+  LDA FIELDSEL
+  CMP #$00
+  BEQ tfupdateweightrange
+  CMP #$03
+  BEQ tfupdatespacingrange
+  JMP textformatmainloop
+tfupdateweightrange:
+  LDA FIELDVAL+0
+  SEC
+  SBC #$40
+  ASL A
+  STA NATURALWEIGHT
+  CLC
+  ADC tffieldminnative+3
+  ADC #$40
+  STA FIELDMIN+3
+  LDA NATURALWEIGHT
+  CLC
+  ADC tffieldmaxnative+3
+  ADC #$40
+  STA FIELDMAX+3
+  CMP FIELDVAL+3
+  BCC tfmaxweight
+  LDA FIELDVAL+3
+  CMP FIELDMIN+3
+  BCC tfminweight
+  JMP textformatmainloop
+tfminweight:
+  LDA FIELDMIN+3
+  STA FIELDVAL+3
+  BNE tfupdateweightval ; BRA
+tfmaxweight:
+  LDA FIELDMAX+3
+  STA FIELDVAL+3
+tfupdateweightval:
+  SEC
+  SBC #$40
+  JSR byte2decnlz
+  JSR WAITVSCANA
+  LDA $8D
+  STA $094C
+  LDA $8E
+  STA $094D
+  LDA $8F
+  STA $094E
+  ;JMP tfupdatespacingrange
+tfupdatespacingrange:
+  LDA tffieldminnative+4
+  SEC
+  SBC FIELDVAL+3
+  CLC
+  ADC #$80
+  STA FIELDMIN+4
+  LDA FIELDVAL+4
+  CMP FIELDMIN+4
+  BCS textformatmainloop
+tfminspacing:
+  LDA FIELDMIN+4
+  STA FIELDVAL+4
+  ;BNE tfupdatespacingval ; BRA
+tfupdatespacingval:
+  SEC
+  SBC #$40
+  JSR byte2decnlz
+  JSR WAITVSCANA
+  LDA $8D
+  STA $098C
+  LDA $8E
+  STA $098D
+  LDA $8F
+  STA $098E
   JMP textformatmainloop
 tfsaveandmarquee:
   ; TODO: convert FIELDVALs to native and save back to appropriate locations in memory
