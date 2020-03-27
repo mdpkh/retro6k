@@ -59,7 +59,7 @@ enum class pageflags : char {
 	PF_IO = 0x08,
 	PF_INONLY = PF_IO | PF_TROM,
 	PF_OUTONLY = PF_IO | PF_TRAM,
-	PF_DONTLOG = 0x80,
+	PF_DONTLOG = (char)0x80,
 };
 enum class voicetype {
 	VT_SQUARE = 0x0,
