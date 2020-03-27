@@ -166,9 +166,63 @@ initrendersettings:
   STA RENDERSLANT
   LDA #$13
   STA SCROLLDELAY
+  ; compile USERCOLORS array from defaults in ROM
+  LDX #00
+compileallusercolorsloop1:
+  TXA
+  ASL A
+  ASL A
+  TAY
+  LDA defaultbgcolors+0,Y
+  STA SCRATCH+0
+  LDA defaultbgcolors+1,Y
+  STA SCRATCH+1
+  LDA defaultbgcolors+2,Y
+  STA SCRATCH+2
+  LDA defaultbgcolors+3,Y
+  STA SCRATCH+3
+  LDA defaultfgcolors+0,Y
+  STA SCRATCH+4
+  LDA defaultfgcolors+1,Y
+  STA SCRATCH+5
+  LDA defaultfgcolors+2,Y
+  STA SCRATCH+6
+  LDA defaultfgcolors+3,Y
+  STA SCRATCH+7
+  TXA
+  TAY
+compileallusercolorsloop0:
+  LSR SCRATCH+0
+  ROR A
+  LSR SCRATCH+1
+  ROR A
+  LSR SCRATCH+4
+  ROR A
+  LSR SCRATCH+5
+  ROR A
+  LSR SCRATCH+2
+  ROR A
+  LSR SCRATCH+3
+  ROR A
+  LSR SCRATCH+6
+  ROR A
+  LSR SCRATCH+7
+  ROR A
+  STA USERCOLORS,Y
+  TYA
+  CLC
+  ADC #$09
+  TAY
+  CPY #$2D
+  BCC compileallusercolorsloop0
+  INX
+  CPX #$09
+  BCC compileallusercolorsloop1
   ; initialize misc state variables
   LDA #$00
   STA FIELDSEL
+
+  .org $2200
 textentrymode:
   ; initialize screen for text entry mode
   JSR WAITVSCANA
@@ -469,7 +523,7 @@ paintcurjmp3:
   STA $0FA0,X
   RTS
 
-  .org $2800
+  .org $2500
 marqueemode:
   ;set up for scrolling before going into marquee loop
   ; initialize screen colors
