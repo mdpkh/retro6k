@@ -3,3 +3,4 @@
 **/*.rom binary delta
 **/*.svg text delta
 **/*.tex text delta
+*.6502 linguist-language=Assembly
