@@ -924,7 +924,35 @@ tfupdatespacingval:
   STA $098E
   JMP textformatmainloop
 tfsaveandmarquee:
-  ; TODO: convert FIELDVALs to native and save back to appropriate locations in memory
+  LDA FIELDVAL+0
+  SEC
+  SBC #$40
+  STA RENDERSCALEX
+  LDA FIELDVAL+1
+  SEC
+  SBC #$40
+  STA RENDERSCALEY
+  LDA FIELDVAL+2
+  SEC
+  SBC #$40
+  STA RENDERSLANT
+  LDA FIELDVAL+3
+  SEC
+  SBC NATURALWEIGHT
+  SEC
+  SBC #$40
+  STA RENDERBOLDEN
+  CLC
+  ADC FIELDVAL+4
+  SEC
+  SBC #$40
+  STA RENDERINTERLS
+  LDA FIELDVAL+5
+  SEC
+  SBC #$40
+  TAX
+  LDA delayscale,X
+  STA SCROLLDELAY
   JMP marqueemode
 
 tffieldcursoron:
