@@ -632,65 +632,84 @@ tfinitscreenloop0:
   BEQ tfinitscreenloop1
   CPX #$10
   BCC tfinitscreenloop0
+tfreloadvalues:
   ; load current field values, convert for user as necessary
   LDA RENDERSCALEX
-  STA FIELDVAL+0
-  ASL A
-  STA NATURALWEIGHT
   CLC
-  ADC RENDERBOLDEN
-  STA FIELDVAL+3
+  ADC #$40
+  STA FIELDVAL+0
   LDA RENDERSCALEY
+  ADC #$40
   STA FIELDVAL+1
   LDA RENDERSLANT
+  ADC #$40
   STA FIELDVAL+2
+  LDA RENDERSCALEX
+  ASL A
+  STA NATURALWEIGHT
+  ADC RENDERBOLDEN
+  ADC #$40
+  STA FIELDVAL+3
   LDA RENDERINTERLS
   SEC
   SBC RENDERBOLDEN
+  CLC
+  ADC #$40
   STA FIELDVAL+4
   LDX SCROLLDELAY
   CPX #delayscale-invdelayscale
   BCC 2 ; if x >= length of invdelayscale label, do following
   LDX #delayscale-invdelayscale-1
   LDA invdelayscale,X
+  ADC #$40
   STA FIELDVAL+5
   ; load minimum field values, convert for user as necessary
   LDA tffieldminnative+0
+  ADC #$40
   STA FIELDMIN+0
   LDA tffieldminnative+1
+  ADC #$40
   STA FIELDMIN+1
   LDA tffieldminnative+2
+  ADC #$40
   STA FIELDMIN+2
   LDA NATURALWEIGHT
   CLC
   ADC tffieldminnative+3
+  ADC #$40
   STA FIELDMIN+3
   LDA tffieldminnative+4
   SEC
   SBC FIELDVAL+3
   CLC
-  ADC NATURALWEIGHT
+  ADC #$80
   STA FIELDMIN+4
   LDA tffieldminnative+5
+  CLC
+  ADC #$40
   STA FIELDMIN+5
   ; load maximum field values, convert for user as necessary
   LDA tffieldmaxnative+0
+  ADC #$40
   STA FIELDMAX+0
   LDA tffieldmaxnative+1
+  ADC #$40
   STA FIELDMAX+1
   LDA tffieldmaxnative+2
+  ADC #$40
   STA FIELDMAX+2
   LDA NATURALWEIGHT
   CLC
   ADC tffieldmaxnative+3
+  ADC #$40
   STA FIELDMAX+3
   LDA tffieldmaxnative+4
-  SEC
-  SBC FIELDVAL+3
   CLC
-  ADC NATURALWEIGHT
+  ADC #$40
   STA FIELDMAX+4
   LDA tffieldmaxnative+5
+  CLC
+  ADC #$40
   STA FIELDMAX+5
   ; initialize screen pointer for field value initial display loop
   LDA #$8C
@@ -703,6 +722,8 @@ tfinitscreenloop2:
   TXA
   PHA
   LDA FIELDVAL,X
+  SEC
+  SBC #$40
   JSR byte2decnlz
   JSR WAITVSCANA
 tfinitscreenloop3:
@@ -727,20 +748,27 @@ tfinitscreenloop3:
 textformatmainloop:
   LDA KBDIN ; check for keypress
   BEQ tfmljmp2
+  CMP #$01 ; esc
+  BEQ tfreloadvalues
   CMP #$03 ; ctrl+c
   ;BNE 3 ; BEQ paintmode
   ;JMP paintmode
   CMP #$04 ; right cursor
-  BEQ tfmljmp2
+  BEQ tffieldinc
   CMP #$06 ; left cursor
-  BEQ tfmljmp2
+  BEQ tffielddec
   CMP #$0C ; down cursor
   BEQ tfcurdown
   CMP #$0D ; enter/return/ctrl+m
-  BNE 3 ; BEQ marqueemode
-  JMP marqueemode
+  BEQ tfsaveandmarquee
   CMP #$0E ; up cursor
   BEQ tfcurup
+  CMP #$1D ; plus
+  BEQ tffieldinc
+  CMP #$3D ; equals
+  BEQ tffieldinc
+  CMP #$60 ; minus
+  BEQ tffielddec
   ; got here, a graphic key has been pressed
 tfmljmp2:
   JMP textformatmainloop
@@ -773,6 +801,61 @@ tfcurbottom:
   STA FIELDSEL
   JSR tffieldcursoron
   JMP textformatmainloop
+tffielddec:
+  LDX FIELDSEL
+  LDA FIELDVAL,X
+  CMP FIELDMIN,X
+  BEQ textformatmainloop ; if value is already = min, do nothing
+  BCC textformatmainloop ; if value is already < min, do nothing
+  ;SEC
+  SBC #$01
+  STA FIELDVAL,X
+  JMP tffieldupdate
+tffieldinc:
+  LDX FIELDSEL
+  LDA FIELDVAL,X
+  CMP FIELDMAX,X
+  BCS textformatmainloop ; if value is already >= max, do nothing
+  ;CLC
+  ADC #$01
+  STA FIELDVAL,X
+tffieldupdate:
+  SEC
+  SBC #$40
+  JSR byte2decnlz
+  LDX #$00
+  LDA #$8C
+  STA SCREENPTR+0
+  LDA #$08
+  STA SCREENPTR+1
+  BNE tffieldupdateptrlooptest ; BRA
+tffieldupdateptrloop:
+  LDA SCREENPTR+0
+  CLC
+  ADC #$40
+  STA SCREENPTR+0
+  LDA SCREENPTR+1
+  ADC #$00
+  STA SCREENPTR+1
+  INX
+tffieldupdateptrlooptest:
+  CPX FIELDSEL
+  BCC tffieldupdateptrloop
+  LDY #$00
+  LDA $8D
+  JSR WAITVSCANX
+  STA (SCREENPTR),Y
+  INY
+  LDA $8E
+  STA (SCREENPTR),Y
+  INY
+  LDA $8F
+  STA (SCREENPTR),Y
+  ;STA $03FF
+  JMP textformatmainloop
+tfsaveandmarquee:
+  ; TODO: convert FIELDVALs to native and save back to appropriate locations in memory
+  JMP marqueemode
 
 tffieldcursoron:
   LDA #$6C
@@ -814,15 +897,16 @@ tffieldcursorloop:
   RTS
 
 byte2decnlz:
-  JSR BYTE2DECP
+  JSR BYTE2DECUS
   TXA
   CLC
   ADC #$03
   BEQ byte2decnlzquit
   TAX
-  LDA #$20
+  LDA $8C
 byte2decnlzloop:
   STA $8C,X
+  LDA #$20
   DEX
   BNE byte2decnlzloop
 byte2decnlzquit:
