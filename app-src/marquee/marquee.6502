@@ -1337,8 +1337,14 @@ renderaloop: ; this loop assembles characters in rendershort buffer
   ; generate pointer into video memory for fetching glyph
   LDA #$01
   STA SCREENPTR+1
-  LDA #$41 ; placeholder: capital letter A
+  LDX MARQUEEPTR
+  LDA MSGBUF,X
   STA RENDERCHAR
+  INX
+  CPX MSGBUFLEN
+  BCC 2
+  LDX #$FF
+  STX MARQUEEPTR
   LDX #$04
 renderagencharptrloop:
   ASL A
