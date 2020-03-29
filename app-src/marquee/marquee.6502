@@ -20,12 +20,15 @@ STRINGRIGHT     =   $38 ; per-row right extent of assembled string
 SCRATCH         =   $40 ; quick use area, 32 bytes
 FRAMECOUNTER    =   $60 ; for cursor blink timing
 CELLCOLORBYTE   =   $61 ; for working storage of a single compiled attribute byte
+MARQUEEPTR      =   $62 ; offset into message buffer for next character to render
+RENDERCHAR      =   $63 ; next character to render
 FIELDMIN        =   $64 ; minimum field values (as presented to user, at least 6 bytes)
 GENERALPTR      =   $6A ; general-purpose movable pointer
 SCREENPTR       =   $6C ; general-purpose movable pointer (such as into video memory)
 NATURALWEIGHT   =   $6E ; width of scaled vertical strokes before boldening
 FIELDSEL        =   $6F ; field selection state (text format mode, range 0-5)
 FIELDVAL        =   $70 ; displayed field values (at least 6 bytes)
+NEWCHARPOS      =   $77 ; position to place next character
 FIELDMAX        =   $78 ; maximum field values (as presented to user, at least 6 bytes)
 KBDIN           = $0244 
 FVMCDEST        = $03F8
@@ -1131,7 +1134,7 @@ defaultfgcolors:
 tffieldminnative:
   .byte 1,1,0,0,0,1
 tffieldmaxnative:
-  .byte 4,4,128,8,8,16
+  .byte 6,4,128,8,8,16
 invdelayscale:  .align 6
   .byte 16,16,15,14,13,12,11,11,10,10,9,9,8,8,8,7
   .byte 7,7,7,6,6,6,6,5,5,5,5,5,5,4,4,4
@@ -1331,16 +1334,90 @@ scrollcolumnloop1:
 
   .org $3A00
 renderaloop: ; this loop assembles characters in rendershort buffer
+  ; generate pointer into video memory for fetching glyph
+  LDA #$01
+  STA SCREENPTR+1
+  LDA #$41 ; placeholder: capital letter A
+  STA RENDERCHAR
+  LDX #$04
+renderagencharptrloop:
+  ASL A
+  ROL SCREENPTR+1
+  DEX
+  BNE renderagencharptrloop
+  STA SCREENPTR+0
+  ; fetch the selected glyph into scratch buffer
+  LDY #$00
+  JSR WAITVSCANA
+renderafetchglyphloop:
+  LDA (SCREENPTR),Y
+  STA SCRATCH,Y
+  INY
+  CPY #$10
+  BCC renderafetchglyphloop
+  ; transpose the bits from video memory via scratch buffer, into one byte per column
+  LDY #$00
+renderatransposeglyphloop:
+  LDA SCRATCH,Y
+  LDX #$00
+renderatransposeglyphbyteloop0:
+  ASL A
+  ROR RENDERLETTER,X
+  ASL A
+  INX
+  CPX #$04
+  BCC renderatransposeglyphbyteloop0
+  INY
+  LDA SCRATCH,Y
+renderatransposeglyphbyteloop1:
+  ASL A
+  ROR RENDERLETTER,X
+  ASL A
+  INX
+  CPX #$08
+  BCC renderatransposeglyphbyteloop1
+  INY
+  CPY #$10
+  BCC renderatransposeglyphloop
+  ; perform horizontal scaling
+  LDX #$00 ; index into renderletter
+  LDY #$00 ; index into renderwidelet
+  LDA #$00
+  ;STA SCRATCH+0  ; end renderwidelet index
+renderascalesrcloop:
+  CLC
+  ADC RENDERSCALEX
+  STA SCRATCH+0
+  LDA RENDERLETTER,X
+renderascaledstloop:
+  STA RENDERWIDELET,Y
+  INY
+  CPY SCRATCH+0
+  BCC renderascaledstloop
+  LDA SCRATCH+0
+  INX
+  CPX #$08
+  BCC renderascalesrcloop
+  STY SCRATCH+1 ; save scaled glyph width
+  ; assemble scaled glyph onto marquee
+  ; quick and dirty, not too complicated for now
+  LDX #$00
+  LDY RENDERFRONTA
+  ;LDY NEWCHARPOS
+renderapaintglyphloop:
+  INY
+  TYA
+  AND #$7F
+  TAY
+  LDA RENDERWIDELET,X
+  STA RENDERSHORT,Y
+  INX
+  CPX SCRATCH+1
+  BCC renderapaintglyphloop
   LDA RENDERFRONTA
   CLC
-  ADC #$01
+  ADC SCRATCH+1
   STA RENDERFRONTA
-  ; for now, placeholder bitmap generation
-  TAY
-  AND #$7F
-  TAX
-  TYA
-  STA RENDERSHORT,X
 renderatest:
   LDA RENDERFRONTA
   SEC
