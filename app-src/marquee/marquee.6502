@@ -1122,8 +1122,8 @@ formatfields:  .align 4
   .text " Horz Scale \x95\x95\x95 "
   .text " Vert Scale \x95\x95\x95 "
   .text " Slant      \x95\x95\x95 "
-  .text " Weight     \x95\x95\x95 "
-  .text " Spacing    \x95\x95\x95 "
+  .text " Weight\x19n\x3fi\x10\x95\x95\x95 "
+  .text " Spacin\x19n\x3fi\x10\x95\x95\x95 "
   .text " Speed      \x95\x95\x95 "
 defaultbgcolors:
   .byte 4,4,4,4,4,7,4,7,7,7,7,10,7,10,10,10,10,12
