@@ -160,14 +160,14 @@ initrendersettings:
   ; initialize render settings with default
   LDA #$03
   STA RENDERSCALEX
-  STA RENDERSCALEY
-  LDA #$02
-  STA RENDERBOLDEN
   LDA #$04
+  STA RENDERSCALEY
+  LDA #$00
+  STA RENDERBOLDEN
   STA RENDERINTERLS
-  LDA #$35
+  LDA #$18
   STA RENDERSLANT
-  LDA #$13
+  LDA #$5
   STA SCROLLDELAY
   ; compile USERCOLORS array from defaults in ROM
   LDX #00
