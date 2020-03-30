@@ -21,9 +21,9 @@ $(OUTPUT_FOLDER)/src/%.o: src/%.c | $(OUTPUT_FOLDER)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTPUT_FOLDER):
-	@if [[ ! -e $(OUTPUT_FOLDER) ]];then mkdir -p $(OUTPUT_FOLDER);fi
+	@mkdir -p $(OUTPUT_FOLDER)
 $(OUTPUT_FOLDER)/src:$(OUTPUT_FOLDER)
-	@if [[ ! -e $(OUTPUT_FOLDER)/src ]];then mkdir $(OUTPUT_FOLDER)/src;fi
+	@mkdir $(OUTPUT_FOLDER)/src
 
 clean:
 	$(RM) -r $(OUTPUT_FOLDER) 2> /dev/null
