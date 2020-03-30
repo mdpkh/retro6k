@@ -1,4 +1,4 @@
-BINARY=rk6
+BINARY=r6k
 OUTPUT_FOLDER=./compiled/bin
 SOURCES=src/main.cpp src/fake6502.c
 HEADERS=src/custombuild.h src/fake6502.h
@@ -23,10 +23,12 @@ $(OUTPUT_FOLDER)/src/%.o: src/%.c | $(OUTPUT_FOLDER)
 $(OUTPUT_FOLDER):
 	@mkdir -p $(OUTPUT_FOLDER)
 $(OUTPUT_FOLDER)/src:$(OUTPUT_FOLDER)
-	@mkdir $(OUTPUT_FOLDER)/src
+	@mkdir -p $(OUTPUT_FOLDER)/src
 
-clean:
+cleanall:
 	$(RM) -r $(OUTPUT_FOLDER) 2> /dev/null
+clean:
+	$(RM) -r $(OUTPUT_FOLDER)/src 2> /dev/null
 
-.PHONY: clean run
+.PHONY: clean cleanall run
 
