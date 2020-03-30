@@ -1,5 +1,5 @@
 BINARY=rk6
-OUTPUT_FOLDER=./bin
+OUTPUT_FOLDER=./compiled/bin
 SOURCES=src/main.cpp src/fake6502.c
 HEADERS=src/custombuild.h src/fake6502.h
 OBJECTS=$(addprefix $(OUTPUT_FOLDER)/,$(addsuffix .o, $(basename $(basename $(SOURCES)))))
@@ -21,7 +21,7 @@ $(OUTPUT_FOLDER)/src/%.o: src/%.c | $(OUTPUT_FOLDER)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OUTPUT_FOLDER):
-	@if [[ ! -e $(OUTPUT_FOLDER) ]];then mkdir $(OUTPUT_FOLDER);fi
+	@if [[ ! -e $(OUTPUT_FOLDER) ]];then mkdir -p $(OUTPUT_FOLDER);fi
 $(OUTPUT_FOLDER)/src:$(OUTPUT_FOLDER)
 	@if [[ ! -e $(OUTPUT_FOLDER)/src ]];then mkdir $(OUTPUT_FOLDER)/src;fi
 
