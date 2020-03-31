@@ -2219,17 +2219,17 @@ int InitPaths()
 			homedrive[homedrivelen] = 0;
 		}
 		homedrive[MAX_PATH - 1] = 0;
-		getenv_s(&homedirlen, homedir, MAX_PATH, "HOMEDIR");
-		if (homedrivelen < 0)
+		getenv_s(&homedirlen, homedir, MAX_PATH, "HOMEPATH");
+		if (homedirlen < 0)
 		{
-			homedrive[0] = '\\';
-			homedrive[1] = 0;
+			homedir[0] = '\\';
+			homedir[1] = 0;
 		}
-		else if (homedrivelen < MAX_PATH)
+		else if (homedirlen < MAX_PATH)
 		{
-			homedrive[homedrivelen] = 0;
+			homedir[homedirlen] = 0;
 		}
-		homedrive[MAX_PATH - 1] = 0;
+		homedir[MAX_PATH - 1] = 0;
 		config.system.homepath = std::filesystem::canonical(
 			std::filesystem::path(homedrive)
 			/ std::filesystem::path(homedir));
