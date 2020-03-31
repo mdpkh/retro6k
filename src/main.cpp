@@ -2426,6 +2426,9 @@ bool LoadConfigFromFile(const wchar_t* infilename)
 	{
 		if (!line.size() || line[0] == '#')
 			continue;
+		while (line.size() > 0 && 
+			(line[line.size() - 1] == '\r' || line[line.size() - 1] == '\n'))
+			line.resize(line.size() - 1);
 		if (line[0] == '[')
 		{
 			if (cilstreq(line.c_str(), "[paths]"))
