@@ -523,7 +523,9 @@ enum class configfilesection {
 
 uint8_t bare_read6502(uint16_t address);
 bool cilstreq(const char* a, const char* b);
+bool cilstreq(const wchar_t* a, const wchar_t* b);
 bool cistreq(const char* a, const char* b);
+bool cistreq(const wchar_t* a, const wchar_t* b);
 int main(int argc, char** argv);
 void CollapsePaths();
 void DisplayArgs(char* dest, unsigned char opc, char* args, char** end);
@@ -547,7 +549,7 @@ extern "C" unsigned char GetSP();
 void InstallROM();
 bool LoadCartridge(const char* infilename);
 void LoadConfig();
-bool LoadConfigFromFile(const char* infilename);
+bool LoadConfigFromFile(const wchar_t* infilename);
 void LogFVMC(uint16_t dest, uint16_t src, uint8_t value);
 void LogRead(uint16_t address, uint8_t value);
 void LogReset();

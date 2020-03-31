@@ -104,12 +104,150 @@ unsigned int UE_RESETCPU;
 
 void CollapsePaths()
 {
-	// TODO: merge config.sessionpath and config.path vectors (sessionpath first)
-	// --- combination goes in config.sessionpath, i guess
-	//     (TODO then: update DoPickFile to use sessionpath vectors)
+	// merge config.sessionpath and config.path vectors (sessionpath first)
+	config.sessionpath.cartpath.insert(
+		config.sessionpath.cartpath.end(),
+		config.path.cartpath.begin(),
+		config.path.cartpath.end());
+	config.sessionpath.rompath.insert(
+		config.sessionpath.rompath.end(),
+		config.path.rompath.begin(),
+		config.path.rompath.end());
+	config.sessionpath.savepath.insert(
+		config.sessionpath.savepath.end(),
+		config.path.savepath.begin(),
+		config.path.savepath.end());
+	config.sessionpath.screencappath.insert(
+		config.sessionpath.screencappath.end(),
+		config.path.screencappath.begin(),
+		config.path.screencappath.end());
 	// in each combined vector, set every path to its canonical form
 	// --- delete path item if it doesn't exist in filesystem
+	for (auto it = config.sessionpath.cartpath.begin();
+		it != config.sessionpath.cartpath.end(); )
+	{
+		if (std::filesystem::exists(*it))
+		{
+			*it = std::filesystem::canonical(*it);
+			++it;
+		}
+		else
+		{
+			it = config.sessionpath.cartpath.erase(it);
+		}
+	}
+	for (auto it = config.sessionpath.rompath.begin();
+		it != config.sessionpath.rompath.end(); )
+	{
+		if (std::filesystem::exists(*it))
+		{
+			*it = std::filesystem::canonical(*it);
+			++it;
+		}
+		else
+		{
+			it = config.sessionpath.rompath.erase(it);
+		}
+	}
+	for (auto it = config.sessionpath.savepath.begin();
+		it != config.sessionpath.savepath.end(); )
+	{
+		if (std::filesystem::exists(*it))
+		{
+			*it = std::filesystem::canonical(*it);
+			++it;
+		}
+		else
+		{
+			it = config.sessionpath.savepath.erase(it);
+		}
+	}
+	for (auto it = config.sessionpath.screencappath.begin();
+		it != config.sessionpath.screencappath.end(); )
+	{
+		if (std::filesystem::exists(*it))
+		{
+			*it = std::filesystem::canonical(*it);
+			++it;
+		}
+		else
+		{
+			it = config.sessionpath.screencappath.erase(it);
+		}
+	}
 	// in each combined vector, remove any duplicates of previous items
+	for (auto it1 = config.sessionpath.cartpath.begin();
+		it1 != config.sessionpath.cartpath.end(); )
+	{
+		for (auto it2 = config.sessionpath.cartpath.begin();
+			it2 != it1; )
+		{
+			if (*it1 == *it2)
+			{
+				it1 = config.sessionpath.cartpath.erase(it1);
+				break;
+			}
+			else
+			{
+				++it2;
+			}
+		}
+		++it1;
+	}
+	for (auto it1 = config.sessionpath.rompath.begin();
+		it1 != config.sessionpath.rompath.end(); )
+	{
+		for (auto it2 = config.sessionpath.rompath.begin();
+			it2 != it1; )
+		{
+			if (*it1 == *it2)
+			{
+				it1 = config.sessionpath.rompath.erase(it1);
+				break;
+			}
+			else
+			{
+				++it2;
+			}
+		}
+		++it1;
+	}
+	for (auto it1 = config.sessionpath.savepath.begin();
+		it1 != config.sessionpath.savepath.end(); )
+	{
+		for (auto it2 = config.sessionpath.savepath.begin();
+			it2 != it1; )
+		{
+			if (*it1 == *it2)
+			{
+				it1 = config.sessionpath.savepath.erase(it1);
+				break;
+			}
+			else
+			{
+				++it2;
+			}
+		}
+		++it1;
+	}
+	for (auto it1 = config.sessionpath.screencappath.begin();
+		it1 != config.sessionpath.screencappath.end(); )
+	{
+		for (auto it2 = config.sessionpath.screencappath.begin();
+			it2 != it1; )
+		{
+			if (*it1 == *it2)
+			{
+				it1 = config.sessionpath.screencappath.erase(it1);
+				break;
+			}
+			else
+			{
+				++it2;
+			}
+		}
+		++it1;
+	}
 	return;
 }
 
@@ -1381,7 +1519,7 @@ void DoPickFile(filetype ft, std::string &path)
 	case filetype::FT_ROM:
 		wintitle = (char*)titles[1];
 		filterext = (char*)exts[1];
-		for (auto& path : config.path.rompath)
+		for (auto& path : config.sessionpath.rompath)
 		{
 			if (std::filesystem::exists(path))
 			{
@@ -1395,7 +1533,7 @@ void DoPickFile(filetype ft, std::string &path)
 	case filetype::FT_CART:
 		wintitle = (char*)titles[2];
 		filterext = (char*)exts[2];
-		for (auto& path : config.path.cartpath)
+		for (auto& path : config.sessionpath.cartpath)
 		{
 			if (std::filesystem::exists(path))
 			{
@@ -1409,7 +1547,7 @@ void DoPickFile(filetype ft, std::string &path)
 	case filetype::FT_CARTSAVE:
 		wintitle = (char*)titles[3];
 		filterext = (char*)exts[3];
-		for (auto& path : config.path.savepath)
+		for (auto& path : config.sessionpath.savepath)
 		{
 			if (std::filesystem::exists(path))
 			{
@@ -2262,19 +2400,19 @@ bool LoadCartridge(const char* infilename)
 void LoadConfig() {
 	for (auto& configloc : config.system.configloc)
 	{
-		if (cilstreq((const char*)configloc.c_str(), "windows registry"))
+		if (cilstreq(configloc.c_str(), L"windows registry"))
 		{
 			// TODO: read config from Windows Registry
 		}
 		else
 		{
-			if (LoadConfigFromFile((const char*)configloc.c_str()))
+			if (LoadConfigFromFile(configloc.c_str()))
 				break;
 		}
 	}
 }
 
-bool LoadConfigFromFile(const char* infilename)
+bool LoadConfigFromFile(const wchar_t* infilename)
 {
 	std::ifstream infile(infilename, std::ios::binary);
 	if (!infile.is_open())
@@ -2286,7 +2424,7 @@ bool LoadConfigFromFile(const char* infilename)
 	configfilesection section = configfilesection::CF_UNKNOWN;
 	while (std::getline(infile, line))
 	{
-		if (!line.size())
+		if (!line.size() || line[0] == '#')
 			continue;
 		if (line[0] == '[')
 		{
@@ -2320,7 +2458,26 @@ bool LoadConfigFromFile(const char* infilename)
 		switch (section)
 		{
 		case configfilesection::CF_PATHS:
-			// TODO: interpret key=value lines for [paths] section
+			if (key == "cart")
+			{
+				config.sessionpath.cartpath.push_back(std::filesystem::path(value));
+				break;
+			}
+			if (key == "rom")
+			{
+				config.sessionpath.rompath.push_back(std::filesystem::path(value));
+				break;
+			}
+			if (key == "save")
+			{
+				config.sessionpath.savepath.push_back(std::filesystem::path(value));
+				break;
+			}
+			if (key == "screencap")
+			{
+				config.sessionpath.screencappath.push_back(std::filesystem::path(value));
+				break;
+			}
 			break;
 		case configfilesection::CF_SCREEN:
 			// TODO: interpret key=value lines for [screen] section
@@ -2603,10 +2760,141 @@ void RandomBitFlip()
 int ReadArgs(int argc, char** argv)
 {
 	// TODO: read command-line arguments.
-	// config file spec should become only item of config.system.configloc
-	// other path spec lists should be saved to config.sessionpath vectors
-	// --- should other config items be taken from command line?
-	//     this function is executed before .retro6k-config is loaded...
+	char* cartspec = nullptr;
+	char* savespec = nullptr;
+	for (char** thisargptr = argv + 1; thisargptr - argv < argc; ++thisargptr)
+	{
+		if ((*thisargptr)[0] == '-')
+		{
+			if ((*thisargptr)[1] == '-')
+			{
+				// long option
+#define WARN_NOMATCH default: \
+                       SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, \
+                         "Command line option %s " \
+				         "ambiguous or not understood.", \
+                         *thisargptr);
+				switch ((*thisargptr)[2])
+				{
+				case 'c':
+					switch ((*thisargptr)[3])
+					{
+					case 'a': //--ca(rtpath): specify cart path
+						goto readcartpathparameter;
+					case 'o': //--co(nfigfile): specify config file location
+						goto readconfigfileparameter;
+					WARN_NOMATCH
+					}
+					break;
+				case 'r':
+					switch ((*thisargptr)[3])
+					{
+					case 'o': //--ro(mpath): specify rom path
+						goto readrompathparameter;
+						WARN_NOMATCH
+					}
+					break;
+				case 's':
+					switch ((*thisargptr)[3])
+					{
+					case 'a': //--sa(vepath): specify save path
+						goto readsavepathparameter;
+					case 'c': //--sc(reencappath): specify save path
+						goto readscreencappathparameter;
+						WARN_NOMATCH
+					}
+					break;
+					WARN_NOMATCH
+				}
+#undef WARN_NOMATCH
+			}
+			else
+			{
+				// short option(s) / switch(es)
+				char lastshort = 0;
+				for (char* thisshortptr = (*thisargptr) + 1; 
+					*thisshortptr; ++thisshortptr)
+				{
+					lastshort = *thisshortptr;
+					switch (lastshort)
+					{
+						// handlers for each short option / switch
+					case 'c': // specify config file location
+					case 'p': // specify cart path
+					case 'r': // specify rom path
+					case 's': // specify save path
+						break;
+					default:
+						SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+							"Command line switch -%c not understood.",
+							lastshort);
+					}
+				}
+				switch (lastshort)
+				{
+				case 'c':
+					goto readconfigfileparameter;
+				case 'p':
+					goto readcartpathparameter;
+				case 'r':
+					goto readrompathparameter;
+				case 's':
+					goto readsavepathparameter;
+					// jumps for next-argument reading
+				default:
+					;
+				}
+			}
+			continue;
+			// labels for reading next argument as parameter to an option
+		readconfigfileparameter:
+			// config file spec, if given, should become
+			//only item of config.system.configloc
+			++thisargptr;
+			config.system.configloc.clear();
+			config.system.configloc.push_back(
+				std::filesystem::path(*thisargptr));
+			continue;
+		readcartpathparameter:
+			++thisargptr;
+			config.sessionpath.cartpath.push_back(
+				std::filesystem::path(*thisargptr));
+			continue;
+		readrompathparameter:
+			++thisargptr;
+			config.sessionpath.rompath.push_back(
+				std::filesystem::path(*thisargptr));
+			continue;
+		readsavepathparameter:
+			++thisargptr;
+			config.sessionpath.savepath.push_back(
+				std::filesystem::path(*thisargptr));
+			continue;
+		readscreencappathparameter:
+			++thisargptr;
+			config.sessionpath.screencappath.push_back(
+				std::filesystem::path(*thisargptr));
+			continue;
+		}
+		else
+		{
+			// positional argument
+			if (cartspec == nullptr)
+			{
+				cartspec = *thisargptr;
+				continue;
+			}
+			if (savespec == nullptr)
+			{
+				savespec = *thisargptr;
+				continue;
+			}
+			SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+				"Command line argument %s not understood.",
+				*thisargptr);
+		}
+	}
+    // TODO: actually do something with cartspec and savespec if they are non-null
 	return 0;
 }
 
@@ -2801,7 +3089,40 @@ bool cilstreq(const char* a, const char* b)
 	}
 }
 
+bool cilstreq(const wchar_t* a, const wchar_t* b)
+// case-insensitive c-string equality comparison,
+// optimized by assuming b is already lowercase
+{
+	if (a == b)
+		return true;
+	while (true)
+	{
+		if (*a == 0 && *b == 0)
+			return true;
+		if (tolower(*a) != *b)
+			return false;
+		++a;
+		++b;
+	}
+}
+
 bool cistreq(const char* a, const char* b)
+// case-insensitive c-string equality comparison
+{
+	if (a == b)
+		return true;
+	while (true)
+	{
+		if (*a == 0 && *b == 0)
+			return true;
+		if (tolower(*a) != tolower(*b))
+			return false;
+		++a;
+		++b;
+	}
+}
+
+bool cistreq(const wchar_t* a, const wchar_t* b)
 // case-insensitive c-string equality comparison
 {
 	if (a == b)
