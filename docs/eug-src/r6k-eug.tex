@@ -44,9 +44,34 @@ write a personal note...\par
 
 Nothing established yet.
 
-\chapter{Emulator Startup}
+\chapter{Configuration}
 
-When the Retro 6k emulator starts, the first thing it does is ask which cartridge to ``insert''. If you press \textsf{Esc}, the cartridge selection closes and the system boots without a cartridge inserted. If you do select a cartridge, the emulator may then ask you to choose which ``instance'' of the selected cartridge to load; the physical equivalent is which of multiple copies of a cartridge are inserted into the machine. This will only happen if the selected cartridge is designed to store data persistently. The process is described in greater detail in chapter \ref{ch:loadcartridge} on page \ref{ch:loadcartridge}. Following the selection of a cartridge and possibly an instance file, the system boots with the selected cartridge inserted.
+\section{Configuration File}
+
+\subsection{Location}
+
+In Windows, the first place the Retro 6k emulator looks for configuration data is the Windows Registry, where the format of the configuration data is a little different than in a file on disk. On Unix/Linux systems, the emulator first looks for a file at \texttt{/etc/.retro6k-config}. If not found, the emulator will next look for a file called \texttt{.retro6k-config} in the current user's home directory. Failing that, the emulator will finally look for a file called \texttt{.retro6k-config} in the same directory as the emulator's own executable file. However, if the emulator is launched with a command line option specifying where to look for configuration data, the emulator will look there and only there.
+
+\subsection{Format (on disk)}
+
+[TODO: use annotated example?]
+
+\section{Command Line Arguments}
+
+[TODO]
+
+\chapter{Startup}
+
+When the Retro 6k emulator starts, the first thing it does is ask which cartridge to ``insert''. If you press \textsf{Esc}, the cartridge selection closes and the system boots without a cartridge inserted. If you do select a cartridge, the emulator may then ask you to choose which ``instance'' or ``save'' of the selected cartridge to load; the physical equivalent is which of multiple copies of a cartridge are inserted into the machine. This will only happen if the selected cartridge is designed to store data persistently. The process is described in greater detail in chapter \ref{ch:cartridges} on page \pageref{ch:cartridges}. Following the selection of a cartridge and possibly an instance file, the system boots with the selected cartridge inserted.
+
+\chapter{Menu}
+
+[TODO]
+
+\chapter{Cartridges and Saves}
+\label{ch:cartridges}
+
+[TODO]
 
 \cleartoverso
 \pagestyle{empty}
