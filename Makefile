@@ -1,35 +1,34 @@
-./compiled/bin/r6k: ./intermed/main.o ./intermed/fake6502.o | ./compiled/bin
-	@echo "Linking..."
-	g++-8 ./intermed/main.o ./intermed/fake6502.o \
-		-lSDL2 -lSDL2main -lstdc++fs \
-		-o ./compiled/bin/r6k
-	@echo "\nBuild successful. Launch Retro 6k by navigating to ./compiled/bin"
-	@echo "and them running ./r6k"
+BINARY=r6k
+OUTPUT_FOLDER=./compiled/bin
+SOURCES=src/main.cpp src/fake6502.c
+HEADERS=src/custombuild.h src/fake6502.h
+OBJECTS=$(addprefix $(OUTPUT_FOLDER)/,$(addsuffix .o, $(basename $(basename $(SOURCES)))))
+LIBRARIES=SDL2 SDL2main stdc++fs
+LIBFLAGS=$(addprefix -l,$(LIBRARIES))
+CXXFLAGS=-std=c++17
 
-./compiled/bin:
-	@mkdir ./compiled/bin 2> /dev/null || echo > /dev/null
+default:$(OUTPUT_FOLDER)/$(BINARY)
+$(OUTPUT_FOLDER)/$(BINARY): $(OBJECTS) | $(OUTPUT_FOLDER)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(OBJECTS) $(LIBFLAGS) -o $@
 
-./intermed/main.o: ./src/main.cpp ./src/custombuild.h ./src/fake6502.h \
-		./src/main.h ./src/strcpys.h ./src/sys.h | ./intermed
-	@echo "Compiling main..."
-	g++-8 -c ./src/main.cpp -std=c++17 -o ./intermed/main.o
+run: $(OUTPUT_FOLDER)/$(BINARY)
+	@cd $(OUTPUT_FOLDER) && ./$(BINARY)
 
-./intermed/fake6502.o: ./src/fake6502.c | ./intermed
-	@echo "Compiling fake6502..."
-	gcc-8 -c ./src/fake6502.c -o ./intermed/fake6502.o
+$(OUTPUT_FOLDER)/src/%.o: src/%.cpp | $(OUTPUT_FOLDER)/src
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-./intermed:
-	@mkdir ./intermed 2> /dev/null || echo > /dev/null
+$(OUTPUT_FOLDER)/src/%.o: src/%.c | $(OUTPUT_FOLDER)
+	$(CC) $(CFLAGS) -c $< -o $@
 
-clean:
-	@rm -r ./intermed 2> /dev/null || echo > /dev/null
+$(OUTPUT_FOLDER):
+	@mkdir -p $(OUTPUT_FOLDER)
+$(OUTPUT_FOLDER)/src:$(OUTPUT_FOLDER)
+	@mkdir -p $(OUTPUT_FOLDER)/src
 
 cleanall:
-	@rm -r ./intermed 2> /dev/null || echo > /dev/null
-	@rm -r ./compiled/bin 2> /dev/null || echo > /dev/null
+	$(RM) -r $(OUTPUT_FOLDER) 2> /dev/null
+clean:
+	$(RM) -r $(OUTPUT_FOLDER)/src 2> /dev/null
 
-install: ./compiled/bin/r6k ./compiled/rom/bankf.rom
-	@echo "Sorry, we haven't yet figured out how to 'install' Retro 6k."
-
-.PHONY: clean cleanall install
+.PHONY: clean cleanall run
 

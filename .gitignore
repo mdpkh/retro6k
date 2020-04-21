@@ -49,8 +49,7 @@
 /updatever.py
 
 #compile stuff
-/compiled/bin/**
-/intermed/**
+bin/
 **/fake6502.o
 /.vs/
 /.vs/**
