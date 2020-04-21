@@ -2099,10 +2099,89 @@ int InitMainWindow()
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER);
 	SDL_DisplayMode desktopmode;
 	SDL_GetDesktopDisplayMode(0, &desktopmode);
-	if (config.screen.pixwidth == -1)
-		config.screen.pixwidth = (desktopmode.w - 64) / 256;
-	if (config.screen.pixheight == -1)
-		config.screen.pixheight = (desktopmode.h - 36) / 144;
+	switch (config.screen.aspectratio)
+	{
+	case aspectratiocat::AR_WIDE:
+		config.screen.reportedaspectratio = aspectratiocat::AR_WIDE;
+		if (config.screen.pixwidth == -1)
+		{
+			if (config.screen.pixheight == -1)
+			{
+				int autowidth = (desktopmode.w - 64) / 256;
+				int autoheight = (desktopmode.h - 64) / 144;
+				if (autowidth >= autoheight)
+				{
+					config.screen.pixheight = autoheight;
+					config.screen.pixwidth = autoheight;
+				}
+				else
+				{
+					config.screen.pixwidth = autowidth;
+					config.screen.pixheight = autowidth;
+				}
+			}
+			else
+			{
+				config.screen.pixwidth = config.screen.pixheight;
+			}
+		}
+		else
+		{
+			if (config.screen.pixheight == -1)
+			{
+				config.screen.pixheight = config.screen.pixwidth;
+			}
+		}
+		break;
+	case aspectratiocat::AR_CLASSIC:
+		config.screen.reportedaspectratio = aspectratiocat::AR_CLASSIC;
+		if (config.screen.pixwidth == -1)
+		{
+			if (config.screen.pixheight == -1)
+			{
+				int autowidth = (desktopmode.w - 64) / 256;
+				int autoheight = (desktopmode.h - 64) / 144;
+				if (autowidth * 4 >= autoheight * 3)
+				{
+					config.screen.pixheight = autoheight;
+					config.screen.pixwidth = (autoheight * 3 + 2) / 4;
+				}
+				else
+				{
+					config.screen.pixwidth = autowidth;
+					config.screen.pixheight = (autowidth * 4 + 1) / 3;
+				}
+			}
+			else
+			{
+				config.screen.pixwidth = (config.screen.pixheight * 3 + 2) / 4;
+			}
+		}
+		else
+		{
+			if (config.screen.pixheight == -1)
+			{
+				config.screen.pixheight = (config.screen.pixwidth * 4 + 1) / 3;
+			}
+		}
+		break;
+	case aspectratiocat::AR_FREE:
+	default:
+		if (config.screen.pixwidth == -1)
+			config.screen.pixwidth = (desktopmode.w - 64) / 256;
+		if (config.screen.pixheight == -1)
+			config.screen.pixheight = (desktopmode.h - 64) / 144;
+		if (config.screen.pixwidth * config.screen.pixwidth * 4
+			> config.screen.pixheight* config.screen.pixheight * 3)
+		{
+			config.screen.reportedaspectratio = aspectratiocat::AR_WIDE;
+		}
+		else
+		{
+			config.screen.reportedaspectratio = aspectratiocat::AR_CLASSIC;
+		}
+		break;
+	}
 	mainwindow = SDL_CreateWindow("Retro 6k Emulator",
 		SDL_WINDOWPOS_UNDEFINED,
 		SDL_WINDOWPOS_UNDEFINED,

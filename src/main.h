@@ -513,6 +513,7 @@ struct {
 		int pixwidth = -1;
 		int pixheight = -1;
 		aspectratiocat aspectratio = aspectratiocat::AR_FREE;
+		aspectratiocat reportedaspectratio = aspectratiocat::AR_CLASSIC;
 	} screen;
 } config;
 enum class configfilesection {
