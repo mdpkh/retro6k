@@ -2483,7 +2483,45 @@ bool LoadConfigFromFile(const wchar_t* infilename)
 			}
 			break;
 		case configfilesection::CF_SCREEN:
-			// TODO: interpret key=value lines for [screen] section
+			if (key == "aspectratio")
+			{
+				if (value == "free")
+				{
+					config.screen.aspectratio = aspectratiocat::AR_FREE;
+					break;
+				}
+				if (value == "classic")
+				{
+					config.screen.aspectratio = aspectratiocat::AR_CLASSIC;
+					break;
+				}
+				if (value == "wide")
+				{
+					config.screen.aspectratio = aspectratiocat::AR_WIDE;
+					break;
+				}
+				break;
+			}
+			if (key == "pixwidth")
+			{
+				if (value == "auto")
+				{
+					config.screen.pixwidth = -1;
+					break;
+				}
+				config.screen.pixwidth = atoi(value.data());
+				break;
+			}
+			if (key == "pixheight")
+			{
+				if (value == "auto")
+				{
+					config.screen.pixheight = -1;
+					break;
+				}
+				config.screen.pixheight = atoi(value.data());
+				break;
+			}
 			break;
 		}
 	}
