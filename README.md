@@ -46,7 +46,7 @@ GCC8 and the normal libSDL2 libraries as well).
 Once all dependencies are installed, simply run `make` to generate a binary. To
 use an alternate compiler, such as Clang, simply override the CXX and CC
 variables(`make CXX=clang`). You can also override the compilation flags by
-tweaking CFLAGS and CXXFLAGS (e.g.
+tweaking CFLAGS and CXXFLAGS (*e. g.*
 `make CXXFLAGS="-march=native -O2" CFLAGS="-march=native -O2"` for a
 significant speed boost and a binary that will only work on your machine).
 
