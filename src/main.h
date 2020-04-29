@@ -510,9 +510,11 @@ struct {
 		std::vector<std::filesystem::path> screencappath;
 	} sessionpath;
 	struct {
-		int pixwidth = -1;
-		int pixheight = -1;
-		aspectratiocat aspectratio = aspectratiocat::AR_FREE;
+		int specpixwidth = -1;
+		int specpixheight = -1;
+		int pixwidth;
+		int pixheight;
+		aspectratiocat specaspectratio = aspectratiocat::AR_FREE;
 		aspectratiocat reportedaspectratio = aspectratiocat::AR_CLASSIC;
 	} screen;
 } config;

@@ -2099,7 +2099,7 @@ int InitMainWindow()
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER);
 	SDL_DisplayMode desktopmode;
 	SDL_GetDesktopDisplayMode(0, &desktopmode);
-	switch (config.screen.aspectratio)
+	switch (config.screen.specaspectratio)
 	{
 	case aspectratiocat::AR_WIDE:
 		config.screen.reportedaspectratio = aspectratiocat::AR_WIDE;
@@ -2566,17 +2566,17 @@ bool LoadConfigFromFile(const wchar_t* infilename)
 			{
 				if (value == "free")
 				{
-					config.screen.aspectratio = aspectratiocat::AR_FREE;
+					config.screen.specaspectratio = aspectratiocat::AR_FREE;
 					break;
 				}
 				if (value == "classic")
 				{
-					config.screen.aspectratio = aspectratiocat::AR_CLASSIC;
+					config.screen.specaspectratio = aspectratiocat::AR_CLASSIC;
 					break;
 				}
 				if (value == "wide")
 				{
-					config.screen.aspectratio = aspectratiocat::AR_WIDE;
+					config.screen.specaspectratio = aspectratiocat::AR_WIDE;
 					break;
 				}
 				break;
@@ -2585,20 +2585,24 @@ bool LoadConfigFromFile(const wchar_t* infilename)
 			{
 				if (value == "auto")
 				{
+					config.screen.specpixwidth = -1;
 					config.screen.pixwidth = -1;
 					break;
 				}
-				config.screen.pixwidth = atoi(value.data());
+				config.screen.specpixwidth = atoi(value.data());
+				config.screen.pixwidth = config.screen.specpixwidth;
 				break;
 			}
 			if (key == "pixheight")
 			{
 				if (value == "auto")
 				{
+					config.screen.specpixheight = -1;
 					config.screen.pixheight = -1;
 					break;
 				}
-				config.screen.pixheight = atoi(value.data());
+				config.screen.specpixheight = atoi(value.data());
+				config.screen.pixheight = config.screen.specpixheight;
 				break;
 			}
 			break;
