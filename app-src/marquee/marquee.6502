@@ -1367,18 +1367,18 @@ renderatransposeglyphloop:
   LDA SCRATCH,Y
   LDX #$00
 renderatransposeglyphbyteloop0:
-  ASL A
+  LSR A
+  LSR A
   ROR RENDERLETTER,X
-  ASL A
   INX
   CPX #$04
   BCC renderatransposeglyphbyteloop0
   INY
   LDA SCRATCH,Y
 renderatransposeglyphbyteloop1:
-  ASL A
+  LSR A
+  LSR A
   ROR RENDERLETTER,X
-  ASL A
   INX
   CPX #$08
   BCC renderatransposeglyphbyteloop1

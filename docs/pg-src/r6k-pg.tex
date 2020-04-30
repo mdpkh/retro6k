@@ -1581,12 +1581,16 @@ Video memory at addresses \texttt{0800-0A3F} determines which graphic character 
 
 $$M_B = \texttt{0800}_h \vee  R \ll 5 \vee C$$
 
-The color assignments for each character cell are contained in memory at addresses \texttt{0A40-0FDF}. The arrangement here is a bit more tricky. As each character cell can be assigned one of 32 palette colors to each of 4 color slots. To simplify video hardware logic, each color assignment's 5 bits are distributed among 5 different ``planes'' of video memory. Each byte of this area of video memory contains a single bit of the color assignment to each of the 4 slots of 2 vertically-adjacent character cells. An upshot to this scheme is alternating colors by row on the screen is very easy. \footnote{As of emulator version \oldstylenums{2022}a, this arrangement has changed slightly. Previously, the high nybble referred to color assignments for the even-row half of the cell pair, while the low nybble referred to color assignmetns for the odd-row half of the cell pair. For consistency with the little-endianness of the 6502 architecture and other memory mapping formul\ae in the Retro 6k design, these nybbles have been swapped.}
+The color assignments for each character cell are contained in memory at addresses \texttt{0A40-0FDF}. The arrangement here is a bit more tricky. As each character cell can be assigned one of 32 palette colors to each of 4 color slots. To simplify video hardware logic, each color assignment's 5 bits are distributed among 5 different ``planes'' of video memory. Each byte of this area of video memory contains a single bit of the color assignment to each of the 4 slots of 2 vertically-adjacent character cells. An upshot to this scheme is alternating colors by row on the screen is very easy. \footnote{As of emulator version \oldstylenums{2022}a, this arrangement has changed slightly. Previously, the high nybble referred to color assignments for the even-row half of the cell pair, while the low nybble referred to color assignmetns for the odd-row half of the cell pair. For consistency with the little-endianness of the 6502 architecture and other memory mapping formul\ae{} in the Retro 6k design, these nybbles have been swapped.}
 
 $$M_B = \texttt{0A40}_h + \texttt{120}_h \times P + (R \wedge \texttt{1E}_h) \ll 4 \vee C$$
 $$M_b = (R \wedge \texttt{1}_h) \ll 2 \vee S$$
 
+\pagebreak[0]
+
 The palette determines the mapping from 5-bit cell color assignments to 8-bit hardware color capabilities, and is located at addresses \texttt{0FE0-0FFF}. Each byte is one color selection:
+
+\nopagebreak[4]
 
 $$M_B = \texttt{0FE0}_h \vee J$$
 
@@ -1596,7 +1600,7 @@ $$R = R_HR_LI_HI_L$$
 $$G = G_HG_LI_HI_L$$
 $$B = B_HB_LI_HI_L$$
 
-The graphic characters themselves are defined by the largest chunk of video memory, at addresses \texttt{1000-1FFF}. The characters are defined one after another, in blocks of 16 bytes. The pair of bits responsible for determining which color slot is used to paint a given pixel in a given graphic character can be found using this formula:
+The graphic characters themselves are defined by the largest chunk of video memory, at addresses \texttt{1000-1FFF}. The characters are defined one after another, in blocks of 16 bytes. The pair of bits responsible for determining which color slot is used to paint a given pixel in a given graphic character can be found using this formula:\footnote{Originally, the bit address portion of this formula was wrong. The first pixel of a group of four was stored in the highest two bits of the byte, a.\,k.\,a. big-endian format. As of emulator version \oldstylenums{2031}b, the first pixel of a group of four is stored in the lowest two bits of the byte, a.\,k.\,a. little-endian format, which is what this formula indicates.}
 
 $$M_B = \texttt{1000}_h \vee G \ll 4 \vee Y \ll 1 \vee X \gg 2$$
 $$M_b = X \ll 1 \vee [0,1]$$

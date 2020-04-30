@@ -2774,15 +2774,15 @@ void PaintCell(unsigned char col, unsigned char row, unsigned char glyph, unsign
 	for (int gy = 0, cy = 0, sy = row << 5; gy < 8; ++gy)
 	{
 		unsigned char pix[8];
-		pix[0] = paddr[att[(*faddr & 0xC0) >> 6]];
-		pix[1] = paddr[att[(*faddr & 0x30) >> 4]];
-		pix[2] = paddr[att[(*faddr & 0xC) >> 2]];
-		pix[3] = paddr[att[(*faddr & 0x3)]];
+		pix[0] = paddr[att[(*faddr & 0x3)]];
+		pix[1] = paddr[att[(*faddr & 0xC) >> 2]];
+		pix[2] = paddr[att[(*faddr & 0x30) >> 4]];
+		pix[3] = paddr[att[(*faddr & 0xC0) >> 6]];
 		faddr++;
-		pix[4] = paddr[att[(*faddr & 0xC0) >> 6]];
-		pix[5] = paddr[att[(*faddr & 0x30) >> 4]];
-		pix[6] = paddr[att[(*faddr & 0xC) >> 2]];
-		pix[7] = paddr[att[(*faddr & 0x3)]];
+		pix[4] = paddr[att[(*faddr & 0x3)]];
+		pix[5] = paddr[att[(*faddr & 0xC) >> 2]];
+		pix[6] = paddr[att[(*faddr & 0x30) >> 4]];
+		pix[7] = paddr[att[(*faddr & 0xC0) >> 6]];
 		faddr++;
 		for (int ry = 0; ry < config.screen.pixheight; ++ry, ++cy)
 		{

@@ -20,15 +20,15 @@ for page in range(lines):
         for y in range(8):
             outfile.write(
                 struct.pack(
-                    '>H',
-                      (r[y][x0] << 14)
-                    | (r[y][x0 + 1] << 12)
-                    | (r[y][x0 + 2] << 10)
-                    | (r[y][x0 + 3] << 8)
-                    | (r[y][x0 + 4] << 6)
-                    | (r[y][x0 + 5] << 4)
-                    | (r[y][x0 + 6] << 2)
-                    | (r[y][x0 + 7])
+                    '<H',
+                      (r[y][x0 + 7] << 14)
+                    | (r[y][x0 + 6] << 12)
+                    | (r[y][x0 + 5] << 10)
+                    | (r[y][x0 + 4] << 8)
+                    | (r[y][x0 + 3] << 6)
+                    | (r[y][x0 + 2] << 4)
+                    | (r[y][x0 + 1] << 2)
+                    | (r[y][x0])
                     ))
 infile.close()
 outfile.close()

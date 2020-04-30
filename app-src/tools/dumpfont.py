@@ -7,17 +7,17 @@ import png
 def glyphrows(data):
     return tuple(
         (
-            (r & 0xc000) >> 14,
-            (r & 0x3000) >> 12,
-            (r & 0xc00) >> 10,
-            (r & 0x300) >> 8,
-            (r & 0xc0) >> 6,
-            (r & 0x30) >> 4,
-            (r & 0xc) >> 2,
             (r & 0x3),
+            (r & 0xc) >> 2,
+            (r & 0x30) >> 4,
+            (r & 0xc0) >> 6,
+            (r & 0x300) >> 8,
+            (r & 0xc00) >> 10,
+            (r & 0x3000) >> 12,
+            (r & 0xc000) >> 14,
         )
         for r in struct.unpack(
-            '>8H', data))
+            '<8H', data))
 
 
 def reserialize(glyphs):
