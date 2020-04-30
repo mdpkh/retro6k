@@ -1,6 +1,9 @@
 **/*.pdf binary -delta
 **/*.png binary -delta
 **/*.rom binary delta
+**/*.bin binary delta
+**/*.compressed binary -delta
+**/*.R6kCart binary delta
 **/*.svg text delta
 **/*.tex text delta
 *.6502 linguist-language=Assembly
