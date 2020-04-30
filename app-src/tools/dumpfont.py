@@ -21,7 +21,7 @@ def glyphrows(data):
 
 
 def reserialize(glyphs):
-    for line in range(16):
+    for line in range(pages):
         c0 = line << 4
         for y in range(8):
             row = list(glyphs[c0][y])
@@ -46,12 +46,21 @@ def reserialize(glyphs):
 infilename = sys.argv[1]
 outfilename = sys.argv[2]
 infile = open(infilename, 'rb')
-indata = [infile.read(16) for c in range(256)]
+indata = []
+while True:
+    inpage = infile.read(16)
+    if len(inpage) == 0:
+        break
+    if len(inpage) < 16:
+        inpage += b'\x00' * (16 - len(inpage))
+    indata.append(inpage)
 infile.close()
+pages = (len(indata) + 15) >> 4
 glyphs = [glyphrows(d) for d in indata]
+glyphs += [((0,) * 8,) * 8] * ((pages << 4) - len(glyphs))
 writer = png.Writer(
     width=128,
-    height=128,
+    height=pages<<3,
     bitdepth=2,
     palette=[
         (  0,   0,   0),
