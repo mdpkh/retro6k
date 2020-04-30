@@ -584,7 +584,7 @@ datasystext5:
 datasystext6:
   .text "   Please insert a cartridge>   "
 datasystext7:
-  .text "     F\267\270\271ware version 1985d     "
+  .text "     F\267\270\271ware version 1985e     "
 datasystext8:
   .text "\0142019\14020 Maggie David \206\207\210 Haynes"
 datasyscolors:
