@@ -3644,7 +3644,7 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 			// TODO: set video flags
 			break;
 		case 0xfc:
-			syspflags[value] = syspflags[value] & !pageflags::PF_DONTLOG;
+			syspflags[value] = syspflags[value] & ~pageflags::PF_DONTLOG;
 			break;
 		case 0xfd:
 			syspflags[value] = syspflags[value] | pageflags::PF_DONTLOG;
