@@ -1,46 +1,34 @@
 ; Retro6K System Firmware
+; zeropage addresses used in subroutines
+POINTER0  = $E0
+POINTER1  = $E2
+POINTER2  = $E4
+POINTER3  = $E6
+SRSCRATCH = $F0
 ; special system addresses
 VIDEOSTATE = $02FC
-FVMCDEST = $03F8
-FVMCSRC = $03F9
+FVMCDEST   = $03F8
+FVMCSRC    = $03F9
+DLSOFF     = $03FC
+DLSON      = $03FD
+DEBUGLOG   = $03FF
 ; code starts here
   .org $F000
-  NOP
-  NOP
-  NOP
-  NOP
 entry: ; system power-on or reset
   ; misc initialization
   SEI
   CLD
   LDA #$00
-  STA $03F8
-  JSR WAITVSCANX
+  STA FVMCSRC
+  STA FVMCDEST
+  ;LDX #$F0
+  ;STX DLSOFF ; turn off debug log suppression
+  ;INX
+  ;BNE -6 ; STX again
+  ;LDX #>waitvscana
+  ;STX DLSON ; but seriously, suppress logging of waitvscana
+  JSR waitvscana
   ; display cartridge identification in bottom of screen
-  LDA #$20
-  STA $0A0A
-  LDA $2000
-  STA $0A0B
-  LDA $2001
-  STA $0A0C
-  LDA $2002
-  STA $0A0D
-  LDA $2003
-  STA $0A0E
-  LDA $2004
-  STA $0A0F
-  LDA $2005
-  STA $0A10
-  LDA $2006
-  STA $0A11
-  LDA $2007
-  STA $0A12
-  LDA $2008
-  STA $0A13
-  LDA $2009
-  STA $0A14
-  LDA #$20
-  STA $0A15
   LDX #$00
 cartidcolloop:
   LDA #$F0
@@ -60,47 +48,43 @@ cartidcolloop:
   LDA #$02
   STA $09EA,X
   STA $0A2A,X
+  LDA $1FFF,X
+  STA $0A0A,X
   INX
-  TXA
-  CMP #$0C
-  BNE cartidcolloop
-  LDA #$00
-  STA $0FE0
-  STA $0FE1
-  STA $0FE2
-  STA $0FE3
-  STA $0FE4
-  STA $0FE5
-  STA $0FE6
-  STA $0FE8
-  STA $0FE9
-  STA $0FEA
-  STA $0FEB
-  STA $0FEC
-  STA $0FED
-  STA $0FEE
-  STA $0FEF
-  STA $0FF0
-  STA $0FF1
-  STA $0FF2
-  STA $0FF3
-  STA $0FF4
-  STA $0FF5
-  STA $0FF6
-  STA $0FF7
-  STA $0FF9
-  STA $0FFA
-  STA $0FFB
-  STA $0FFC
-  STA $0FFD
-  STA $0FFE
-  LDA #$0F
-  STA $0FE7
-  LDA #$F0
-  STA $0FF8
-  LDA #$FF
-  STA $0FFF
-  ; detect presence of valid cartridge by checking for magic bytes 47 A9 0C 1E
+  CPX #$0C
+  BCC cartidcolloop
+  LDA #$20
+  STA $0A0A
+  STA $0A15
+  ;initialize palette
+  LDX #$00
+initpalloop:  
+  LDA datasyscolors,X ; palette colors
+  STA $0FE0,X
+  INX
+  CPX #$20
+  BCC initpalloop
+  ; load system font (specific subset in specific order)
+  LDA #$E0
+  STA FVMCSRC
+  LDA #$10
+  STA FVMCDEST
+  JSR waitvscana
+  LDX #$20
+  JSR fvmcchar
+  LDX #$00
+initfontloop:
+  LDA initfontsrcpage,X
+  STA FVMCSRC
+  LDA initfontdestpage,X
+  STA FVMCDEST
+  BEQ initfontloopexit
+  JSR fvmcpage
+  INX
+  JMP initfontloop
+initfontloopexit:
+  ; detect presence of valid cartridge
+  ; by checking for magic bytes 47 A9 0C 1E
   LDA $200A
   CMP #$47
   BNE nocart
@@ -116,77 +100,21 @@ cartidcolloop:
   ; if we got this far, jump to cartridge start vector
   JMP ($200E)
 nocart: ; no cartridge inserted
-  ; copy system font (low half)
-  LDY #$E0 ; system font source page start
-  LDA #$10 ; video RAM font page start
-copyfontpageloop1:
-  JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
-  ; enable fast video memory copy
-  CLC
-  STA FVMCDEST
-  STY FVMCSRC
-  LDX #$00
-copyfontbyteloop1:
-  STA $00,X ; actual address and value written is overridden by fast video memory copy circuit
-  INX
-  STA $00,X
-  INX
-  STA $00,X
-  INX
-  STA $00,X
-  INX
-  BNE copyfontbyteloop1
-  ; disable fast video memory copy
-  ; X should be zero
-  STX FVMCDEST
-  INY ; increment source page
-  CLC
-  ADC #$01 ; increment destination page
-  CMP #$18 ; compare against stop page number
-  BNE copyfontpageloop1
-  ; copy start screen graphics and custom chars
-  LDY #$FA ; system font source page start
-  LDA #$18 ; video RAM font page start
-copyfontpageloop2:
-  JSR WAITVSCANX ; wait for vertical retrace (preserve A & Y registers please)
-  ; enable fast video memory copy
-  CLC
-  STA FVMCDEST
-  STY FVMCSRC
-  LDX #$00
-copyfontbyteloop2:
-  STA $00,X ; actual address and value written is overridden by fast video memory copy circuit
-  INX
-  STA $00,X
-  INX
-  STA $00,X
-  INX
-  STA $00,X
-  INX
-  BNE copyfontbyteloop2
-  ; disable fast video memory copy
-  ; X should be zero
-  STX FVMCDEST
-  INY ; increment source page
-  CLC
-  ADC #$01 ; increment destination page
-  CMP #$1C ; compare against stop page number
-  BNE copyfontpageloop2
-  JSR WAITVSCANA ; wait for vertical retrace
   ; initialize screen display
+  JSR waitvscana
   LDX #$00
 initscreenloop:
   LDA datasystext0,X ; screen line 0: system startup text
   STA $0800,X
-  LDA datasystext1,X ; screen line 1: system startup text
+  LDA #$20 ; screen line 1: blank
   STA $0820,X
   LDA datasystext2,X ; screen line 2: system startup text
   STA $0840,X
   LDA datasystext3,X ; screen line 3: system startup text
   STA $0860,X
-  LDA datasystext1,X ; screen line 4: system startup text
+  LDA #$20 ; screen line 4: blank
   STA $0880,X
-  LDA datasystext5,X ; screen line 5: system startup text
+  LDA datasystext0,X ; screen line 5: system startup text
   STA $08A0,X
   LDA datasystext6,X ; screen line 6: system startup text
   STA $08C0,X
@@ -194,19 +122,17 @@ initscreenloop:
   STA $08E0,X
   LDA datasystext8,X ; screen line 8: system startup text
   STA $0900,X
-  LDA #$20 ; screen lines 9-12: blank
+  LDA #$20 ; screen lines 9-17: blank
   STA $0920,X
   STA $0940,X
   STA $0960,X
   STA $0980,X
-  LDA datasystext4,X ; screen line 13: logo placeholder
   STA $09A0,X
-  LDA #$20 ; screen lines 14-17: blank
   STA $09C0,X
   STA $09E0,X
   STA $0A00,X
   STA $0A20,X
-  LDA #$FC ; screen lines 0-17 attribute bit 0: 0/1 0/1 1/1 1/1
+  LDA #$CC ; screen lines 0-17 attribute bit 0: 0/0 0/0 1/1 1/1
   STA $0A40,X
   STA $0A60,X
   STA $0A80,X
@@ -216,7 +142,7 @@ initscreenloop:
   STA $0B00,X
   STA $0B20,X
   STA $0B40,X
-  LDA #$CC ; screen lines 2-17 attribute bit 1: 0/0 0/0 1/1 1/1
+  ; screen lines 2-17 attribute bit 1: 0/0 0/0 1/1 1/1
   STA $0B60,X
   STA $0B80,X
   STA $0BA0,X
@@ -260,14 +186,12 @@ initscreenloop:
   STA $0F80,X
   STA $0FA0,X
   STA $0FC0,X
-  LDA datasyscolors,X ; palette colors
-  STA $0FE0,X
   INX
   TXA
   AND #$03
   CMP #$00
   BNE initscreenloop
-  JSR WAITVSCANA
+  JSR waitvscana
   TXA
   CMP #$20
   BNE initscreenloop
@@ -276,108 +200,401 @@ initscreenloop:
   STA FVMCDEST
   LDA #$EB ; source page: Bank E font row B
   STA FVMCSRC
-  STA $C0 ; copy column C: copyright sign to position $0C
-  STA $C1
-  STA $C2
-  STA $C3
-  STA $C4
-  STA $C5
-  STA $C6
-  STA $C7
-  STA $C8
-  STA $C9
-  STA $CA
-  STA $CB
-  STA $CC
-  STA $CD
-  STA $CE
-  STA $CF
+  LDX #$C0 ; copy column C: copyright sign to position $0C
+  JSR waitvscana
+  JSR fvmcchar
   LDA #$EA ; source page: Bank E font row A
   STA FVMCSRC
-  STA $E0 ; copy column E: diamond outline to position $0E
-  STA $E1
-  STA $E2
-  STA $E3
-  STA $E4
-  STA $E5
-  STA $E6
-  STA $E7
-  STA $E8
-  STA $E9
-  STA $EA
-  STA $EB
-  STA $EC
-  STA $ED
-  STA $EE
-  STA $EF
+  LDX #$E0 ; copy column E: diamond outline to position $0E
+  JSR fvmcchar
   LDA #$EE ; source page: Bank E font row E
   STA FVMCSRC
   LDA #$16 ; destination page: screen font row 6
   STA FVMCDEST
-  STA $00 ; copy column 0: en dash to position $60
-  STA $01
-  STA $02
-  STA $03
-  STA $04
-  STA $05
-  STA $06
-  STA $07
-  STA $08
-  STA $09
-  STA $0A
-  STA $0B
-  STA $0C
-  STA $0D
-  STA $0E
-  STA $0F
+  LDX #$00 ; copy column 0: en dash to position $60
+  JSR fvmcchar
   LDA #$00 ; disable FVMC
   STA FVMCDEST
   STA FVMCSRC
-  JSR WAITVSCANA
+  ; decompress and load graphics common to both aspect ratios
+  LDA #<datagfx
+  STA POINTER0+0
+  LDA #>datagfx
+  STA POINTER0+1
+  LDA #$03 ; page 3 in compressed data
+  JSR decompresspage
+  LDA #$07
+  STA FVMCSRC
+  LDA #$18 ; page 8 in font memory
+  STA FVMCDEST
+  JSR fvmcpage
+  LDA #$06 ; page 6 in compressed data
+  JSR decompresspage
+  LDA #$07
+  STA FVMCSRC
+  LDA #$1F ; page F in font memory
+  STA FVMCDEST
+  JSR fvmcpage
+  ; check aspect ratio
+  LDA VIDEOSTATE
+  AND #$80
+  BNE widescreenlogo
+  ; logo (classic)
+  JSR waitvscana
+  LDX #$00
+logocloop:
+  TXA
+  ORA #$A0 ; X+A0
+  STA $096C,X
+  ORA #$08 ; X+A8
+  STA $098C,X
+  EOR #$18 ; X+B0
+  STA $09AC,X
+  ORA #$08 ; X+B8
+  STA $09CC,X
+  EOR #$78 ; X+C0
+  STA $09EC,X
+  ORA #$08 ; X+C8
+  STA $0A0C,X
+  JSR logocommonpercolumn ; sets Acc := 0
+  STA $094C,X ; use blank characters on rows 10 and 17
+  STA $0A2C,X
+  INX
+  CPX #$08
+  BCC logocloop
+  LDA #$00 ; page 0 in compressed data
+  JSR decompresspage
+  LDA #$07
+  STA FVMCSRC
+  LDA #$1A ; page A in font memory
+  STA FVMCDEST
+  JSR fvmcpage
+  LDA #$01 ; page 1 in compressed data
+  JSR decompresspage
+  LDA #$07
+  STA FVMCSRC
+  LDA #$1B ; page B in font memory
+  STA FVMCDEST
+  JSR fvmcpage
+  LDA #$02 ; page 2 in compressed data
+  JSR decompresspage
+  LDA #$07
+  STA FVMCSRC
+  LDA #$1C ; page C in font memory
+  STA FVMCDEST
+  JSR fvmcpage
+  JMP logocolors
+widescreenlogo:  
+  ; logo (wide)
+  JSR waitvscana
+  LDX #$00
+logowloop:
+  TXA
+  ORA #$80 ; X+80
+  STA $094C,X
+  ORA #$08 ; X+88
+  STA $096C,X
+  EOR #$18 ; X+90
+  STA $098C,X
+  ORA #$08 ; X+98
+  STA $09AC,X
+  EOR #$78 ; X+E0
+  STA $09CC,X
+  ORA #$08 ; X+E8
+  STA $09EC,X
+  EOR #$18 ; X+F0
+  STA $0A0C,X
+  ORA #$08 ; X+F8
+  STA $0A2C,X
+  JSR logocommonpercolumn
+  INX
+  CPX #$08
+  BCC logowloop
+  ; blank out cells not used for logo
+  STA $094C
+  STA $094D
+  STA $0952
+  STA $0953
+  STA $096C
+  STA $0973
+  STA $0A0C
+  STA $0A13
+  STA $0A2C
+  STA $0A2D
+  STA $0A32
+  STA $0A33
+  LDA #$04 ; page 4 in compressed data
+  JSR decompresspage
+  LDA #$07
+  STA FVMCSRC
+  LDA #$19 ; page 9 in font memory
+  STA FVMCDEST
+  JSR fvmcpage
+  LDA #$05 ; page 5 in compressed data
+  JSR decompresspage
+  LDA #$07
+  STA FVMCSRC
+  LDA #$1E ; page E in font memory
+  STA FVMCDEST
+  JSR fvmcpage
+logocolors:
+  ; cell color overrides common to both aspect ratios
+  LDX #$00
+  JSR waitvscana
+logocolorloop:
+  LDA datalogocolors+$00,X
+  STA $0B0E,X
+  LDA datalogocolors+$04,X
+  STA $0B2E,X
+  LDA datalogocolors+$08,X
+  STA $0C2E,X
+  LDA datalogocolors+$0C,X
+  STA $0C4E,X
+  LDA datalogocolors+$10,X
+  STA $0D4E,X
+  LDA datalogocolors+$14,X
+  STA $0D6E,X
+  LDA datalogocolors+$18,X
+  STA $0E6E,X
+  LDA datalogocolors+$1C,X
+  STA $0E8E,X
+  LDA datalogocolors+$20,X
+  STA $0F8E,X
+  LDA datalogocolors+$24,X
+  STA $0FAE,X
+  INX
+  CPX #$04
+  BCC logocolorloop
   
 halt:
   JMP halt
 
-  .org $F3CA
-WAITVSCANA:
-; Subroutine: Wait for start of vertical blanking interval.
-; Side effects: Accumulator is clobbered.
-waitvscanaloop:
-  LDA VIDEOSTATE
-  AND #$30
-  CMP #$20
-  BNE waitvscanaloop
-  RTS
-WAITVSCANX:
-; Subroutine: Wait for start of vertical blanking interval.
-; Side effects: X register is clobbered.
-  TAX
-waitvscanxloop:
-  LDA VIDEOSTATE
-  AND #$30
-  CMP #$20
-  BNE waitvscanxloop
-  TXA
-  RTS
-WAITVSCANY:
-; Subroutine: Wait for start of vertical blanking interval.
-; Side effects: Y register is clobbered.
-  TAY
-waitvscanyloop:
-  LDA VIDEOSTATE
-  AND #$30
-  CMP #$20
-  BNE waitvscanyloop
-  TYA
+logocommonpercolumn:
+  LDA #$CC ; bits 0-2 on for "foreground" colors
+  STA $0AEC,X
+  STA $0B0C,X
+  STA $0B2C,X
+  STA $0B4C,X
+  STA $0C0C,X
+  STA $0C2C,X
+  STA $0C4C,X
+  STA $0C6C,X
+  STA $0D2C,X
+  STA $0D4C,X
+  STA $0D6C,X
+  STA $0D8C,X
+  LDA #$AA ; bits 3-4 on for "secondary" colors
+  STA $0E4C,X
+  STA $0E6C,X
+  STA $0E8C,X
+  STA $0EAC,X
+  STA $0F6C,X
+  STA $0F8C,X
+  STA $0FAC,X
+  STA $0FCC,X
+  LDA #$00 ; blank out character 00
+  STA $1000,X
+  STA $1008,X
   RTS
 
-  .org $F3EC
-BYTETOHEX:
+fvmcpage:
+; Subroutine: Copy one full page via FVMC (registers already set)
+; Side effects: Accumulator clobbered.
+; Acc := X
+  JSR waitvscana
+  TXA
+  LDX #$00
+fvmcpagecopyloop:
+  STA $00,X
+  INX
+  BNE fvmcpagecopyloop
+  STX FVMCSRC
+  STX FVMCDEST
+  TAX
+  RTS
+  
+fvmcchar:
+; Subroutine: Copy one character via FVMC (page registers already set;
+; character specified by setting X register to address within page)
+; Side effects: Accumulator, X register clobbered
+; Acc := 0
+; X := (X & $0F) + $10
+fvmccharcopyloop:
+  STA $00,X
+  INX
+  TXA
+  AND #$0F
+  BNE fvmccharcopyloop
+  RTS
+
+decompresspage:
+; Subroutine: Load page number Acc from compressed data beginning at POINTER0
+; and store the decompressed data in page 07
+; Side effects: Acc, X, Y, POINTER1, POINTER2 clobbered
+  ; get starting address of requested page
+CDATASTART     = POINTER0
+DECODELEN      = SRSCRATCH+0 ; not needed?
+READHEADBYTE   = POINTER1
+READHEADNYBBLE = SRSCRATCH+1
+WRITEHEADBYTE  = POINTER2
+WRITEHEADCRUMB = SRSCRATCH+2
+RUNLENCRUMBS   = SRSCRATCH+3
+RUNLENBYTES    = SRSCRATCH+4
+RUNDIGIT       = SRSCRATCH+5
+RUNVAL         = SRSCRATCH+6
+NEWRUNVAL      = SRSCRATCH+7
+READBYTEBUF    = SRSCRATCH+8
+WRITEBYTEBUF   = SRSCRATCH+9
+READNYBBLEBUF  = SRSCRATCH+10 ; not needed?
+WRITECRUMBBUF  = SRSCRATCH+11 ; not needed?
+  ; get starting address of requested page
+  ; (CDATASTART),Y + CDATASTART
+  ASL A
+  TAY
+  CLC
+  LDA (CDATASTART),Y
+  ADC CDATASTART+0
+  STA READHEADBYTE+0
+  INY
+  LDA (CDATASTART),Y
+  ADC CDATASTART+1
+  STA READHEADBYTE+1
+  LDA #$00
+  STA READHEADNYBBLE
+  STA WRITEHEADBYTE
+  STA WRITEHEADCRUMB
+  STA WRITEBYTEBUF
+  LDA #$07
+  STA WRITEHEADBYTE+1
+  LDA #$FF
+  STA RUNVAL
+  LDA #$00
+  STA RUNLENBYTES
+  STA RUNLENCRUMBS
+  LDY #$00 ; because there are no unindexed indirect load/store opcodes
+  ; read one nybble
+dcpreadnybble:
+  LDA READHEADNYBBLE
+  BNE dcpreadnybbleelse
+  ; low nybble; fetch byte
+  LDA #$01 ; next time, read saved high nybble
+  STA READHEADNYBBLE
+  LDA (READHEADBYTE),Y
+  STA READBYTEBUF
+  INC READHEADBYTE
+  BNE 2 ; skip next INC if nonzero
+  INC READHEADBYTE+1 ; if low byte zero, increment high byte
+  ; extract low nybble (Acc still holds just-read byte)
+  AND #$0F
+  BPL dcpreadnybbleendif ; BRA: negative flag cleared by AND
+dcpreadnybbleelse:
+  ; extract high nybble from stored byte value
+  LDA #$00 ; next time, read low nybble from fresh byte
+  STA READHEADNYBBLE
+  LDA READBYTEBUF
+  LSR A
+  LSR A
+  LSR A
+  LSR A
+dcpreadnybbleendif:
+  ; just-read nybble in Acc
+  ; separate to NEWRUNVAL and RUNDIGIT
+  TAX
+  AND #$03
+  STA NEWRUNVAL
+  TXA
+  LSR A
+  LSR A
+  BNE 2 ; skip next LDA if nonzero
+  LDA #$04 ; replace 0 digit with 4
+  STA RUNDIGIT
+  ; is this a continuation of a run spec in progress?
+  LDA NEWRUNVAL
+  CMP RUNVAL
+  BNE dcpwriterun
+  ; add new digit to run length
+  LDA RUNLENBYTES
+  ; it's possible we read past the end of compressed data and found a
+  ; matching run spec nybble by chance. a too-long last run isn't a problem,
+  ; because we won't write past a page boundary, but we need a stop condition
+  ; for reading garbage as a run spec. If computed run length meets or
+  ; exceeds maximum (256 bytes), just stop reading and write the run.
+  ASL A
+  BCS dcprunlenoverflow
+  ASL A
+  BCS dcprunlenoverflow
+  ADC RUNLENCRUMBS
+  BCS dcprunlenoverflow
+  STA RUNLENBYTES
+  LDA RUNDIGIT
+  STA RUNLENCRUMBS
+  ; read another nybble
+  JMP dcpreadnybble
+dcprunlenoverflow:
+  LDA #$04
+  STA RUNLENCRUMBS
+  LDA #$FF
+  STA RUNLENBYTES ; 256 bytes is represented as 255 bytes and 4 crumbs
+  ; fall through to write run
+dcpwriterun:
+  ; check if run length has reached zero
+  ; this contition is evaluated at the top of the loop because reading the
+  ; first nybble counts as non-matching and therefore triggers writing a
+  ; zero-length run
+  LDA RUNLENCRUMBS
+  BNE dcpwriterunskip1
+  LDA RUNLENBYTES
+  BEQ dcpwriterundone
+dcpwriterunskip1:
+  ; output a crumb: shift RUNVAL into high bits of WRITEBYTEBUF
+  ; (earlier output crumbs get shifted lower)
+  LDA RUNVAL
+  LSR A
+  ROR WRITEBYTEBUF
+  LSR A
+  ROR WRITEBYTEBUF
+  ; advance write head by one crumb
+  LDA WRITEHEADCRUMB
+  ADC #$01 ; if WRITEBYTEBUF was not already full, carry is clear
+  CMP #$04
+  BCC dcpwriterunskip2 ; do the following if WRITEBYTEBUF is full
+  ; write byte from buffer
+  LDA WRITEBYTEBUF
+  STA (WRITEHEADBYTE),Y
+  INC WRITEHEADBYTE
+  BNE 1 ; if nonzero, skip next RTS
+  RTS ; if zero, page is full, decompression is done
+  ; INC DECODELEN ; not needed?
+  LDA #$00 ; reset WRITEBYTEBUF and WRITEHEADCRUMB
+  STA WRITEBYTEBUF
+dcpwriterunskip2:
+  STA WRITEHEADCRUMB
+  ; decrement run length
+  DEC RUNLENCRUMBS
+  BPL dcpwriterun ; if RUNLENCRUMBS wraps around to >=128, perform borrow
+  ; from RUNLENBYTES below; otherwise, continue writing run above.
+  DEC RUNLENBYTES
+  LDA #$03
+  STA RUNLENCRUMBS
+  BNE dcpwriterun ; BRA: zero flag cleared by LDA above
+dcpwriterundone:
+  ; now we need to retrieve the nonmatching nybble that triggered the run to
+  ; be written, and set it up as the runspec in progress
+  LDA NEWRUNVAL
+  STA RUNVAL
+  LDA RUNDIGIT
+  STA RUNLENCRUMBS
+  ; RUNLENBYTES should still be 0 at this point
+  JMP dcpreadnybble ; this could be BNE as BRA because RUNDIGIT is always
+  ; nonzero, but it seems to be too far for a branch to jump
+  
+
+bytetohex:
 ; Subroutine: Convert value in Accumulator to uppercase hexadecimal.
 ; Side effects: result stored in zp$86,$87, neg digit count stored in X
   TAX
   AND #$0F ; extract low nybble
-  ADC #$30 ; convert to numeric character
+  ORA #$30 ; convert to numeric character
   CMP #$3A ; N := (A in 30-39); C := (A in 3A-3F)
   BMI bytetohexb1
   ADC #$06 ; if lo nybble > 9, convert to letter (C is set; effectively add 7)
@@ -406,10 +623,10 @@ bytetohexb3:
   LDX #$FF ; set X to -1 (1 digit)
   RTS
 
-  .org $F418
 ; Subroutine: Convert value in Accumulator to decimal. Several entry points.
-; Side effects: result stored in zp$8C,$8D,$8E,$8F, neg digit count stored in X, accumulator clobbered
-BYTE2DECN:
+; Side effects: result stored in zp$8C,$8D,$8E,$8F, neg digit count stored
+; in X, accumulator clobbered
+bytetodecn:
   ; treat value as twos-complement negative number
   EOR #$FF ; find negative number
   CLC
@@ -433,22 +650,22 @@ bytetodecb10:
   LDA #$00 ; restore Accumulator
   LDX #$FD ; set X to -3 (3 digits)
   RTS
-BYTE2DECUS:
+bytetodecus:
   ; Treat value as result of unsigned subtraction. Branch on carry flag...
-  BCC BYTE2DECN
-  JMP BYTE2DECP
-BYTE2DECS:
+  BCC bytetodecn
+  JMP bytetodecp
+bytetodecs:
   ; Treat value as result of signed subtraction. Branch on overflow and negative flags...
   BVS bytetodecb8
-  BMI BYTE2DECN
-  JMP BYTE2DECP
+  BMI bytetodecn
+  JMP bytetodecp
 bytetodecb8:
-  BPL BYTE2DECN
-  JMP BYTE2DECP
-BYTE2DECUA:
+  BPL bytetodecn
+  JMP bytetodecp
+bytetodecua:
   ; Treat value as result of unsigned addition (or 9-bit unsigned value). Branch on carry flag...
-  BCC BYTE2DECP
-BYTE2DECBP:
+  BCC bytetodecp
+bytetodecbp:
   ; Treat value as unsigned, add 256 (range 256-511)
   STA $8F ; place input in zeropage (temporarily using units digit output byte)
   LDA #$20 ; load space for sign column
@@ -457,7 +674,7 @@ BYTE2DECBP:
   STA $8D ; initialize hundreds digit in output position
   LDA #$56 ; initialize units and tens digits in accumulator
   JMP bytetodecj9
-BYTE2DECP:
+bytetodecp:
   ; Treat value as unsigned in range 0-255
   STA $8F ; place input in zeropage (temporarily using units digit output byte)
   LDA #$20 ; load space for sign column
@@ -565,38 +782,53 @@ bytetodecb13:
   LDX #$FD ; set X to -3 (3 digits)
   RTS
 
+  .align 8
+waitvscana:
+; Subroutine: Wait for start of vertical blanking interval.
+; Side effects: Accumulator is clobbered.
+  ; determine video flags to look for
+  LDA VIDEOSTATE
+  AND #$CC
+  ORA #$20
+  ; wait for start of vertical retrace
+  CMP VIDEOSTATE
+  BNE -5 ; CMP again
+  RTS
 
-  .org $F500
+nmicode: ; empty, because NMI not presently used
+  RTI
+
+  .org $FA00
 datagfx:
-  .incbin firmwaregfx.bin,$0,$0900
-datasystext0:
-  .text "\056 \276\277 \200\201 \056  \016  \016  \016  \016  \056 \276\277 \200\201 \056"
-datasystext1:
-  .text "                                "
+  .incbin firmwaregfx.compressed
+datalogocolors: .align 3
+  .byte $CC,$CC,$8A,$8C,$CE,$EE,$EC,$CC
+  .byte $AC,$AE,$EE,$EC,$C8,$C8,$AA,$CA
+  .byte $8C,$8C,$EE,$EC,$CA,$EA,$EE,$CE
+  .byte $EA,$EA,$CC,$CA,$AE,$AE,$88,$A8
+  .byte $8A,$88,$A8,$AA,$A8,$88,$CE,$AE
+datasystext0: .align 5
+  .text ". \xFE\xFF \x80\x81 .  \x0E  \x0E  \x0E  \x0E  . \xFE\xFF \x80\x81 ."
 datasystext2:
-  .text "\217   Retro 6k Fantasy Computer  \217"
+  .text "\x8F   Retro 6k Fantasy Computer  \x8F"
 datasystext3:
-  .text "\260     Entertainment System\021    \260"
-datasystext4:
-  .text "         \031 Logo  here \020         "
-datasystext5:
-  .text "\056 \276\277 \200\201 \056  \016  \016  \016  \016  \056 \276\277 \200\201 \056"
+  .text "\xF0     Entertainment System\x11    \xF0"
 datasystext6:
   .text "   Please insert a cartridge>   "
 datasystext7:
-  .text "     F\267\270\271ware version 2031@     "
+  .text "     F\xF7\xF8\xF9ware version 2031@     "
 datasystext8:
-  .text "\0142019\14020 Maggie David \206\207\210 Haynes"
+  .text "\0142019`20 Maggie David \x86\x87\x88 Haynes"
 datasyscolors:
   .byte $00,$81,$84,$0D,$02,$83,$86,$0F
   .byte $D0,$59,$5C,$DD,$D2,$5B,$5E,$DF
   .byte $20,$A1,$A4,$2D,$22,$A3,$A6,$2F
   .byte $F0,$79,$7C,$FD,$F2,$7B,$7E,$FF
+initfontsrcpage:
+  .byte $E4,$E5,$E6,$E7,$E3,$E2,$E1,$00
+initfontdestpage:
+  .byte $14,$15,$16,$17,$13,$12,$11,$00
 
-  .org $FFF9
-nmicode: ; empty, because NMI not presently used
-  RTI
-  
 ; 6502 program counter initialization vectors
   .org $FFFA
   .word nmicode ; NMI vector, in firmware
