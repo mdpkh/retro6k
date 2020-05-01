@@ -73,9 +73,9 @@ pageflags operator| (pageflags left, pageflags right) // because it's a bitfield
 {
 	return (pageflags)((char)left | (char)right);
 }
-pageflags operator! (pageflags right) // because it's a bitfield-like enum
+pageflags operator~ (pageflags right) // because it's a bitfield-like enum
 {
-	return (pageflags)(!(char)right);
+	return (pageflags)(~(char)right);
 }
 typedef struct {
 	dletype entrytype;
