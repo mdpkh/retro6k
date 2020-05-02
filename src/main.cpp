@@ -71,6 +71,7 @@ bool scanlinedirty[576];
 bool videobusy;
 bool suppresslogging;
 unsigned char videostate;
+unsigned char videomode = 0x00;
 unsigned char keypressregister;
 unsigned short soundfreqregister[4];
 unsigned char soundvolregister[4];
@@ -2103,6 +2104,7 @@ int InitMainWindow()
 	{
 	case aspectratiocat::AR_WIDE:
 		config.screen.reportedaspectratio = aspectratiocat::AR_WIDE;
+		videomode |= 0x80;
 		if (config.screen.pixwidth == -1)
 		{
 			if (config.screen.pixheight == -1)
@@ -2135,6 +2137,7 @@ int InitMainWindow()
 		break;
 	case aspectratiocat::AR_CLASSIC:
 		config.screen.reportedaspectratio = aspectratiocat::AR_CLASSIC;
+		videomode &= 0x7f;
 		if (config.screen.pixwidth == -1)
 		{
 			if (config.screen.pixheight == -1)
@@ -2175,10 +2178,12 @@ int InitMainWindow()
 			> config.screen.pixheight* config.screen.pixheight * 3)
 		{
 			config.screen.reportedaspectratio = aspectratiocat::AR_WIDE;
+			videomode |= 0x80;
 		}
 		else
 		{
 			config.screen.reportedaspectratio = aspectratiocat::AR_CLASSIC;
+			videomode &= 0x7f;
 		}
 		break;
 	}
@@ -3761,15 +3766,15 @@ int main(int argc, char** argv)
 			{
 				LogScanline(scanline);
 				videobusy = true;
-				videostate = 0x00;
+				videostate = 0x00 | videomode;
 				// run 6502 for 21.967963386728 microseconds (768 pixel ticks, 88 cpu cycles)
 				exec6502(88);
 				RenderScanline(scanline, framebuffer, mwsurface);
 				videobusy = false;
-				videostate = 0x02;
+				videostate = 0x02 | videomode;
 				// run 6502 for 5.949656750572 microseconds (208 pixel ticks, 24 cpu cycles)
 				exec6502(12);
-				videostate = 0x03;
+				videostate = 0x03 | videomode;
 				exec6502(12);
 			}
 			else
@@ -3785,21 +3790,21 @@ int main(int argc, char** argv)
 				LogScanline(scanline);
 				if (scanline == 576)
 				{
-					videostate = 0x20;
+					videostate = 0x20 | videomode;
 					exec6502(32);
-					videostate = 0x30;
+					videostate = 0x30 | videomode;
 					exec6502(56);
-					videostate = 0x32;
+					videostate = 0x32 | videomode;
 					exec6502(12);
-					videostate = 0x33;
+					videostate = 0x33 | videomode;
 					exec6502(12);
 				}
 				else {
-					videostate = 0x30;
+					videostate = 0x30 | videomode;
 					exec6502(88);
-					videostate = 0x32;
+					videostate = 0x32 | videomode;
 					exec6502(12);
-					videostate = 0x33;
+					videostate = 0x33 | videomode;
 					exec6502(12);
 				}
 			}
