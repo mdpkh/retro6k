@@ -1,17 +1,38 @@
 ; Retro6K System Firmware
 ; zeropage addresses used in subroutines
+TEXTBUF   = $80 ; up to 8 bytes
+TCURSORLO = $88 ; bits 0-4: text cursor column; bits 5-7: text cursor row b0-2
+TCURSORHI = $89 ; bits 0-1: text cursor row bits 3-4
+TCBLINK   = $8A ; bits 0-4: cursor blink cycle counter
+CONSFLAGS = $8B ; bit 7: print next char literally
+COLORS    = $8C ; colors (4 bytes) for new characters to print
+CHSRCPTR  = $90 ; character source row pointers (4 bytes) for scrolling
+CHDESTPTR = $94 ; character destination row pointers (4 bytes) for scrolling
+COSRCPTR  = $98 ; color source row pointers (10 bytes) for scrolling
+CODESTPTR = $A2 ; color destination row pointers (10 bytes) for scrolling
+WSTARGET  = $AD ; VIDEOSTATE flag to wait for
+COBYTES   = $B0 ; packed color bytes (5 bytes)
+BLINKBITS = $B5 ; which bits to toggle for blinking cursor (5 bytes)
+COKNMASK  = $BA ; keep-nybble color mask
+CORNMASK  = $BB ; replace-nybble color mask
 POINTER0  = $E0
 POINTER1  = $E2
 POINTER2  = $E4
 POINTER3  = $E6
 SRSCRATCH = $F0
+SAVEX     = $FE
+SAVEY     = $FF
 ; special system addresses
-VIDEOSTATE = $02FC
-FVMCDEST   = $03F8
-FVMCSRC    = $03F9
-DLSOFF     = $03FC
-DLSON      = $03FD
-DEBUGLOG   = $03FF
+KBDIN           = $0244
+VIDEOSTATE      = $02FC
+SOUNDVOICE0FREQ = $0380
+SOUNDVOICE0VOL  = $0388
+SOUNDVOICETYPES = $038C
+FVMCDEST        = $03F8
+FVMCSRC         = $03F9
+DLSOFF          = $03FC
+DLSON           = $03FD
+DEBUGLOG        = $03FF
 ; code starts here
   .org $F000
 entry: ; system power-on or reset
@@ -21,12 +42,12 @@ entry: ; system power-on or reset
   LDA #$00
   STA FVMCSRC
   STA FVMCDEST
-  ;LDX #$F0
-  ;STX DLSOFF ; turn off debug log suppression
-  ;INX
-  ;BNE -6 ; STX again
-  ;LDX #>waitvscana
-  ;STX DLSON ; but seriously, suppress logging of waitvscana
+  LDX #$F0
+  STX DLSOFF ; turn off debug log suppression
+  INX
+  BNE -6 ; STX again
+  LDX #>waitsubs
+  STX DLSON ; but seriously, suppress logging of waiting subroutines
   JSR waitvscana
   ; display cartridge identification in bottom of screen
   LDX #$00
@@ -365,9 +386,7 @@ logocolorloop:
   INX
   CPX #$04
   BCC logocolorloop
-  
-halt:
-  JMP halt
+  BCS startsysshell
 
 logocommonpercolumn:
   LDA #$CC ; bits 0-2 on for "foreground" colors
@@ -397,230 +416,69 @@ logocommonpercolumn:
   STA $1008,X
   RTS
 
-fvmcpage:
-; Subroutine: Copy one full page via FVMC (registers already set)
-; Side effects: Accumulator clobbered.
-; Acc := X
-  JSR waitvscana
-  TXA
-  LDX #$00
-fvmcpagecopyloop:
-  STA $00,X
-  INX
-  BNE fvmcpagecopyloop
-  STX FVMCSRC
-  STX FVMCDEST
-  TAX
-  RTS
-  
-fvmcchar:
-; Subroutine: Copy one character via FVMC (page registers already set;
-; character specified by setting X register to address within page)
-; Side effects: Accumulator, X register clobbered
-; Acc := 0
-; X := (X & $0F) + $10
-fvmccharcopyloop:
-  STA $00,X
-  INX
-  TXA
-  AND #$0F
-  BNE fvmccharcopyloop
-  RTS
-
-decompresspage:
-; Subroutine: Load page number Acc from compressed data beginning at POINTER0
-; and store the decompressed data in page 07
-; Side effects: Acc, X, Y, POINTER1, POINTER2 clobbered
-  ; get starting address of requested page
-CDATASTART     = POINTER0
-DECODELEN      = SRSCRATCH+0 ; not needed?
-READHEADBYTE   = POINTER1
-READHEADNYBBLE = SRSCRATCH+1
-WRITEHEADBYTE  = POINTER2
-WRITEHEADCRUMB = SRSCRATCH+2
-RUNLENCRUMBS   = SRSCRATCH+3
-RUNLENBYTES    = SRSCRATCH+4
-RUNDIGIT       = SRSCRATCH+5
-RUNVAL         = SRSCRATCH+6
-NEWRUNVAL      = SRSCRATCH+7
-READBYTEBUF    = SRSCRATCH+8
-WRITEBYTEBUF   = SRSCRATCH+9
-READNYBBLEBUF  = SRSCRATCH+10 ; not needed?
-WRITECRUMBBUF  = SRSCRATCH+11 ; not needed?
-  ; get starting address of requested page
-  ; (CDATASTART),Y + CDATASTART
-  ASL A
-  TAY
-  CLC
-  LDA (CDATASTART),Y
-  ADC CDATASTART+0
-  STA READHEADBYTE+0
-  INY
-  LDA (CDATASTART),Y
-  ADC CDATASTART+1
-  STA READHEADBYTE+1
+startsysshell:
+  ; initialize shell state
+  LDA #$20
+  STA TCURSORLO
+  LDA #$0A
+  STA TCURSORHI
   LDA #$00
-  STA READHEADNYBBLE
-  STA WRITEHEADBYTE
-  STA WRITEHEADCRUMB
-  STA WRITEBYTEBUF
+  STA TCBLINK
+  STA COLORS+0
+  STA COLORS+1
   LDA #$07
-  STA WRITEHEADBYTE+1
-  LDA #$FF
-  STA RUNVAL
-  LDA #$00
-  STA RUNLENBYTES
-  STA RUNLENCRUMBS
-  LDY #$00 ; because there are no unindexed indirect load/store opcodes
-  ; read one nybble
-dcpreadnybble:
-  LDA READHEADNYBBLE
-  BNE dcpreadnybbleelse
-  ; low nybble; fetch byte
-  LDA #$01 ; next time, read saved high nybble
-  STA READHEADNYBBLE
-  LDA (READHEADBYTE),Y
-  STA READBYTEBUF
-  INC READHEADBYTE
-  BNE 2 ; skip next INC if nonzero
-  INC READHEADBYTE+1 ; if low byte zero, increment high byte
-  ; extract low nybble (Acc still holds just-read byte)
-  AND #$0F
-  BPL dcpreadnybbleendif ; BRA: negative flag cleared by AND
-dcpreadnybbleelse:
-  ; extract high nybble from stored byte value
-  LDA #$00 ; next time, read low nybble from fresh byte
-  STA READHEADNYBBLE
-  LDA READBYTEBUF
-  LSR A
-  LSR A
-  LSR A
-  LSR A
-dcpreadnybbleendif:
-  ; just-read nybble in Acc
-  ; separate to NEWRUNVAL and RUNDIGIT
-  TAX
-  AND #$03
-  STA NEWRUNVAL
-  TXA
-  LSR A
-  LSR A
-  BNE 2 ; skip next LDA if nonzero
-  LDA #$04 ; replace 0 digit with 4
-  STA RUNDIGIT
-  ; is this a continuation of a run spec in progress?
-  LDA NEWRUNVAL
-  CMP RUNVAL
-  BNE dcpwriterun
-  ; add new digit to run length
-  LDA RUNLENBYTES
-  ; it's possible we read past the end of compressed data and found a
-  ; matching run spec nybble by chance. a too-long last run isn't a problem,
-  ; because we won't write past a page boundary, but we need a stop condition
-  ; for reading garbage as a run spec. If computed run length meets or
-  ; exceeds maximum (256 bytes), just stop reading and write the run.
-  ASL A
-  BCS dcprunlenoverflow
-  ASL A
-  BCS dcprunlenoverflow
-  ADC RUNLENCRUMBS
-  BCS dcprunlenoverflow
-  STA RUNLENBYTES
-  LDA RUNDIGIT
-  STA RUNLENCRUMBS
-  ; read another nybble
-  JMP dcpreadnybble
-dcprunlenoverflow:
-  LDA #$04
-  STA RUNLENCRUMBS
-  LDA #$FF
-  STA RUNLENBYTES ; 256 bytes is represented as 255 bytes and 4 crumbs
-  ; fall through to write run
-dcpwriterun:
-  ; check if run length has reached zero
-  ; this contition is evaluated at the top of the loop because reading the
-  ; first nybble counts as non-matching and therefore triggers writing a
-  ; zero-length run
-  LDA RUNLENCRUMBS
-  BNE dcpwriterunskip1
-  LDA RUNLENBYTES
-  BEQ dcpwriterundone
-dcpwriterunskip1:
-  ; output a crumb: shift RUNVAL into high bits of WRITEBYTEBUF
-  ; (earlier output crumbs get shifted lower)
-  LDA RUNVAL
-  LSR A
-  ROR WRITEBYTEBUF
-  LSR A
-  ROR WRITEBYTEBUF
-  ; advance write head by one crumb
-  LDA WRITEHEADCRUMB
-  ADC #$01 ; if WRITEBYTEBUF was not already full, carry is clear
-  CMP #$04
-  BCC dcpwriterunskip2 ; do the following if WRITEBYTEBUF is full
-  ; write byte from buffer
-  LDA WRITEBYTEBUF
-  STA (WRITEHEADBYTE),Y
-  INC WRITEHEADBYTE
-  BNE 1 ; if nonzero, skip next RTS
-  RTS ; if zero, page is full, decompression is done
-  ; INC DECODELEN ; not needed?
-  LDA #$00 ; reset WRITEBYTEBUF and WRITEHEADCRUMB
-  STA WRITEBYTEBUF
-dcpwriterunskip2:
-  STA WRITEHEADCRUMB
-  ; decrement run length
-  DEC RUNLENCRUMBS
-  BPL dcpwriterun ; if RUNLENCRUMBS wraps around to >=128, perform borrow
-  ; from RUNLENBYTES below; otherwise, continue writing run above.
-  DEC RUNLENBYTES
-  LDA #$03
-  STA RUNLENCRUMBS
-  BNE dcpwriterun ; BRA: zero flag cleared by LDA above
-dcpwriterundone:
-  ; now we need to retrieve the nonmatching nybble that triggered the run to
-  ; be written, and set it up as the runspec in progress
-  LDA NEWRUNVAL
-  STA RUNVAL
-  LDA RUNDIGIT
-  STA RUNLENCRUMBS
-  ; RUNLENBYTES should still be 0 at this point
-  JMP dcpreadnybble ; this could be BNE as BRA because RUNDIGIT is always
-  ; nonzero, but it seems to be too far for a branch to jump
-  
+  STA COLORS+2
+  STA COLORS+3
+  LDA #$AA ; blink "secondary" colors in bitplanes 0-2 (RGB)
+  STA BLINKBITS+0
+  STA BLINKBITS+1
+  STA BLINKBITS+2
+  LDA #$CC ; blink "foreground" colors in bitplanes 3-4 (intensity)
+  STA BLINKBITS+3
+  STA BLINKBITS+4
+readcommand:
+  LDA #$1E ; ">" in SCE
+  JSR printch
+readcommandkeyloop:
+  JSR waitvscana
+  JSR cursortick
+  LDA KBDIN
+  BEQ readcommandkeyloop
+  CMP #$0D
+  BEQ processcommand
+  JSR printch
+  JMP readcommandkeyloop
+processcommand:
+  JSR printch
+  LDA #$0A
+  JSR printch
+  ; TODO: read and interpret command that was entered
+  JMP readcommand
 
-bytetohex:
-; Subroutine: Convert value in Accumulator to uppercase hexadecimal.
-; Side effects: result stored in zp$86,$87, neg digit count stored in X
-  TAX
-  AND #$0F ; extract low nybble
-  ORA #$30 ; convert to numeric character
-  CMP #$3A ; N := (A in 30-39); C := (A in 3A-3F)
-  BMI bytetohexb1
-  ADC #$06 ; if lo nybble > 9, convert to letter (C is set; effectively add 7)
-bytetohexb1:
-  STA $87 ; write low nybble character
-  TXA
-  AND #$F0 ; extract high nybble
-  BEQ bytetohexb3 ; if high nybble is zero, jump
-  LSR
-  LSR
-  LSR
-  LSR ; shift nybble into place
-  ADC #$30 ; convert to numeric character
-  CMP #$3A ; N := (A in 30-39); C := (A in 3A-3F)
-  BMI bytetohexb2
-  ADC #$06 ; if hi nybble > 9, convert to letter (C is set; effectively add 7)
-bytetohexb2:
-  STA $86 ; write high nybble character
-  TXA ; restore Accumulator
-  LDX #$FE ; set X to -2 (2 digits)
-  RTS
-bytetohexb3:
-  LDA #$30
-  STA $86 ; write high zero
-  TXA ; restore Accumulator
-  LDX #$FF ; set X to -1 (1 digit)
+beep:
+BEEPFREQ = 750
+  ; start beep
+  LDA <BEEPFREQ
+  STA SOUNDVOICE0FREQ
+  LDA >BEEPFREQ
+  STA SOUNDVOICE0FREQ+1
+  LDA #$AA
+  STA SOUNDVOICE0VOL
+  LDA #$00
+  STA SOUNDVOICETYPES
+  ; delay
+  LDY #$15
+beepdelayloop:
+  JSR waitvscana
+  AND #$CC
+  CMP VIDEOSTATE
+  BNE -5
+  DEY
+  BNE beepdelayloop
+  LDA #$00
+  STA SOUNDVOICE0FREQ
+  STA SOUNDVOICE0FREQ+1
+  STA SOUNDVOICE0VOL
   RTS
 
 ; Subroutine: Convert value in Accumulator to decimal. Several entry points.
@@ -782,7 +640,770 @@ bytetodecb13:
   LDX #$FD ; set X to -3 (3 digits)
   RTS
 
-  .align 8
+bytetohex:
+; Subroutine: Convert value in Accumulator to uppercase hexadecimal.
+; Side effects: result stored in zp$86,$87, neg digit count stored in X
+  TAX
+  AND #$0F ; extract low nybble
+  ORA #$30 ; convert to numeric character
+  CMP #$3A ; N := (A in 30-39); C := (A in 3A-3F)
+  BMI bytetohexb1
+  ADC #$06 ; if lo nybble > 9, convert to letter (C is set; effectively add 7)
+bytetohexb1:
+  STA $87 ; write low nybble character
+  TXA
+  AND #$F0 ; extract high nybble
+  BEQ bytetohexb3 ; if high nybble is zero, jump
+  LSR
+  LSR
+  LSR
+  LSR ; shift nybble into place
+  ADC #$30 ; convert to numeric character
+  CMP #$3A ; N := (A in 30-39); C := (A in 3A-3F)
+  BMI bytetohexb2
+  ADC #$06 ; if hi nybble > 9, convert to letter (C is set; effectively add 7)
+bytetohexb2:
+  STA $86 ; write high nybble character
+  TXA ; restore Accumulator
+  LDX #$FE ; set X to -2 (2 digits)
+  RTS
+bytetohexb3:
+  LDA #$30
+  STA $86 ; write high zero
+  TXA ; restore Accumulator
+  LDX #$FF ; set X to -1 (1 digit)
+  RTS
+
+calccolorbytes:
+; Subroutine: Transpose color selections from COLORS[0-3] to COLORBYTES[0-4]
+  PHA
+  TXA
+  PHA
+  TYA
+  PHA
+  LDY #$00
+calccolorloopy:
+  LDA COLORS,Y
+  LDX #$00
+calccolorloopx:
+  LSR A
+  ROR COBYTES,X
+  INX
+  CPX #$05
+  BCC calccolorloopx
+  INY
+  CPY #$04
+  BCC calccolorloopy
+  LDX #$00
+calccolorloopz:
+  LDA COBYTES,X
+  AND #$F0
+  STA COBYTES,X
+  LSR A
+  LSR A
+  LSR A
+  LSR A
+  ORA COBYTES,X
+  STA COBYTES,X
+  INX
+  CPX #$05
+  BCC calccolorloopz
+  PLA
+  TAY
+  PLA
+  TAX
+  PLA
+  RTS
+
+calcrownybble:
+  LDA TCURSORLO
+  AND #$20
+  BEQ 2
+  LDA #$FF ; Acc now #$00 for even row or #$FF for odd row
+  EOR #$0F ; Acc now #$0F for even row or #$F0 for odd row
+  RTS
+
+coptradvance:
+  CLC
+  LDA COSRCPTR+0
+  ADC #$20
+  STA COSRCPTR+0
+  LDA COSRCPTR+1
+  ADC #$01
+  STA COSRCPTR+1
+  RTS
+
+coptrcalc:
+  LDA TCURSORLO
+  AND #$1F
+  TAY
+  LDA TCURSORLO
+  AND #$C0
+  STA COSRCPTR+0
+  LDA TCURSORHI
+  LSR A ; now #$04 or #$05
+  STA COSRCPTR+1
+  LDA COSRCPTR+0
+  ROR A ; bit shifted out is zero, so carry is now clear
+  ADC #$40
+  STA COSRCPTR+0
+  LDA COSRCPTR+1
+  ADC #$06 ; should not cause a carry
+  STA COSRCPTR+1
+  RTS
+
+cursoradvance:
+  ; clear cursor if shown
+  JSR cursorhide
+  ; move cursor pointer
+  CLC
+  LDA TCURSORLO
+  ADC #$01
+  STA TCURSORLO
+  LDA TCURSORHI
+  ADC #$00
+  STA TCURSORHI
+  ; bounds check
+cursoradvancecheck:
+  CMP #$0A
+  BCC cursoradvrts ; if TCURSORHI < $0A, return
+  LDA TCURSORLO
+  CMP #$40
+  BCC cursoradvrts ; if TCURSORLO < $20, return
+  JMP scrolldown2
+cursoradvrts:
+  RTS
+
+cursordown:
+  ; clear cursor if shown
+  JSR cursorhide
+  ; move cursor pointer
+  CLC
+  LDA TCURSORLO
+  ADC #$20
+  STA TCURSORLO
+  LDA TCURSORHI
+  ADC #$00
+  STA TCURSORHI
+  ; bounds check
+  JMP cursoradvancecheck
+
+cursorhide:
+  LDA TCBLINK
+  AND #$10
+  BNE 1 ; if cursor in 'off' phase, return
+  RTS
+  LDA #$00 ; set cursor cycle to reflect 'off'
+  STA TCBLINK
+  JMP cursortoggle
+
+cursorleft:
+  ; clear cursor if shown
+  JSR cursorhide
+  ; move cursor pointer
+  SEC
+  LDA TCURSORLO
+  SBC #$01
+  STA TCURSORLO
+  LDA TCURSORHI
+  SBC #$00
+  STA TCURSORHI
+  ; bounds check
+cursorbackcheck:
+  CMP #$08
+  BCC 1 ; if TCURSORHI >= $08, return
+  RTS
+  LDA #$00
+  STA TCURSORLO
+  LDA #$08
+  STA TCURSORHI
+
+cursorreturn:
+  ; clear cursor if shown
+  JSR cursorhide
+  ; move cursor pointer
+  LDA TCURSORLO
+  AND #$E0
+  STA TCURSORLO
+  RTS
+
+cursortab:
+  ; clear cursor if shown
+  JSR cursorhide
+  ; move cursor pointer
+  CLC
+  LDA TCURSORLO
+  ADC #$04
+  AND #$FC
+  STA TCURSORLO
+  LDA TCURSORHI
+  ADC #$00
+  STA TCURSORHI
+  ; bounds check
+  JMP cursoradvancecheck
+
+cursortick:
+  CLC
+  LDA TCBLINK
+  ADC #$01
+  STA TCBLINK
+  AND #$0F
+  BEQ 1
+  RTS
+  ; fall through to cursortoggle
+
+cursortoggle:
+  JSR calcrownybble
+  TAY
+  LDX #$00
+cursortogglesetuploop:
+  TYA
+  AND BLINKBITS,X
+  STA COBYTES,X
+  INX
+  CPX #$05
+  BCC cursortogglesetuploop
+  JSR coptrcalc
+  LDX #$00
+cursortogglewriteloop:
+  LDA COBYTES,X
+  STX SAVEX
+  JSR waithscanx
+  EOR (COSRCPTR),Y
+  JSR waithscanx
+  STA (COSRCPTR),Y
+  JSR coptradvance
+  LDX SAVEX
+  INX
+  CPX #$05
+  BCC cursortogglewriteloop
+  RTS
+
+cursorup:
+  ; clear cursor if shown
+  JSR cursorhide
+  ; move cursor pointer
+  SEC
+  LDA TCURSORLO
+  SBC #$20
+  STA TCURSORLO
+  LDA TCURSORHI
+  SBC #$00
+  STA TCURSORHI
+  ; bounds check
+  JMP cursorbackcheck
+
+decompresspage:
+; Subroutine: Load page number Acc from compressed data beginning at POINTER0
+; and store the decompressed data in page 07
+; Side effects: Acc, X, Y, POINTER1, POINTER2 clobbered
+  ; get starting address of requested page
+CDATASTART     = POINTER0
+DECODELEN      = SRSCRATCH+0 ; not needed?
+READHEADBYTE   = POINTER1
+READHEADNYBBLE = SRSCRATCH+1
+WRITEHEADBYTE  = POINTER2
+WRITEHEADCRUMB = SRSCRATCH+2
+RUNLENCRUMBS   = SRSCRATCH+3
+RUNLENBYTES    = SRSCRATCH+4
+RUNDIGIT       = SRSCRATCH+5
+RUNVAL         = SRSCRATCH+6
+NEWRUNVAL      = SRSCRATCH+7
+READBYTEBUF    = SRSCRATCH+8
+WRITEBYTEBUF   = SRSCRATCH+9
+READNYBBLEBUF  = SRSCRATCH+10 ; not needed?
+WRITECRUMBBUF  = SRSCRATCH+11 ; not needed?
+  ; get starting address of requested page
+  ; (CDATASTART),Y + CDATASTART
+  ASL A
+  TAY
+  CLC
+  LDA (CDATASTART),Y
+  ADC CDATASTART+0
+  STA READHEADBYTE+0
+  INY
+  LDA (CDATASTART),Y
+  ADC CDATASTART+1
+  STA READHEADBYTE+1
+  LDA #$00
+  STA READHEADNYBBLE
+  STA WRITEHEADBYTE
+  STA WRITEHEADCRUMB
+  STA WRITEBYTEBUF
+  LDA #$07
+  STA WRITEHEADBYTE+1
+  LDA #$FF
+  STA RUNVAL
+  LDA #$00
+  STA RUNLENBYTES
+  STA RUNLENCRUMBS
+  LDY #$00 ; because there are no unindexed indirect load/store opcodes
+  ; read one nybble
+dcpreadnybble:
+  LDA READHEADNYBBLE
+  BNE dcpreadnybbleelse
+  ; low nybble; fetch byte
+  LDA #$01 ; next time, read saved high nybble
+  STA READHEADNYBBLE
+  LDA (READHEADBYTE),Y
+  STA READBYTEBUF
+  INC READHEADBYTE
+  BNE 2 ; skip next INC if nonzero
+  INC READHEADBYTE+1 ; if low byte zero, increment high byte
+  ; extract low nybble (Acc still holds just-read byte)
+  AND #$0F
+  BPL dcpreadnybbleendif ; BRA: negative flag cleared by AND
+dcpreadnybbleelse:
+  ; extract high nybble from stored byte value
+  LDA #$00 ; next time, read low nybble from fresh byte
+  STA READHEADNYBBLE
+  LDA READBYTEBUF
+  LSR A
+  LSR A
+  LSR A
+  LSR A
+dcpreadnybbleendif:
+  ; just-read nybble in Acc
+  ; separate to NEWRUNVAL and RUNDIGIT
+  TAX
+  AND #$03
+  STA NEWRUNVAL
+  TXA
+  LSR A
+  LSR A
+  BNE 2 ; skip next LDA if nonzero
+  LDA #$04 ; replace 0 digit with 4
+  STA RUNDIGIT
+  ; is this a continuation of a run spec in progress?
+  LDA NEWRUNVAL
+  CMP RUNVAL
+  BNE dcpwriterun
+  ; add new digit to run length
+  LDA RUNLENBYTES
+  ; it's possible we read past the end of compressed data and found a
+  ; matching run spec nybble by chance. a too-long last run isn't a problem,
+  ; because we won't write past a page boundary, but we need a stop condition
+  ; for reading garbage as a run spec. If computed run length meets or
+  ; exceeds maximum (256 bytes), just stop reading and write the run.
+  ASL A
+  BCS dcprunlenoverflow
+  ASL A
+  BCS dcprunlenoverflow
+  ADC RUNLENCRUMBS
+  BCS dcprunlenoverflow
+  STA RUNLENBYTES
+  LDA RUNDIGIT
+  STA RUNLENCRUMBS
+  ; read another nybble
+  JMP dcpreadnybble
+dcprunlenoverflow:
+  LDA #$04
+  STA RUNLENCRUMBS
+  LDA #$FF
+  STA RUNLENBYTES ; 256 bytes is represented as 255 bytes and 4 crumbs
+  ; fall through to write run
+dcpwriterun:
+  ; check if run length has reached zero
+  ; this contition is evaluated at the top of the loop because reading the
+  ; first nybble counts as non-matching and therefore triggers writing a
+  ; zero-length run
+  LDA RUNLENCRUMBS
+  BNE dcpwriterunskip1
+  LDA RUNLENBYTES
+  BEQ dcpwriterundone
+dcpwriterunskip1:
+  ; output a crumb: shift RUNVAL into high bits of WRITEBYTEBUF
+  ; (earlier output crumbs get shifted lower)
+  LDA RUNVAL
+  LSR A
+  ROR WRITEBYTEBUF
+  LSR A
+  ROR WRITEBYTEBUF
+  ; advance write head by one crumb
+  LDA WRITEHEADCRUMB
+  ADC #$01 ; if WRITEBYTEBUF was not already full, carry is clear
+  CMP #$04
+  BCC dcpwriterunskip2 ; do the following if WRITEBYTEBUF is full
+  ; write byte from buffer
+  LDA WRITEBYTEBUF
+  STA (WRITEHEADBYTE),Y
+  INC WRITEHEADBYTE
+  BNE 1 ; if nonzero, skip next RTS
+  RTS ; if zero, page is full, decompression is done
+  ; INC DECODELEN ; not needed?
+  LDA #$00 ; reset WRITEBYTEBUF and WRITEHEADCRUMB
+  STA WRITEBYTEBUF
+dcpwriterunskip2:
+  STA WRITEHEADCRUMB
+  ; decrement run length
+  DEC RUNLENCRUMBS
+  BPL dcpwriterun ; if RUNLENCRUMBS wraps around to >=128, perform borrow
+  ; from RUNLENBYTES below; otherwise, continue writing run above.
+  DEC RUNLENBYTES
+  LDA #$03
+  STA RUNLENCRUMBS
+  BNE dcpwriterun ; BRA: zero flag cleared by LDA above
+dcpwriterundone:
+  ; now we need to retrieve the nonmatching nybble that triggered the run to
+  ; be written, and set it up as the runspec in progress
+  LDA NEWRUNVAL
+  STA RUNVAL
+  LDA RUNDIGIT
+  STA RUNLENCRUMBS
+  ; RUNLENBYTES should still be 0 at this point
+  JMP dcpreadnybble ; this could be BNE as BRA because RUNDIGIT is always
+  ; nonzero, but it seems to be too far for a branch to jump
+
+fvmcchar:
+; Subroutine: Copy one character via FVMC (page registers already set;
+; character specified by setting X register to address within page)
+; Side effects: Accumulator, X register clobbered
+; Acc := 0
+; X := (X & $0F) + $10
+fvmccharcopyloop:
+  STA $00,X
+  INX
+  TXA
+  AND #$0F
+  BNE fvmccharcopyloop
+  RTS
+
+fvmcpage:
+; Subroutine: Copy one full page via FVMC (registers already set)
+; Side effects: Accumulator clobbered.
+; Acc := X
+  JSR waitvscana
+  TXA
+  LDX #$00
+fvmcpagecopyloop:
+  STA $00,X
+  INX
+  BNE fvmcpagecopyloop
+  STX FVMCSRC
+  STX FVMCDEST
+  TAX
+  RTS
+
+actoncontrolcode:
+; Subroutine: Act on control code designated by Y (index into control code
+; table, not actual control code)
+; Side effects: Accumulator clobbered, Y register doubled
+  TYA
+  ASL
+  TAY
+  LDA controlcodetargets,Y
+  STA SRSCRATCH+12
+  LDA controlcodetargets+1,Y
+  STA SRSCRATCH+13
+  JMP (SRSCRATCH+12)
+
+printch:
+; Subroutine: Print a character identified by Accumulator, at current cursor
+; location. If control code, act accordingly. Else, assert selected colors at
+; current cursor location and advance cursor.
+; Side effects: Y register clobbered.
+NCONTROLCODES = 12
+  LDY CONSFLAGS
+  BMI printliteral0
+  LDY #$00
+controlcodeloop:
+  CMP controlcodes,Y
+  BEQ actoncontrolcode
+  INY
+  CPY #NCONTROLCODES
+  BCC controlcodeloop
+printliteral1:
+  JSR putch
+  PHA
+  JSR putcolors
+  JSR cursoradvance
+  PLA
+  RTS
+
+printliteral0:
+  PHA
+  LDA CONSFLAGS
+  AND #$7F
+  STA CONSFLAGS
+  PLA
+  JMP printliteral1
+
+printsetupliteral:
+  PHA
+  LDA CONSFLAGS
+  ORA #$80
+  STA CONSFLAGS
+  PLA
+  RTS
+
+putch:
+; Subroutine: Print a character identified by Accumulator, at current cursor
+; location. Do not treat control codes specially.
+; Side effects: X, Y registers clobbered.
+  LDY #$00
+  JSR waithscanx
+  STA (TCURSORLO),Y
+  RTS
+
+putcolors:
+; Subroutine: Assert selected colors at current cursor location.
+; Side effects: Accumulator, X, Y registers clobbered.
+  LDA #$00
+  STA TCBLINK ; cursor will be hidden by this procedure
+  JSR calccolorbytes
+  JSR coptrcalc
+  JSR calcrownybble
+  STA CORNMASK
+  EOR #$FF
+  STA COKNMASK
+  LDX #$00
+putcolorswriteloop:
+  STX SAVEX
+  LDA COBYTES,X
+  AND CORNMASK
+  STA COBYTES,X
+  JSR waithscanx
+  LDA (COSRCPTR),Y
+  AND COKNMASK
+  LDX SAVEX
+  ORA COBYTES,X
+  JSR waithscanx
+  STA (COSRCPTR),Y
+  JSR coptradvance
+  LDX SAVEX
+  INX
+  CPX #$05
+  BCC putcolorswriteloop
+  RTS
+
+scrolldown2:
+  LDA #$00
+  STA CHDESTPTR+0
+  LDA #$08
+  STA CHSRCPTR+1
+  STA CHDESTPTR+1
+  STA CHSRCPTR+3
+  STA CHDESTPTR+3
+  LDA #$20
+  STA CHDESTPTR+2
+  LDA #$60
+  STA CHSRCPTR+2
+  LDA #$40
+  STA CHSRCPTR+0
+  CLC
+  LDX #$00 ; color bitplane counter (doubled)
+  LDY #$0A ; color destination / source pointer hi
+sd2ptrinitloop:
+  STA CODESTPTR+0,X
+  ADC #$20
+  STA COSRCPTR+0,X
+  STY CODESTPTR+1,X
+  STY COSRCPTR+1,X
+  INX
+  INX
+  INY
+  CPX #$0A
+  BCC sd2ptrinitloop
+  LDX #$00
+  LDA VIDEOSTATE
+  AND #$CC
+  ORA #$02
+  STA WSTARGET
+sd2rowloop:
+  LDY #$00
+  STX SAVEX
+sd2colloop:
+  JSR waitscanx
+  LDA (CHSRCPTR+0),Y
+  STA (CHDESTPTR+0),Y
+  JSR waitscanx
+  LDA (CHSRCPTR+2),Y
+  STA (CHDESTPTR+2),Y
+  JSR waitscanx
+  LDA (COSRCPTR+0),Y
+  STA (CODESTPTR+0),Y
+  JSR waitscanx
+  LDA (COSRCPTR+2),Y
+  STA (CODESTPTR+2),Y
+  JSR waitscanx
+  LDA (COSRCPTR+4),Y
+  STA (CODESTPTR+4),Y
+  JSR waitscanx
+  LDA (COSRCPTR+6),Y
+  STA (CODESTPTR+6),Y
+  JSR waitscanx
+  LDA (COSRCPTR+8),Y
+  STA (CODESTPTR+8),Y
+  INY
+  CPY #$20
+  BCC sd2colloop
+  CLC
+  LDA CHSRCPTR+0
+  STA CHDESTPTR+0
+  ORA #$20
+  STA CHDESTPTR+2
+  ADC #$20
+  STA CHSRCPTR+0
+  ORA #$20
+  STA CHSRCPTR+2
+  LDA CHSRCPTR+1
+  STA CHDESTPTR+1
+  STA CHDESTPTR+3
+  ADC #$00
+  STA CHSRCPTR+1
+  STA CHSRCPTR+3
+  LDX #$00
+sd2coptrloop:
+  LDA COSRCPTR+0,X
+  STA CODESTPTR+0,X
+  ADC #$20
+  STA COSRCPTR+0,X
+  LDA COSRCPTR+1,X
+  STA CODESTPTR+1,X
+  ADC #$00
+  STA COSRCPTR+1,X
+  INX
+  INX
+  CPX #$0A
+  BCC sd2coptrloop
+  LDX SAVEX
+  INX
+  CPX #$08
+  BCC sd2rowloop
+  ; clear bottom 2 rows
+  LDX #$00
+  JSR calccolorbytes
+sd2clearloop:
+  LDA #$20
+  JSR waithscany
+  STA $0A00,X
+  STA $0A20,X
+  LDA COBYTES+0
+  JSR waithscany
+  STA $0B40,X
+  LDA COBYTES+1
+  JSR waithscany
+  STA $0C60,X
+  LDA COBYTES+2
+  JSR waithscany
+  STA $0D80,X
+  LDA COBYTES+3
+  JSR waithscany
+  STA $0EA0,X
+  LDA COBYTES+4
+  JSR waithscany
+  STA $0FC0,X
+  INX
+  CPX #$20
+  BCC sd2clearloop
+  ;SEC Carry should be already set
+  LDA TCURSORLO
+  SBC #$40
+  STA TCURSORLO
+  LDA TCURSORHI
+  SBC #$00
+  STA TCURSORHI
+  JMP cursorbackcheck
+
+textbackspace:
+  ; do nothing if cursor is in leftmost column
+  LDA TCURSORLO
+  AND #$1F
+  BNE 1
+  RTS
+  JSR cursorleft
+  ; fall through to textdelete
+
+textdelete:
+  PHA
+  LDA TCURSORLO
+  PHA
+  AND #$1F
+  TAY
+  LDA TCURSORLO
+  AND #$E0
+  STA TCURSORLO
+textdeleteshiftloop:
+  INY
+  CPY #$20
+  BCS textdeleteshiftloopexit
+  LDA (TCURSORLO),Y
+  DEY
+  STA (TCURSORLO),Y
+  INY
+  BNE textdeleteshiftloop ; BRA: Y is nonzero here
+textdeleteshiftloopexit:
+  DEY
+  LDA #$20 ; put a space in last column
+  STA (TCURSORLO),Y
+  PLA ; restore cursor position
+  STA TCURSORLO
+  PLA ; restore Acc
+  RTS
+
+textinsert:
+  PHA
+  LDA TCURSORLO
+  PHA
+  AND #$1F
+  TAY
+  LDA TCURSORLO
+  AND #$E0
+  STA TCURSORLO
+textinsertshiftloop:
+  LDA (TCURSORLO),Y
+  INY
+  CPY #$20
+  BCS textinsertshiftloopexit
+  STA (TCURSORLO),Y
+  BCC textinsertshiftloop ; BRA: carry clear this side of BCS branch
+textinsertshiftloopexit:
+  PLA ; restore cursor position
+  STA TCURSORLO
+  LDY #$00
+  LDA #$20 ; put a space in current column
+  STA (TCURSORLO),Y
+  PLA ; restore Acc
+  RTS
+
+
+waitsubs:  .align 8
+waithscanx:
+; Subroutine: Wait for start of horizontal blanking interval after active
+; scanline.
+; Side effects: X register is clobbered.
+  PHA
+  LDA VIDEOSTATE
+  AND #$CC
+  ORA #$02
+  TAX
+  PLA
+  CPX VIDEOSTATE
+  BNE -5
+  RTS
+
+waithscany:
+; Subroutine: Wait for start of horizontal blanking interval after active
+; scanline.
+; Side effects: Y register is clobbered.
+  PHA
+  LDA VIDEOSTATE
+  AND #$CC
+  ORA #$02
+  TAY
+  PLA
+  CPY VIDEOSTATE
+  BNE -5
+  RTS
+
+waitscanx:
+; Subroutine: Wait for videostate stored in WSTARGET.
+; Side effects: X register is clobbered
+  LDX WSTARGET
+  CPX VIDEOSTATE
+  BNE -5
+  RTS
+
 waitvscana:
 ; Subroutine: Wait for start of vertical blanking interval.
 ; Side effects: Accumulator is clobbered.
@@ -798,7 +1419,7 @@ waitvscana:
 nmicode: ; empty, because NMI not presently used
   RTI
 
-  .org $FA00
+  .org $FA40
 datagfx:
   .incbin firmwaregfx.compressed
 datalogocolors: .align 3
@@ -828,6 +1449,22 @@ initfontsrcpage:
   .byte $E4,$E5,$E6,$E7,$E3,$E2,$E1,$00
 initfontdestpage:
   .byte $14,$15,$16,$17,$13,$12,$11,$00
+controlcodes:
+  ; CAUTION: Ensure NCONTROLCODES is defined earlier as the length of this list
+  .byte $01,$04,$06,$07,$08,$09,$0A,$0C,$0D,$0E,$2C,$7F
+controlcodetargets:
+  .word printsetupliteral
+  .word cursoradvance
+  .word cursorleft
+  .word beep
+  .word textbackspace
+  .word cursortab
+  .word cursordown
+  .word cursordown
+  .word cursorreturn
+  .word cursorup
+  .word textinsert
+  .word textdelete
 
 ; 6502 program counter initialization vectors
   .org $FFFA
