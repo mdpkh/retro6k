@@ -2402,7 +2402,7 @@ void InstallROM()
 	}
 }
 
-bool LoadCartridge(const char* infilename)
+template <class T> bool LoadCartridge(T infilename)
 {
 	std::ifstream infile(infilename, std::ios::binary);
 	if (!infile.is_open())
@@ -2496,7 +2496,7 @@ void LoadConfig() {
 	}
 }
 
-bool LoadConfigFromFile(const wchar_t* infilename)
+template <class T> bool LoadConfigFromFile(T infilename)
 {
 	std::ifstream infile(infilename, std::ios::binary);
 	if (!infile.is_open())
