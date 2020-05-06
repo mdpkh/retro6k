@@ -1761,7 +1761,7 @@ void DoPickFile(filetype ft, std::string &path)
 			pathlist.clear();
 			for (auto& entry: std::filesystem::directory_iterator(browsedir, std::filesystem::directory_options::skip_permission_denied))
 			{
-				if (entry.is_regular_file() && (ignoreext || cilstreq(entry.path().extension().string().c_str(), filterext)))
+				if (entry.is_regular_file() && (ignoreext || cilstreq(entry.path().extension().string().c_str(), (const char*)filterext)))
 				{
 					filelist.push_back(entry.path().filename().string());
 					pathlist.push_back(entry.path());
@@ -3201,7 +3201,7 @@ inline uint8_t bare_read6502(uint16_t address)
 	return sysram[address];
 }
 
-bool cilstreq(const char* a, const char* b)
+template <class T> bool cilstreq(T a, T b)
 // case-insensitive c-string equality comparison,
 // optimized by assuming b is already lowercase
 {
@@ -3218,40 +3218,7 @@ bool cilstreq(const char* a, const char* b)
 	}
 }
 
-bool cilstreq(const wchar_t* a, const wchar_t* b)
-// case-insensitive c-string equality comparison,
-// optimized by assuming b is already lowercase
-{
-	if (a == b)
-		return true;
-	while (true)
-	{
-		if (*a == 0 && *b == 0)
-			return true;
-		if (tolower(*a) != *b)
-			return false;
-		++a;
-		++b;
-	}
-}
-
-bool cistreq(const char* a, const char* b)
-// case-insensitive c-string equality comparison
-{
-	if (a == b)
-		return true;
-	while (true)
-	{
-		if (*a == 0 && *b == 0)
-			return true;
-		if (tolower(*a) != tolower(*b))
-			return false;
-		++a;
-		++b;
-	}
-}
-
-bool cistreq(const wchar_t* a, const wchar_t* b)
+template <class T> bool cistreq(T a, T b)
 // case-insensitive c-string equality comparison
 {
 	if (a == b)
