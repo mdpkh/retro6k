@@ -2484,11 +2484,13 @@ template <class T> bool LoadCartridge(T infilename)
 void LoadConfig() {
 	for (auto& configloc : config.system.configloc)
 	{
+#ifdef WINDOWS
 		if (cilstreq(configloc.c_str(), L"windows registry"))
 		{
 			// TODO: read config from Windows Registry
 		}
 		else
+#endif
 		{
 			if (LoadConfigFromFile(configloc.c_str()))
 				break;
