@@ -525,8 +525,8 @@ enum class configfilesection {
 };
 
 uint8_t bare_read6502(uint16_t address);
-template <class T> bool cilstreq(T a, const T b);	
-template <class T> bool cistreq(T a, const T b);
+template <class T> bool cilstreq(T a, T b);	
+template <class T> bool cistreq(T a, T b);
 int main(int argc, char** argv);
 void CollapsePaths();
 void DisplayArgs(char* dest, unsigned char opc, char* args, char** end);
