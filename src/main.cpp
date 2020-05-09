@@ -1837,7 +1837,19 @@ void DrawLogo(int x0, int y0, SDL_Surface* destsurf) {
 
 void DrawText(const char* text, int &x, const int y0, unsigned char fg, unsigned char bg, SDL_Surface* destsurf)
 {
+	if (destsurf == nullptr)
+		return;
+	if (destsurf->pixels == nullptr)
+		return;
+	if (y0 >= destsurf->h)
+		return;
 	unsigned char c[2] = { bg, fg };
+	int mingy = -y0;
+	if (mingy < 0)
+		mingy = 0;
+	int maxgy = destsurf->h - y0;
+	if (maxgy > 16)
+		maxgy = 16;
 	while (*text)
 	{
 		int gw = hifont[(unsigned char)*text].w;
@@ -1845,15 +1857,23 @@ void DrawText(const char* text, int &x, const int y0, unsigned char fg, unsigned
 		for (unsigned short* src = (unsigned short*)hifont[(unsigned char)*text].bmp, * dst = gbits; src < hifont[(unsigned char)*text].bmp + 16; ++src, ++dst)
 			*dst = *src;
 		unsigned char* rowstart = (unsigned char*)destsurf->pixels + (long long)destsurf->pitch * y0 + x;
-		for (int gy = 0; gy < 16; ++gy)
+		int mingx = -x;
+		int maxgx = destsurf->w - x;
+		if (mingx < gw)
 		{
-			for (int gx = 0; gx < gw; ++gx)
+			for (int gy = mingy; gy < maxgy; ++gy)
 			{
-				rowstart[gx] = c[gbits[gy] & 1];
-				gbits[gy] >>= 1;
+				for (int gx = 0; gx < gw; ++gx)
+				{
+					if (gx >= mingx && gx < maxgx)
+						rowstart[gx] = c[gbits[gy] & 1];
+					gbits[gy] >>= 1;
+				}
+				rowstart += destsurf->pitch;
 			}
-			rowstart += destsurf->pitch;
 		}
+		if (maxgx <= 0)
+			break;
 		x += gw;
 		++text;
 	}
