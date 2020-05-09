@@ -2209,6 +2209,10 @@ int InitMainWindow()
 		}
 		break;
 	}
+	if (config.screen.pixwidth < 1)
+		config.screen.pixwidth = 1;
+	if (config.screen.pixheight < 1)
+		config.screen.pixheight = 1;
 	mainwindow = SDL_CreateWindow("Retro 6k Emulator",
 		SDL_WINDOWPOS_UNDEFINED,
 		SDL_WINDOWPOS_UNDEFINED,
