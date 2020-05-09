@@ -2120,6 +2120,8 @@ int InitMainWindow()
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER);
 	SDL_DisplayMode desktopmode;
 	SDL_GetDesktopDisplayMode(0, &desktopmode);
+	config.screen.pixwidth = config.screen.specpixwidth;
+	config.screen.pixheight = config.screen.specpixheight;
 	switch (config.screen.specaspectratio)
 	{
 	case aspectratiocat::AR_WIDE:
@@ -2613,7 +2615,6 @@ template <class T> bool LoadConfigFromFile(T infilename)
 				if (value == "auto")
 				{
 					config.screen.specpixwidth = -1;
-					config.screen.pixwidth = -1;
 					break;
 				}
 				config.screen.specpixwidth = atoi(value.data());
@@ -2625,7 +2626,6 @@ template <class T> bool LoadConfigFromFile(T infilename)
 				if (value == "auto")
 				{
 					config.screen.specpixheight = -1;
-					config.screen.pixheight = -1;
 					break;
 				}
 				config.screen.specpixheight = atoi(value.data());
