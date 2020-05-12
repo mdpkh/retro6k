@@ -523,9 +523,45 @@ pcscancmdnext:
 pcscancmderror:
   JSR beep
   BEQ readcommand ; BRA: Z flag set by beep
-  JMP readcommand
+pcscanhex:
+  LDY #$00
+pcscanhexloop:
+  LDA CMDBUF,X
+  CMP #$20 ; skip copying spaces
+  BEQ pcscanhexskip
+  CMP #$14 ; skip copying "$"s
+  BEQ pcscanhexskip
+  CMP #$30 ; stop copying if A < "0"
+  BCC pcscanhexexit
+  CMP #$67 ; stop copying if A > "f"
+  BCS pcscanhexexit
+  CMP #$3A ; copy if A <= "9"
+  BCC pcscanhexcopy
+  CMP #$60 ; copy if A >= "-"
+  BCS pcscanhexcopy
+  CMP #$41 ; stop copying if A < "A"
+  BCC pcscanhexexit
+  CMP #$47 ; stop copying if A > "F"
+  BCS pcscanhexexit
+pcscanhexcopy:
+  STA TEXTBUF,Y
+  INY
+pcscanhexskip:
+  INX
+  CPY #$10
+  BCS pcscanhexexitnonull
+  CPX #$20
+  BCC pcscanhexloop
+pcscanhexexit:
+  LDA #$00
+  STA TEXTBUF,Y
+pcscanhexexitnonull:
+  RTS
 
 test:
+  INX
+  JSR pcscanhex
+  JSR hextodword
   JSR dwordtohex
   LDA TCURSORLO
   ORA #$08
@@ -907,6 +943,54 @@ fvmcpagecopyloop:
   STX FVMCSRC
   STX FVMCDEST
   TAX
+  RTS
+
+hextodword:
+  LDX #$00
+  LDA TEXTBUF+0
+  CMP #$60 ; check for minus sign
+  BNE 1 ; skip next INX
+  INX
+  LDA #$00
+  STA DWORDBUF+0
+  STA DWORDBUF+1
+  STA DWORDBUF+2
+  STA DWORDBUF+3
+hextodwloop0:
+  LDA TEXTBUF,X
+  BEQ hextodwexit ; stop at null byte
+  LDY #$04
+hextodwloop1:
+  ASL DWORDBUF+0
+  ROL DWORDBUF+1
+  ROL DWORDBUF+2
+  ROL DWORDBUF+3
+  DEY
+  BNE hextodwloop1
+  CMP #$3A
+  BCC 2 ; skip next SBC
+  SBC #$07 ; carry set this side of previous BCC, subtract 7
+  AND #$0F ; extract nybble
+  ORA DWORDBUF+0
+  STA DWORDBUF+0
+  INX
+  CPX #$10
+  BCC hextodwloop0
+hextodwexit:
+  LDA TEXTBUF+0
+  CMP #$60
+  BNE hextodwpositive
+  ; negate DWORDBUF
+  SEC
+  LDX #-4
+hextodwloop2:
+  LDA DWORDBUF+4,X
+  EOR #$FF
+  ADC #$00
+  STA DWORDBUF+4,X
+  INX
+  BNE hextodwloop2
+hextodwpositive:
   RTS
 
 actoncontrolcode:
