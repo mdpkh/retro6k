@@ -3,21 +3,24 @@
 CMDBUF     = $00 ; 32 bytes
 
 ; zeropage addresses used in subroutines
-TEXTBUF   = $80 ; up to 8 bytes
-TCURSORLO = $88 ; bits 0-4: text cursor column; bits 5-7: text cursor row b0-2
-TCURSORHI = $89 ; bits 0-1: text cursor row bits 3-4
-TCBLINK   = $8A ; bits 0-4: cursor blink cycle counter
-CONSFLAGS = $8B ; bit 7: print next char literally
-COLORS    = $8C ; colors (4 bytes) for new characters to print
-CHSRCPTR  = $90 ; character source row pointers (4 bytes) for scrolling
-CHDESTPTR = $94 ; character destination row pointers (4 bytes) for scrolling
-COSRCPTR  = $98 ; color source row pointers (10 bytes) for scrolling
-CODESTPTR = $A2 ; color destination row pointers (10 bytes) for scrolling
-WSTARGET  = $AD ; VIDEOSTATE flag to wait for
-COBYTES   = $B0 ; packed color bytes (5 bytes)
-BLINKBITS = $B5 ; which bits to toggle for blinking cursor (5 bytes)
-COKNMASK  = $BA ; keep-nybble color mask
-CORNMASK  = $BB ; replace-nybble color mask
+TEXTBUF   = $80 ; up to 16 bytes
+DWORDBUF  = $90
+WORDBUF0  = $94
+WORDBUF1  = $96
+TCURSORLO = $98 ; bits 0-4: text cursor column; bits 5-7: text cursor row b0-2
+TCURSORHI = $99 ; bits 0-1: text cursor row bits 3-4
+TCBLINK   = $9A ; bits 0-4: cursor blink cycle counter
+CONSFLAGS = $9B ; bit 7: print next char literally
+COLORS    = $9C ; colors (4 bytes) for new characters to print
+CHSRCPTR  = $A0 ; character source row pointers (4 bytes) for scrolling
+CHDESTPTR = $A4 ; character destination row pointers (4 bytes) for scrolling
+COSRCPTR  = $A8 ; color source row pointers (10 bytes) for scrolling
+CODESTPTR = $B2 ; color destination row pointers (10 bytes) for scrolling
+WSTARGET  = $BD ; VIDEOSTATE flag to wait for
+COBYTES   = $C0 ; packed color bytes (5 bytes)
+BLINKBITS = $C5 ; which bits to toggle for blinking cursor (5 bytes)
+COKNMASK  = $CA ; keep-nybble color mask
+CORNMASK  = $CB ; replace-nybble color mask
 POINTER0  = $E0
 POINTER1  = $E2
 POINTER2  = $E4
@@ -53,6 +56,8 @@ entry: ; system power-on or reset
   BNE -6 ; STX again
   LDX #>waitsubs
   STX DLSON ; but seriously, suppress logging of waiting subroutines
+  INX
+  BNE -6 ; STX again
   JSR waitvscana
   ; display cartridge identification in bottom of screen
   LDX #$00
@@ -507,6 +512,8 @@ pcscancmdloop:
   BEQ clearscreen
   CMP #"R"
   BEQ entry
+  CMP #"T"
+  BEQ test
   BNE pcscancmderror ; BRA else
   BEQ pcscancmdnext
 pcscancmdnext:
@@ -518,39 +525,32 @@ pcscancmderror:
   BEQ readcommand ; BRA: Z flag set by beep
   JMP readcommand
 
-bytetohex:
-; Subroutine: Convert value in Accumulator to uppercase hexadecimal.
-; Side effects: result stored in zp$86,$87, neg digit count stored in X
-  TAX
-  AND #$0F ; extract low nybble
-  ORA #$30 ; convert to numeric character
-  CMP #$3A ; N := (A in 30-39); C := (A in 3A-3F)
-  BMI bytetohexb1
-  ADC #$06 ; if lo nybble > 9, convert to letter (C is set; effectively add 7)
-bytetohexb1:
-  STA $87 ; write low nybble character
+test:
+  JSR dwordtohex
+  LDA TCURSORLO
+  ORA #$08
+  STA TCURSORLO
+  JSR waitvscana
   TXA
-  AND #$F0 ; extract high nybble
-  BEQ bytetohexb3 ; if high nybble is zero, jump
-  LSR
-  LSR
-  LSR
-  LSR ; shift nybble into place
-  ADC #$30 ; convert to numeric character
-  CMP #$3A ; N := (A in 30-39); C := (A in 3A-3F)
-  BMI bytetohexb2
-  ADC #$06 ; if hi nybble > 9, convert to letter (C is set; effectively add 7)
-bytetohexb2:
-  STA $86 ; write high nybble character
-  TXA ; restore Accumulator
-  LDX #$FE ; set X to -2 (2 digits)
-  RTS
-bytetohexb3:
-  LDA #$30
-  STA $86 ; write high zero
-  TXA ; restore Accumulator
-  LDX #$FF ; set X to -1 (1 digit)
-  RTS
+  EOR #$FF
+  CLC
+  ADC #$31
+  LDY #$00
+  STA (TCURSORLO),Y
+  LDA TCURSORLO
+  ORA #$10
+  STA TCURSORLO
+testdwtohexloop:
+  LDA TEXTBUF+8,Y
+  STA (TCURSORLO),Y
+  INY
+  CPY #$08
+  BCC testdwtohexloop
+  LDA #$0D
+  JSR printch
+  LDA #$0A
+  JSR printch
+  JMP readcommand
 
 calccolorbytes:
 ; Subroutine: Transpose color selections from COLORS[0-3] to COLORBYTES[0-4]
@@ -681,147 +681,6 @@ coptrcalc:
   ADC #$06 ; should not cause a carry
   STA COSRCPTR+1
   RTS
-
-cursoradvance:
-  ; clear cursor if shown
-  JSR cursorhide
-  ; move cursor pointer
-  CLC
-  LDA TCURSORLO
-  ADC #$01
-  STA TCURSORLO
-  LDA TCURSORHI
-  ADC #$00
-  STA TCURSORHI
-  ; bounds check
-cursoradvancecheck:
-  CMP #$0A
-  BCC cursoradvrts ; if TCURSORHI < $0A, return
-  LDA TCURSORLO
-  CMP #$40
-  BCC cursoradvrts ; if TCURSORLO < $20, return
-  JMP scrolldown2
-cursoradvrts:
-  RTS
-
-cursordown:
-  ; clear cursor if shown
-  JSR cursorhide
-  ; move cursor pointer
-  CLC
-  LDA TCURSORLO
-  ADC #$20
-  STA TCURSORLO
-  LDA TCURSORHI
-  ADC #$00
-  STA TCURSORHI
-  ; bounds check
-  JMP cursoradvancecheck
-
-cursorhide:
-  LDA TCBLINK
-  AND #$10
-  BNE 1 ; if cursor in 'off' phase, return
-  RTS
-  LDA #$00 ; set cursor cycle to reflect 'off'
-  STA TCBLINK
-  JMP cursortoggle
-
-cursorleft:
-  ; clear cursor if shown
-  JSR cursorhide
-  ; move cursor pointer
-  SEC
-  LDA TCURSORLO
-  SBC #$01
-  STA TCURSORLO
-  LDA TCURSORHI
-  SBC #$00
-  STA TCURSORHI
-  ; bounds check
-cursorbackcheck:
-  CMP #$08
-  BCC 1 ; if TCURSORHI >= $08, return
-  RTS
-  LDA #$00
-  STA TCURSORLO
-  LDA #$08
-  STA TCURSORHI
-
-cursorreturn:
-  ; clear cursor if shown
-  JSR cursorhide
-  ; move cursor pointer
-  LDA TCURSORLO
-  AND #$E0
-  STA TCURSORLO
-  RTS
-
-cursortab:
-  ; clear cursor if shown
-  JSR cursorhide
-  ; move cursor pointer
-  CLC
-  LDA TCURSORLO
-  ADC #$04
-  AND #$FC
-  STA TCURSORLO
-  LDA TCURSORHI
-  ADC #$00
-  STA TCURSORHI
-  ; bounds check
-  JMP cursoradvancecheck
-
-cursortick:
-  CLC
-  LDA TCBLINK
-  ADC #$01
-  STA TCBLINK
-  AND #$0F
-  BEQ 1
-  RTS
-  ; fall through to cursortoggle
-
-cursortoggle:
-  JSR calcrownybble
-  TAY
-  LDX #$00
-cursortogglesetuploop:
-  TYA
-  AND BLINKBITS,X
-  STA COBYTES,X
-  INX
-  CPX #$05
-  BCC cursortogglesetuploop
-  JSR coptrcalc
-  LDX #$00
-cursortogglewriteloop:
-  LDA COBYTES,X
-  STX SAVEX
-  JSR waithscanx
-  EOR (COSRCPTR),Y
-  JSR waithscanx
-  STA (COSRCPTR),Y
-  JSR coptradvance
-  LDX SAVEX
-  INX
-  CPX #$05
-  BCC cursortogglewriteloop
-  RTS
-
-cursorup:
-  ; clear cursor if shown
-  JSR cursorhide
-  ; move cursor pointer
-  SEC
-  LDA TCURSORLO
-  SBC #$20
-  STA TCURSORLO
-  LDA TCURSORHI
-  SBC #$00
-  STA TCURSORHI
-  ; bounds check
-  JMP cursorbackcheck
 
 decompresspage:
 ; Subroutine: Load page number Acc from compressed data beginning at POINTER0
@@ -983,6 +842,42 @@ dcpwriterundone:
   ; RUNLENBYTES should still be 0 at this point
   JMP dcpreadnybble ; this could be BNE as BRA because RUNDIGIT is always
   ; nonzero, but it seems to be too far for a branch to jump
+
+dwordtohex:
+; Subroutine: Convert value in DWORDBUF to uppercase hexadecimal.
+; Side effects: result stored in TEXTBUF[8-15], neg digit count stored in X
+  LDX #$FF
+  LDY #$07
+  STY SRSCRATCH+2 ; randomly chosen scratch slot
+dwtohexloop:
+  TYA
+  LSR A
+  BCC dwtohexb1
+  ; do this if Y is odd
+  INX
+  LDA DWORDBUF,X
+  AND #$0F
+  BPL dwtohexb2 ; BRA; N flag cleared by previous AND
+dwtohexb1: ; do this if Y is even
+  LDA DWORDBUF,X
+  LSR A
+  LSR A
+  LSR A
+  LSR A
+dwtohexb2:
+  BEQ 2 ; skip next STY zp if nybble is zero
+  STY SRSCRATCH+2
+  ORA #$30 ; convert to numeric character
+  CMP #$3A ; N := (A in $30-39); C := (A in $3A-3F)
+  BMI 2 ; if A < $3A, skip next ADC
+  ADC #$06 ; if lo nybble > 9, convert to letter (C is set; effectively add 7)
+  STA TEXTBUF+8,Y
+  DEY
+  BPL dwtohexloop
+  LDA SRSCRATCH+2 ; most-significant nonzero nybble (0 msn, 7 lsn)
+  ORA #$F8 ; F8 msn, FF lsn = negative count of nybbles
+  TAX
+  RTS
 
 fvmcchar:
 ; Subroutine: Copy one character via FVMC (page registers already set;
@@ -1324,6 +1219,148 @@ beepdelayloop:
   STA SOUNDVOICE0FREQ+1
   STA SOUNDVOICE0VOL
   RTS
+
+cursoradvance:
+  ; clear cursor if shown
+  JSR cursorhide
+  ; move cursor pointer
+  CLC
+  LDA TCURSORLO
+  ADC #$01
+  STA TCURSORLO
+  LDA TCURSORHI
+  ADC #$00
+  STA TCURSORHI
+  ; bounds check
+cursoradvancecheck:
+  CMP #$0A
+  BCC cursoradvrts ; if TCURSORHI < $0A, return
+  LDA TCURSORLO
+  CMP #$40
+  BCC cursoradvrts ; if TCURSORLO < $20, return
+  JMP scrolldown2
+cursoradvrts:
+  RTS
+
+cursordown:
+  ; clear cursor if shown
+  JSR cursorhide
+  ; move cursor pointer
+  CLC
+  LDA TCURSORLO
+  ADC #$20
+  STA TCURSORLO
+  LDA TCURSORHI
+  ADC #$00
+  STA TCURSORHI
+  ; bounds check
+  JMP cursoradvancecheck
+
+cursorhide:
+  LDA TCBLINK
+  AND #$10
+  BNE 1 ; if cursor in 'off' phase, return
+  RTS
+  LDA #$00 ; set cursor cycle to reflect 'off'
+  STA TCBLINK
+  JMP cursortoggle
+
+cursorleft:
+  ; clear cursor if shown
+  JSR cursorhide
+  ; move cursor pointer
+  SEC
+  LDA TCURSORLO
+  SBC #$01
+  STA TCURSORLO
+  LDA TCURSORHI
+  SBC #$00
+  STA TCURSORHI
+  ; bounds check
+cursorbackcheck:
+  CMP #$08
+  BCS cursorbackrts ; if TCURSORHI >= $08, return
+  LDA #$00
+  STA TCURSORLO
+  LDA #$08
+  STA TCURSORHI
+cursorbackrts:
+  RTS
+
+cursorreturn:
+  ; clear cursor if shown
+  JSR cursorhide
+  ; move cursor pointer
+  LDA TCURSORLO
+  AND #$E0
+  STA TCURSORLO
+  RTS
+
+cursortab:
+  ; clear cursor if shown
+  JSR cursorhide
+  ; move cursor pointer
+  CLC
+  LDA TCURSORLO
+  ADC #$04
+  AND #$FC
+  STA TCURSORLO
+  LDA TCURSORHI
+  ADC #$00
+  STA TCURSORHI
+  ; bounds check
+  JMP cursoradvancecheck
+
+cursortick:
+  CLC
+  LDA TCBLINK
+  ADC #$01
+  STA TCBLINK
+  AND #$0F
+  BEQ 1
+  RTS
+  ; fall through to cursortoggle
+
+cursortoggle:
+  JSR calcrownybble
+  TAY
+  LDX #$00
+cursortogglesetuploop:
+  TYA
+  AND BLINKBITS,X
+  STA COBYTES,X
+  INX
+  CPX #$05
+  BCC cursortogglesetuploop
+  JSR coptrcalc
+  LDX #$00
+cursortogglewriteloop:
+  LDA COBYTES,X
+  STX SAVEX
+  JSR waithscanx
+  EOR (COSRCPTR),Y
+  JSR waithscanx
+  STA (COSRCPTR),Y
+  JSR coptradvance
+  LDX SAVEX
+  INX
+  CPX #$05
+  BCC cursortogglewriteloop
+  RTS
+
+cursorup:
+  ; clear cursor if shown
+  JSR cursorhide
+  ; move cursor pointer
+  SEC
+  LDA TCURSORLO
+  SBC #$20
+  STA TCURSORLO
+  LDA TCURSORHI
+  SBC #$00
+  STA TCURSORHI
+  ; bounds check
+  JMP cursorbackcheck
 
 waithscanx:
 ; Subroutine: Wait for start of horizontal blanking interval after active
