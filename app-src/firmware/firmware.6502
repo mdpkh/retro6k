@@ -1,6 +1,14 @@
 ; Retro6K System Firmware
 ; zeropage addresses used by interactive console
 CMDBUF     = $00 ; 32 bytes
+INRADIX    = $20 ; 0=decimal; 1=hexadecimal
+INDIRECT   = $21 ; count of @ in currently-scanning number
+DESTSIZE   = $22 ; 0=byte; 1=word; 2=dword; 3=char*16; 4=zterm; 5=page
+SRCSIZE    = $23 ; 0=byte; 1=word; 2=dword; 3=char*16; 4=zterm; 5=page
+DESTWORD   = $24 ; destination address of memcopy command
+DESTIND    = $26 ; destination indirect count
+SRCDWORD   = $28 ; source address/literal of memcopy command
+SRCIND     = $2C ; source indirect count
 
 ; zeropage addresses used in subroutines
 TEXTBUF   = $80 ; up to 16 bytes
@@ -523,6 +531,35 @@ pcscancmdnext:
 pcscancmderror:
   JSR beep
   BEQ readcommand ; BRA: Z flag set by beep
+pcscandec:
+  LDY #$00
+  STY INRADIX
+pcscandecloop:
+  LDA CMDBUF,X
+  CMP #$20 ; skip copying spaces
+  BEQ pcscandecskip
+  CMP #$14 ; if "$" encountered, switch to scanning for hex (and skip $)
+  BEQ pcscanhexskip
+  CMP #$60 ; copy if A == "-"
+  BEQ pcscandeccopy
+  CMP #$30 ; stop copying if A < "0"
+  BCC pcscandecexit
+  CMP #$3A ; stop copying if A > "9"
+  BCS pcscandecexit
+pcscandeccopy:
+  STA TEXTBUF,Y
+  INY
+pcscandecskip:
+  INX
+  CPY #$10
+  BCS pcscandecexitnonull
+  CPX #$20
+  BCC pcscandecloop
+pcscandecexit:
+  LDA #$00
+  STA TEXTBUF,Y
+pcscandecexitnonull:
+  RTS
 pcscanhex:
   LDY #$00
 pcscanhexloop:
@@ -556,12 +593,19 @@ pcscanhexexit:
   LDA #$00
   STA TEXTBUF,Y
 pcscanhexexitnonull:
+  LDA #$01
+  STA INRADIX
   RTS
 
 test:
   INX
-  JSR pcscanhex
+  JSR pcscandec
+  LDA INRADIX
+  BNE 6 ; skip JSR and JMP
+  JSR dectodword
+  JMP testaftertodw
   JSR hextodword
+testaftertodw:
   JSR dwordtohex
   LDA TCURSORLO
   ORA #$08
@@ -878,6 +922,82 @@ dcpwriterundone:
   ; RUNLENBYTES should still be 0 at this point
   JMP dcpreadnybble ; this could be BNE as BRA because RUNDIGIT is always
   ; nonzero, but it seems to be too far for a branch to jump
+
+dectodword:
+  LDX #$00
+  LDA TEXTBUF+0
+  CMP #$60 ; check for minus sign
+  BNE 1 ; skip next INX
+  INX
+  LDA #$00
+  STA DWORDBUF+0
+  STA DWORDBUF+1
+  STA DWORDBUF+2
+  STA DWORDBUF+3
+dectodwloop0:
+  LDA TEXTBUF,X
+  BEQ dectodwexit ; stop at null byte
+  ; multiply DWORDBUF by 10
+  JSR dwordmul2
+  STX SAVEX
+  LDX #-4
+dectodwloop3:
+  LDA DWORDBUF+4,X
+  STA SRSCRATCH+8,X
+  INX
+  BNE dectodwloop3
+  JSR dwordmul2
+  JSR dwordmul2
+  CLC
+  LDX #-4
+dectodwloop4:
+  LDA SRSCRATCH+8,X
+  ADC DWORDBUF+4,X
+  STA DWORDBUF+4,X
+  INX
+  BNE dectodwloop4
+  LDX SAVEX
+  ; add new digit
+  LDA TEXTBUF,X
+  AND #$0F
+  CLC
+  ADC DWORDBUF+0
+  STA DWORDBUF+0
+  STX SAVEX
+  LDX #-3
+dectodwloop1:
+  LDA DWORDBUF+4,X
+  ADC #$00
+  STA DWORDBUF+4,X
+  INX
+  BNE dectodwloop1
+  LDX SAVEX
+  INX
+  CPX #$10
+  BCC dectodwloop0
+dectodwexit:
+  LDA TEXTBUF+0
+  CMP #$60
+  BNE dectodwpositive
+  ; negate DWORDBUF
+  SEC
+  LDX #-4
+dectodwloop2:
+  LDA DWORDBUF+4,X
+  EOR #$FF
+  ADC #$00
+  STA DWORDBUF+4,X
+  INX
+  BNE dectodwloop2
+dectodwpositive:
+  RTS
+
+dwordmul2:
+  ASL DWORDBUF+0
+  ROL DWORDBUF+1
+  ROL DWORDBUF+2
+  ROL DWORDBUF+3
+  RTS
 
 dwordtohex:
 ; Subroutine: Convert value in DWORDBUF to uppercase hexadecimal.
@@ -1276,7 +1396,7 @@ textinsertshiftloopexit:
   RTS
 
 
-waitsubs:  .align 8
+waitsubs:
 
 beep:
 BEEPFREQ = 750
