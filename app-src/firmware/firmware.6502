@@ -1,4 +1,7 @@
 ; Retro6K System Firmware
+; zeropage addresses used by interactive console
+CMDBUF     = $00 ; 32 bytes
+
 ; zeropage addresses used in subroutines
 TEXTBUF   = $80 ; up to 8 bytes
 TCURSORLO = $88 ; bits 0-4: text cursor column; bits 5-7: text cursor row b0-2
@@ -33,8 +36,10 @@ FVMCSRC         = $03F9
 DLSOFF          = $03FC
 DLSON           = $03FD
 DEBUGLOG        = $03FF
-; code starts here
+
   .org $F000
+; firmware version signature
+  .word 20310 ; 2031-development
 entry: ; system power-on or reset
   ; misc initialization
   SEI
@@ -446,40 +451,72 @@ readcommandkeyloop:
   BEQ readcommandkeyloop
   CMP #$0D
   BEQ processcommand
+processliteralchar:
   JSR printch
   JMP readcommandkeyloop
 processcommand:
+  ; check if escape sequence in progress
+  LDA CONSFLAGS
+  BPL pcsetupcopycmd
+  LDA #$0D ; replace CR that got us here, then continue as if not a CR
+  BNE processliteralchar ; BRA: Z flag cleared by previous LDA
+pcsetupcopycmd:
+  ; read and interpret command that was entered
+  ; set POINTER0 to first column of current line
+  LDA TCURSORLO
+  AND #$E0
+  STA POINTER0+0
+  LDA TCURSORHI
+  STA POINTER0+1
+  ; copy command line from screen memory to zp buffer
+  LDY #$00
+  JSR waitvscana
+pccopyloop:
+  LDA (POINTER0),Y
+  STA CMDBUF,Y
+  INY
+  CPY #$20
+  BCC pccopyloop
+  ; now send CRLF to screen
+  LDA #$0D
   JSR printch
   LDA #$0A
   JSR printch
-  ; TODO: read and interpret command that was entered
+  ; scan CMDBUF for command start indicator (">")
+  LDX #$00
+pcscanstartloop:
+  LDA CMDBUF,X
+  CMP #$20 ; leading spaces allowed
+  BEQ pcscanstartnext
+  CMP #$1E ; ">"
+  BEQ pcscancmdnext
+  BNE pcscanstarterror ; BRA else
+pcscanstartnext:
+  INX
+  CPX #$1F ; command start indicator doesn't make sense in final column
+  BCC pcscanstartloop
+pcscanstarterror:
+  JSR beep
+  BEQ readcommand ; BRA: Z flag set by beep
+pcscancmdloop:  
+  LDA CMDBUF,X
+  CMP #$20 ; leading spaces allowed
+  BEQ pcscancmdnext
+  AND #$DF ; case-insensitive comparisons follow
+  CMP #"C"
+  BEQ clearscreen
+  CMP #"R"
+  BEQ entry
+  BNE pcscancmderror ; BRA else
+  BEQ pcscancmdnext
+pcscancmdnext:
+  INX
+  CPX #$20
+  BCC pcscancmdloop
+pcscancmderror:
+  JSR beep
+  BEQ readcommand ; BRA: Z flag set by beep
   JMP readcommand
-
-beep:
-BEEPFREQ = 750
-  ; start beep
-  LDA <BEEPFREQ
-  STA SOUNDVOICE0FREQ
-  LDA >BEEPFREQ
-  STA SOUNDVOICE0FREQ+1
-  LDA #$AA
-  STA SOUNDVOICE0VOL
-  LDA #$00
-  STA SOUNDVOICETYPES
-  ; delay
-  LDY #$15
-beepdelayloop:
-  JSR waitvscana
-  AND #$CC
-  CMP VIDEOSTATE
-  BNE -5
-  DEY
-  BNE beepdelayloop
-  LDA #$00
-  STA SOUNDVOICE0FREQ
-  STA SOUNDVOICE0FREQ+1
-  STA SOUNDVOICE0VOL
-  RTS
 
 ; Subroutine: Convert value in Accumulator to decimal. Several entry points.
 ; Side effects: result stored in zp$8C,$8D,$8E,$8F, neg digit count stored
@@ -722,6 +759,58 @@ calcrownybble:
   LDA #$FF ; Acc now #$00 for even row or #$FF for odd row
   EOR #$0F ; Acc now #$0F for even row or #$F0 for odd row
   RTS
+
+clearscreen:
+  JSR calccolorbytes
+  LDX #$00
+clearscreenloop0:
+  JSR waitvscana
+;  STA DEBUGLOG
+clearscreenloop1:
+  LDA #$20
+  STA $0800,X
+  STA $0900,X
+  CPX #$40
+  BCC 2 ; skip next if X < $40
+  LDA COBYTES+0
+  STA $0A00,X
+  LDA COBYTES+0
+  CPX #$60
+  BCC 2 ; skip next if X < $60
+  LDA COBYTES+1
+  STA $0B00,X
+  LDA COBYTES+1
+  CPX #$80
+  BCC 2 ; skip next if X < $80
+  LDA COBYTES+2
+  STA $0C00,X
+  LDA COBYTES+2
+  CPX #$A0
+  BCC 2 ; skip next if X < $A0
+  LDA COBYTES+3
+  STA $0D00,X
+  LDA COBYTES+3
+  CPX #$C0
+  BCC 2 ; skip next if X < $C0
+  LDA COBYTES+4
+  STA $0E00,X
+  LDA COBYTES+4
+  CPX #$E0
+  BCS 3 ; skip next if X >= $E0
+  STA $0F00,X
+  INX
+  BEQ clearscreenfinish
+  TXA
+  AND #$0F
+  BEQ clearscreenloop0
+  BNE clearscreenloop1
+clearscreenfinish:
+  LDA #$00
+  STA TCURSORLO
+  STA TCBLINK
+  LDA #$08
+  STA TCURSORHI
+  JMP readcommand
 
 coptradvance:
   CLC
@@ -1368,6 +1457,33 @@ textinsertshiftloopexit:
 
 
 waitsubs:  .align 8
+
+beep:
+BEEPFREQ = 750
+  ; start beep
+  LDA #<BEEPFREQ
+  STA SOUNDVOICE0FREQ
+  LDA #>BEEPFREQ
+  STA SOUNDVOICE0FREQ+1
+  LDA #$AA
+  STA SOUNDVOICE0VOL
+  LDA #$00
+  STA SOUNDVOICETYPES
+  ; delay
+  LDY #$15
+beepdelayloop:
+  JSR waitvscana
+  AND #$CC
+  CMP VIDEOSTATE
+  BNE -5
+  DEY
+  BNE beepdelayloop
+  LDA #$00
+  STA SOUNDVOICE0FREQ
+  STA SOUNDVOICE0FREQ+1
+  STA SOUNDVOICE0VOL
+  RTS
+
 waithscanx:
 ; Subroutine: Wait for start of horizontal blanking interval after active
 ; scanline.
@@ -1419,7 +1535,7 @@ waitvscana:
 nmicode: ; empty, because NMI not presently used
   RTI
 
-  .org $FA40
+  .org $FA80
 datagfx:
   .incbin firmwaregfx.compressed
 datalogocolors: .align 3
