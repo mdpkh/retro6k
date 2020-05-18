@@ -60,12 +60,6 @@ entry: ; system power-on or reset
   STA FVMCDEST
   LDX #$F0
   STX DLSOFF ; turn off debug log suppression
-  INX
-  BNE -6 ; STX again
-  LDX #>waitsubs
-  STX DLSON ; but seriously, suppress logging of waiting subroutines
-  INX
-  BNE -6 ; STX again
   JSR waitvscana
   ; display cartridge identification in bottom of screen
   LDX #$00
@@ -140,100 +134,56 @@ initfontloopexit:
   JMP ($200E)
 nocart: ; no cartridge inserted
   ; initialize screen display
-  JSR waitvscana
-  LDX #$00
-initscreenloop:
-  LDA datasystext0,X ; screen line 0: system startup text
-  STA $0800,X
-  LDA #$20 ; screen line 1: blank
-  STA $0820,X
-  LDA datasystext2,X ; screen line 2: system startup text
-  STA $0840,X
-  LDA datasystext3,X ; screen line 3: system startup text
-  STA $0860,X
-  LDA #$20 ; screen line 4: blank
-  STA $0880,X
-  LDA datasystext0,X ; screen line 5: system startup text
-  STA $08A0,X
-  LDA datasystext6,X ; screen line 6: system startup text
-  STA $08C0,X
-  LDA datasystext7,X ; screen line 7: system startup text
-  STA $08E0,X
-  LDA datasystext8,X ; screen line 8: system startup text
-  STA $0900,X
-  LDA #$20 ; screen lines 9-17: blank
-  STA $0920,X
-  STA $0940,X
-  STA $0960,X
-  STA $0980,X
-  STA $09A0,X
-  STA $09C0,X
-  STA $09E0,X
-  STA $0A00,X
-  STA $0A20,X
-  LDA #$CC ; screen lines 0-17 attribute bit 0: 0/0 0/0 1/1 1/1
-  STA $0A40,X
-  STA $0A60,X
-  STA $0A80,X
-  STA $0AA0,X
-  STA $0AC0,X
-  STA $0AE0,X
-  STA $0B00,X
-  STA $0B20,X
-  STA $0B40,X
-  ; screen lines 2-17 attribute bit 1: 0/0 0/0 1/1 1/1
-  STA $0B60,X
-  STA $0B80,X
-  STA $0BA0,X
-  STA $0BC0,X
-  STA $0BE0,X
-  STA $0C00,X
-  STA $0C20,X
-  STA $0C40,X
-  STA $0C60,X
-  ; screen lines 0-17 attribute bit 2: 0/0 0/0 1/1 1/1
-  STA $0C80,X
-  STA $0CA0,X
-  STA $0CC0,X
-  STA $0CE0,X
-  STA $0D00,X
-  STA $0D20,X
-  STA $0D40,X
-  STA $0D60,X
-  ; screen lines 0-5 attribute bit 3: 0/0 0/0 1/1 1/1
-  STA $0D80,X
-  STA $0DA0,X
-  STA $0DC0,X
-  STA $0DE0,X
-  LDA #$C0 ; screen lines 6&7 attribute bit 3: 0/0 0/0 0/1 0/1
-  STA $0E00,X
-  LDA #$00 ; screen lines 8-17 attribute bit 3: 0/0 0/0 0/0 0/0
-  STA $0E20,X
-  STA $0E40,X
-  STA $0E60,X
-  STA $0E80,X
-  STA $0EA0,X
-  LDA #$CC ; screen lines 0-5 attribute bit 4: 0/0 0/0 1/1 1/1
-  STA $0EC0,X
-  STA $0EE0,X
-  STA $0F00,X
-  LDA #$0C ; screen lines 6&7 attribute bit 4: 0/0 0/0 1/0 1/0
-  STA $0F20,X
-  LDA #$00 ; screen lines 8-17 attribute bit 4: 0/0 0/0 0/0 0/0
-  STA $0F40,X
-  STA $0F60,X
-  STA $0F80,X
-  STA $0FA0,X
-  STA $0FC0,X
+  LDA #$00
+  STA POINTER0+0
+  STA SAVEX
+  LDA #$08
+  STA POINTER0+1
+  LDA #>datatext
+  STA POINTER1+1
+  LDA VIDEOSTATE
+  AND #$CC
+  ORA #$02
+  STA WSTARGET
+initscreenrowloop:
+  LDX SAVEX
+  LDA datascreendef,X
+  BMI initscreenconstrow
+  ASL A
+  STA POINTER1+0
+  LDY #$00
+initscreendrloop:
+  LDA (POINTER1),Y
+  JSR waitscanx
+  STA (POINTER0),Y
+  INY
+  CPY #$20
+  BCC initscreendrloop
+  BCS initscreenrowadvance ; BRA
+initscreenconstrow:
+  AND #$7F
+  TAY
+  LDA datascreenconst,Y
+  LDY #$00
+initscreencrcolloop:
+  JSR waitscanx
+  STA (POINTER0),Y
+  INY
+  CPY #$20
+  BCC initscreencrcolloop
+initscreenrowadvance:
+  CLC
+  LDA POINTER0+0
+  ADC #$20
+  STA POINTER0+0
+  BCC 2 ; skip INC zp
+  INC POINTER0+1
+  LDX SAVEX
   INX
-  TXA
-  AND #$03
-  CMP #$00
-  BNE initscreenloop
-  JSR waitvscana
-  TXA
-  CMP #$20
-  BNE initscreenloop
+  STX SAVEX
+  CPX #$3F
+  BCC initscreenrowloop
+
   ; copy a few extra characters from Bank E font to video memory
   LDA #$10 ; destination page: screen font row 0
   STA FVMCDEST
@@ -1395,9 +1345,6 @@ textinsertshiftloopexit:
   PLA ; restore Acc
   RTS
 
-
-waitsubs:
-
 beep:
 BEEPFREQ = 750
   ; start beep
@@ -1617,32 +1564,38 @@ waitvscana:
 nmicode: ; empty, because NMI not presently used
   RTI
 
-  .org $FA80
+  .org $FA40
 datagfx:
   .incbin firmwaregfx.compressed
+datascreenconst:
+  .byte $20,$CC,$C0,$00,$0C ; screendef $80-$84
 datalogocolors: .align 3
   .byte $CC,$CC,$8A,$8C,$CE,$EE,$EC,$CC
   .byte $AC,$AE,$EE,$EC,$C8,$C8,$AA,$CA
   .byte $8C,$8C,$EE,$EC,$CA,$EA,$EE,$CE
   .byte $EA,$EA,$CC,$CA,$AE,$AE,$88,$A8
   .byte $8A,$88,$A8,$AA,$A8,$88,$CE,$AE
-datasystext0: .align 5
-  .text ". \xFE\xFF \x80\x81 .  \x0E  \x0E  \x0E  \x0E  . \xFE\xFF \x80\x81 ."
-datasystext2:
-  .text "\x8F   Retro 6k Fantasy Computer  \x8F"
-datasystext3:
-  .text "\xF0     Entertainment System\x11    \xF0"
-datasystext6:
-  .text "   Please insert a cartridge>   "
-datasystext7:
-  .text "     F\xF7\xF8\xF9ware version 2031@     "
-datasystext8:
-  .text "\0142019`20 Maggie David \x86\x87\x88 Haynes"
-datasyscolors:
+datasyscolors: .align 5
   .byte $00,$81,$84,$0D,$02,$83,$86,$0F
   .byte $D0,$59,$5C,$DD,$D2,$5B,$5E,$DF
   .byte $20,$A1,$A4,$2D,$22,$A3,$A6,$2F
   .byte $F0,$79,$7C,$FD,$F2,$7B,$7E,$FF
+datascreendef: .align 6
+  .byte $00,$80,$10,$20,$80,$00,$30,$40
+  .byte $50,$80,$80,$80,$80,$80,$80,$80
+  .byte $80,$80,$81,$81,$81,$81,$81,$81
+  .byte $81,$81,$81,$81,$81,$81,$81,$81
+  .byte $81,$81,$81,$81,$81,$81,$81,$81
+  .byte $81,$81,$81,$81,$81,$81,$81,$81
+  .byte $82,$83,$83,$83,$83,$83,$81,$81
+  .byte $81,$84,$83,$83,$83,$83,$83
+datatext: .align 8
+  .text ". \xFE\xFF \x80\x81 .  \x0E  \x0E  \x0E  \x0E  . \xFE\xFF \x80\x81 ." ; screendef $00
+  .text "\x8F   Retro 6k Fantasy Computer  \x8F" ; screendef $10
+  .text "\xF0     Entertainment System\x11    \xF0" ; screendef $20
+  .text "   Please insert a cartridge>   " ; screendef $30
+  .text "     F\xF7\xF8\xF9ware version 2031@     " ; screendef $40
+  .text "\0142019`20 Maggie David \x86\x87\x88 Haynes" ; screendef $50
 initfontsrcpage:
   .byte $E4,$E5,$E6,$E7,$E3,$E2,$E1,$00
 initfontdestpage:
