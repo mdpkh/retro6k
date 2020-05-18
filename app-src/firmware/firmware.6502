@@ -623,14 +623,6 @@ calccolorloopz:
   PLA
   RTS
 
-calcrownybble:
-  LDA TCURSORLO
-  AND #$20
-  BEQ 2
-  LDA #$FF ; Acc now #$00 for even row or #$FF for odd row
-  EOR #$0F ; Acc now #$0F for even row or #$F0 for odd row
-  RTS
-
 clearscreen:
   JSR calccolorbytes
   LDX #$00
@@ -710,6 +702,14 @@ coptrcalc:
   LDA COSRCPTR+1
   ADC #$06 ; should not cause a carry
   STA COSRCPTR+1
+  ;JMP calcrownybble
+
+calcrownybble:
+  LDA TCURSORLO
+  AND #$20
+  BEQ 2
+  LDA #$FF ; Acc now #$00 for even row or #$FF for odd row
+  EOR #$0F ; Acc now #$0F for even row or #$F0 for odd row
   RTS
 
 decompresspage:
@@ -928,7 +928,20 @@ dectodwloop1:
 dectodwexit:
   LDA TEXTBUF+0
   CMP #$60
-  BNE dectodwpositive
+  ; BNE dectodwpositive
+  ; JMP dwordnegate
+  BEQ dwordnegate
+dectodwpositive:
+  RTS
+
+dwordmul2:
+  ASL DWORDBUF+0
+  ROL DWORDBUF+1
+  ROL DWORDBUF+2
+  ROL DWORDBUF+3
+  RTS
+
+dwordnegate:
   ; negate DWORDBUF
   SEC
   LDX #-4
@@ -939,15 +952,9 @@ dectodwloop2:
   STA DWORDBUF+4,X
   INX
   BNE dectodwloop2
-dectodwpositive:
-  RTS
 
-dwordmul2:
-  ASL DWORDBUF+0
-  ROL DWORDBUF+1
-  ROL DWORDBUF+2
-  ROL DWORDBUF+3
-  RTS
+dwordtodec:
+; Subroutine: Convert value in DWORDBUF to decimal as unsigned.
 
 dwordtohex:
 ; Subroutine: Convert value in DWORDBUF to uppercase hexadecimal.
@@ -1308,12 +1315,14 @@ textdeleteshiftloop:
   BCS textdeleteshiftloopexit
   LDA (TCURSORLO),Y
   DEY
+  JSR waithscanx
   STA (TCURSORLO),Y
   INY
   BNE textdeleteshiftloop ; BRA: Y is nonzero here
 textdeleteshiftloopexit:
   DEY
   LDA #$20 ; put a space in last column
+  JSR waithscanx
   STA (TCURSORLO),Y
   PLA ; restore cursor position
   STA TCURSORLO
@@ -1329,19 +1338,22 @@ textinsert:
   LDA TCURSORLO
   AND #$E0
   STA TCURSORLO
+  LDA #$7F
 textinsertshiftloop:
+  PHA
   LDA (TCURSORLO),Y
+  STA SRSCRATCH+11
+  PLA
+  JSR waithscanx
+  STA (TCURSORLO),Y
+  LDA SRSCRATCH+11
   INY
   CPY #$20
   BCS textinsertshiftloopexit
-  STA (TCURSORLO),Y
   BCC textinsertshiftloop ; BRA: carry clear this side of BCS branch
 textinsertshiftloopexit:
   PLA ; restore cursor position
   STA TCURSORLO
-  LDY #$00
-  LDA #$20 ; put a space in current column
-  STA (TCURSORLO),Y
   PLA ; restore Acc
   RTS
 
