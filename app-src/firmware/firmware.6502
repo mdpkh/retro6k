@@ -570,7 +570,7 @@ test:
   INX
   JSR pcscandec
   LDA INRADIX
-  BNE 6 ; skip JSR and JMP
+  BNE *+8 ; skip JSR and JMP
   JSR dectodword
   JMP testaftertodw
   JSR hextodword
@@ -653,32 +653,32 @@ clearscreenloop1:
   STA $0800,X
   STA $0900,X
   CPX #$40
-  BCC 2 ; skip next if X < $40
+  BCC *+4 ; skip next if X < $40
   LDA COBYTES+0
   STA $0A00,X
   LDA COBYTES+0
   CPX #$60
-  BCC 2 ; skip next if X < $60
+  BCC *+4 ; skip next if X < $60
   LDA COBYTES+1
   STA $0B00,X
   LDA COBYTES+1
   CPX #$80
-  BCC 2 ; skip next if X < $80
+  BCC *+4 ; skip next if X < $80
   LDA COBYTES+2
   STA $0C00,X
   LDA COBYTES+2
   CPX #$A0
-  BCC 2 ; skip next if X < $A0
+  BCC *+4 ; skip next if X < $A0
   LDA COBYTES+3
   STA $0D00,X
   LDA COBYTES+3
   CPX #$C0
-  BCC 2 ; skip next if X < $C0
+  BCC *+4 ; skip next if X < $C0
   LDA COBYTES+4
   STA $0E00,X
   LDA COBYTES+4
   CPX #$E0
-  BCS 3 ; skip next if X >= $E0
+  BCS *+5 ; skip next if X >= $E0
   STA $0F00,X
   INX
   BEQ clearscreenfinish
@@ -726,7 +726,7 @@ coptrcalc:
 calcrownybble:
   LDA TCURSORLO
   AND #$20
-  BEQ 2
+  BEQ *+4
   LDA #$FF ; Acc now #$00 for even row or #$FF for odd row
   EOR #$0F ; Acc now #$0F for even row or #$F0 for odd row
   RTS
@@ -786,7 +786,7 @@ dcpreadnybble:
   LDA (READHEADBYTE),Y
   STA READBYTEBUF
   INC READHEADBYTE
-  BNE 2 ; skip next INC if nonzero
+  BNE *+4 ; skip next INC zp if nonzero
   INC READHEADBYTE+1 ; if low byte zero, increment high byte
   ; extract low nybble (Acc still holds just-read byte)
   AND #$0F
@@ -809,7 +809,7 @@ dcpreadnybbleendif:
   TXA
   LSR A
   LSR A
-  BNE 2 ; skip next LDA if nonzero
+  BNE *+4 ; skip next LDA if nonzero
   LDA #$04 ; replace 0 digit with 4
   STA RUNDIGIT
   ; is this a continuation of a run spec in progress?
@@ -866,7 +866,7 @@ dcpwriterunskip1:
   LDA WRITEBYTEBUF
   STA (WRITEHEADBYTE),Y
   INC WRITEHEADBYTE
-  BNE 1 ; if nonzero, skip next RTS
+  BNE *+3 ; if nonzero, skip next RTS
   RTS ; if zero, page is full, decompression is done
   ; INC DECODELEN ; not needed?
   LDA #$00 ; reset WRITEBYTEBUF and WRITEHEADCRUMB
@@ -896,7 +896,7 @@ dectodword:
   LDX #$00
   LDA TEXTBUF+0
   CMP #$60 ; check for minus sign
-  BNE 1 ; skip next INX
+  BNE *+3 ; skip next INX
   INX
   LDA #$00
   STA DWORDBUF+0
@@ -997,11 +997,11 @@ dwtohexb1: ; do this if Y is even
   LSR A
   LSR A
 dwtohexb2:
-  BEQ 2 ; skip next STY zp if nybble is zero
+  BEQ *+4 ; skip next STY zp if nybble is zero
   STY SRSCRATCH+2
   ORA #$30 ; convert to numeric character
   CMP #$3A ; N := (A in $30-39); C := (A in $3A-3F)
-  BMI 2 ; if A < $3A, skip next ADC
+  BMI *+4 ; if A < $3A, skip next ADC
   ADC #$06 ; if lo nybble > 9, convert to letter (C is set; effectively add 7)
   STA TEXTBUF+8,Y
   DEY
@@ -1045,7 +1045,7 @@ hextodword:
   LDX #$00
   LDA TEXTBUF+0
   CMP #$60 ; check for minus sign
-  BNE 1 ; skip next INX
+  BNE *+3 ; skip next INX
   INX
   LDA #$00
   STA DWORDBUF+0
@@ -1064,7 +1064,7 @@ hextodwloop1:
   DEY
   BNE hextodwloop1
   CMP #$3A
-  BCC 2 ; skip next SBC
+  BCC *+4 ; skip next SBC
   SBC #$07 ; carry set this side of previous BCC, subtract 7
   AND #$0F ; extract nybble
   ORA DWORDBUF+0
@@ -1314,7 +1314,7 @@ textbackspace:
   ; do nothing if cursor is in leftmost column
   LDA TCURSORLO
   AND #$1F
-  BNE 1
+  BNE *+3
   RTS
   JSR cursorleft
   ; fall through to textdelete
@@ -1393,7 +1393,7 @@ beepdelayloop:
   JSR waitvscana
   AND #$CC
   CMP VIDEOSTATE
-  BNE -5
+  BNE *-3
   DEY
   BNE beepdelayloop
   LDA #$00
@@ -1441,7 +1441,7 @@ cursordown:
 cursorhide:
   LDA TCBLINK
   AND #$10
-  BNE 1 ; if cursor in 'off' phase, return
+  BNE *+3 ; if cursor in 'off' phase, return
   RTS
   LDA #$00 ; set cursor cycle to reflect 'off'
   STA TCBLINK
@@ -1499,7 +1499,7 @@ cursortick:
   ADC #$01
   STA TCBLINK
   AND #$0F
-  BEQ 1
+  BEQ *+3
   RTS
   ; fall through to cursortoggle
 
@@ -1555,7 +1555,7 @@ waithscanx:
   TAX
   PLA
   CPX VIDEOSTATE
-  BNE -5
+  BNE *-3
   RTS
 
 waithscany:
@@ -1569,7 +1569,7 @@ waithscany:
   TAY
   PLA
   CPY VIDEOSTATE
-  BNE -5
+  BNE *-3
   RTS
 
 waitscanx:
@@ -1577,7 +1577,7 @@ waitscanx:
 ; Side effects: X register is clobbered
   LDX WSTARGET
   CPX VIDEOSTATE
-  BNE -5
+  BNE *-3
   RTS
 
 waitvscana:
@@ -1589,7 +1589,7 @@ waitvscana:
   ORA #$20
   ; wait for start of vertical retrace
   CMP VIDEOSTATE
-  BNE -5 ; CMP again
+  BNE *-3 ; CMP again
   RTS
 
 nmicode: ; empty, because NMI not presently used
