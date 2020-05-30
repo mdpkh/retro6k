@@ -492,7 +492,6 @@ pcscancmdloop:
   CMP #"T"
   BEQ test
   BNE pcscancmderror ; BRA else
-  BEQ pcscancmdnext
 pcscancmdnext:
   INX
   CPX #$20
