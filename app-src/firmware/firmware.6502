@@ -480,6 +480,13 @@ pcscanstartnext:
 pcscanstarterror:
   JSR beep
   BEQ readcommand ; BRA: Z flag set by beep
+pcscancmdnext:
+  INX
+  CPX #$20
+  BCC pcscancmdloop
+pcscancmderror:
+  JSR beep
+  BEQ readcommand ; BRA: Z flag set by beep
 pcscancmdloop:  
   LDA CMDBUF,X
   CMP #$20 ; leading spaces allowed
@@ -492,13 +499,6 @@ pcscancmdloop:
   CMP #"T"
   BEQ test
   BNE pcscancmderror ; BRA else
-pcscancmdnext:
-  INX
-  CPX #$20
-  BCC pcscancmdloop
-pcscancmderror:
-  JSR beep
-  BEQ readcommand ; BRA: Z flag set by beep
 pcscandec:
   LDY #$00
   STY INRADIX
