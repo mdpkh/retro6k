@@ -188,7 +188,6 @@ initscreencrcolloop:
   INY
   CPY #$20
   BCC initscreencrcolloop
-  STA DEBUGLOG
 initscreenrowadvance:
   CLC
   LDA POINTER0+0
@@ -646,7 +645,6 @@ clearscreen:
   LDX #$00
 clearscreenloop0:
   JSR waitvscana
-;  STA DEBUGLOG
 clearscreenloop1:
   LDA #$20
   STA $0800,X
