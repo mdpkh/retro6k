@@ -3,8 +3,8 @@
 CMDBUF     = $00 ; 32 bytes
 INRADIX    = $20 ; 0=decimal; 1=hexadecimal
 INDIRECT   = $21 ; count of @ in currently-scanning number
-DESTSIZE   = $22 ; 0=byte; 1=word; 2=dword; 3=char*16; 4=zterm; 5=page
-SRCSIZE    = $23 ; 0=byte; 1=word; 2=dword; 3=char*16; 4=zterm; 5=page
+DESTSIZE   = $22 ; 0=byte; 1=word; 2=dword; 3=char*32; 4=zterm; 5=page
+SRCSIZE    = $23 ; 0=byte; 1=word; 2=dword; 3=char*32; 4=zterm; 5=page
 DESTWORD   = $24 ; destination address of memcopy command
 DESTIND    = $26 ; destination indirect count
 SRCDWORD   = $28 ; source address/literal of memcopy command
