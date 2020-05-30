@@ -60,6 +60,8 @@ entry: ; system power-on or reset
   STA FVMCDEST
   LDX #$F0
   STX DLSOFF ; turn off debug log suppression
+  INX
+  STX DLSOFF
   JSR waitvscana
   ; display cartridge identification in bottom of screen
   LDX #$00
@@ -136,7 +138,7 @@ nocart: ; no cartridge inserted
   ; initialize screen display
   LDA #$00
   STA POINTER0+0
-  STA SAVEX
+  STA SRSCRATCH+3
   LDA #$08
   STA POINTER0+1
   LDA #>datatext
@@ -145,10 +147,17 @@ nocart: ; no cartridge inserted
   AND #$CC
   ORA #$02
   STA WSTARGET
+  LDA #$FF
+  STA SAVEX
 initscreenrowloop:
+  LDA SRSCRATCH+3 ; check if we're in the middle of a constant-row run
+  BNE initscreencrcontinue
+  INC SAVEX
   LDX SAVEX
   LDA datascreendef,X
-  BMI initscreenconstrow
+  AND #$0F
+  BNE initscreenconstrow
+  LDA datascreendef,X
   ASL A
   STA POINTER1+0
   LDY #$00
@@ -161,29 +170,39 @@ initscreendrloop:
   BCC initscreendrloop
   BCS initscreenrowadvance ; BRA
 initscreenconstrow:
-  AND #$7F
+  STA SRSCRATCH+3 ; save runlen
+initscreencrcontinue:
+  LDX SAVEX
+  LDA datascreendef,X ; get index into table of constant values
+  LSR A
+  LSR A
+  LSR A
+  LSR A
   TAY
   LDA datascreenconst,Y
   LDY #$00
+  DEC SRSCRATCH+3 ; decrement runlen
 initscreencrcolloop:
   JSR waitscanx
   STA (POINTER0),Y
   INY
   CPY #$20
   BCC initscreencrcolloop
+  STA DEBUGLOG
 initscreenrowadvance:
   CLC
   LDA POINTER0+0
   ADC #$20
   STA POINTER0+0
-  BCC 2 ; skip INC zp
+  BCC initscreencheckend ; if POINTER0 didn't change pages, check for exit contition below
   INC POINTER0+1
-  LDX SAVEX
-  INX
-  STX SAVEX
-  CPX #$3F
-  BCC initscreenrowloop
-
+  BCS initscreenrowloop ; BRA
+initscreencheckend:
+  CMP #$E0
+  BNE initscreenrowloop ; if POINTER0 low byte == #$E0, inspect high byte
+  LDA POINTER0+1
+  CMP #$0F
+  BCC initscreenrowloop ; if POINTER0 >= $0FE0, exit loop now
   ; copy a few extra characters from Bank E font to video memory
   LDA #$10 ; destination page: screen font row 0
   STA FVMCDEST
@@ -1576,31 +1595,28 @@ waitvscana:
 nmicode: ; empty, because NMI not presently used
   RTI
 
-  .org $FA40
-datagfx:
-  .incbin firmwaregfx.compressed
-datascreenconst:
-  .byte $20,$CC,$C0,$00,$0C ; screendef $80-$84
-datalogocolors: .align 3
+  .org $FA6F
+datalogocolors:
   .byte $CC,$CC,$8A,$8C,$CE,$EE,$EC,$CC
   .byte $AC,$AE,$EE,$EC,$C8,$C8,$AA,$CA
   .byte $8C,$8C,$EE,$EC,$CA,$EA,$EE,$CE
   .byte $EA,$EA,$CC,$CA,$AE,$AE,$88,$A8
   .byte $8A,$88,$A8,$AA,$A8,$88,$CE,$AE
-datasyscolors: .align 5
+datasyscolors:
   .byte $00,$81,$84,$0D,$02,$83,$86,$0F
   .byte $D0,$59,$5C,$DD,$D2,$5B,$5E,$DF
   .byte $20,$A1,$A4,$2D,$22,$A3,$A6,$2F
   .byte $F0,$79,$7C,$FD,$F2,$7B,$7E,$FF
-datascreendef: .align 6
-  .byte $00,$80,$10,$20,$80,$00,$30,$40
-  .byte $50,$80,$80,$80,$80,$80,$80,$80
-  .byte $80,$80,$81,$81,$81,$81,$81,$81
-  .byte $81,$81,$81,$81,$81,$81,$81,$81
-  .byte $81,$81,$81,$81,$81,$81,$81,$81
-  .byte $81,$81,$81,$81,$81,$81,$81,$81
-  .byte $82,$83,$83,$83,$83,$83,$81,$81
-  .byte $81,$84,$83,$83,$83,$83,$83
+datascreendef:
+  .byte $00,$01,$10,$20,$01,$00,$30,$40,$50
+  .byte $09
+  .byte $1F,$1F
+  .byte $21,$35
+  .byte $13,$41,$35
+datascreenconst:
+  .byte $20,$CC,$C0,$00,$0C ; screendef AND $0F != $00 (low nybble is run count, high nybble is index)
+datagfx:
+  .incbin firmwaregfx.compressed
 datatext: .align 8
   .text ". \xFE\xFF \x80\x81 .  \x0E  \x0E  \x0E  \x0E  . \xFE\xFF \x80\x81 ." ; screendef $00
   .text "\x8F   Retro 6k Fantasy Computer  \x8F" ; screendef $10
