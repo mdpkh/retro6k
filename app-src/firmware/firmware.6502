@@ -3,12 +3,13 @@
 CMDBUF     = $00 ; 32 bytes
 INRADIX    = $20 ; 0=decimal; 1=hexadecimal
 INDIRECT   = $21 ; count of @ in currently-scanning number
-DESTSIZE   = $22 ; 0=byte; 1=word; 2=dword; 3=char*32; 4=zterm; 5=page
-SRCSIZE    = $23 ; 0=byte; 1=word; 2=dword; 3=char*32; 4=zterm; 5=page
+MEMASSIGN  = $22 ; nonzero if scanned number ends with = sign
 DESTWORD   = $24 ; destination address of memcopy command
 DESTIND    = $26 ; destination indirect count
 SRCDWORD   = $28 ; source address/literal of memcopy command
 SRCIND     = $2C ; source indirect count
+DESTSIZE   = $2E ; 1=byte; 2=word; 4=dword; 32=char*32; 0=zterm
+SRCSIZE    = $2F ; 1=byte; 2=word; 4=dword; 32=char*32; 0=zterm
 
 ; zeropage addresses used in subroutines
 TEXTBUF   = $80 ; up to 16 bytes
@@ -59,9 +60,10 @@ entry: ; system power-on or reset
   STA FVMCSRC
   STA FVMCDEST
   LDX #$F0
+dlsoffloop:
   STX DLSOFF ; turn off debug log suppression
   INX
-  STX DLSOFF
+  BNE dlsoffloop
   JSR waitvscana
   ; display cartridge identification in bottom of screen
   LDX #$00
@@ -463,8 +465,11 @@ pccopyloop:
   JSR printch
   LDA #$0A
   JSR printch
+  ; initialize MEMASSIGN, for memory commands
+  LDA #$00
+  STA MEMASSIGN
   ; scan CMDBUF for command start indicator (">")
-  LDX #$00
+  TAX ; one byte shorter than LDX #$00
 pcscanstartloop:
   LDA CMDBUF,X
   CMP #$20 ; leading spaces allowed
@@ -494,19 +499,29 @@ pcscancmdloop:
   CMP #"C"
   BEQ clearscreen
   CMP #"R"
-  BEQ entry
-  CMP #"T"
-  BEQ test
+  BEQ entry ; TODO: test following character for rb=reboot, ri=return from int, rs = return from sub
+pcmemchartests:
+  CMP #"B"
+  BEQ pcmemb
+  CMP #"D"
+  BEQ pcmemd
+  CMP #"W"
+  BEQ pcmemw
   BNE pcscancmderror ; BRA else
 pcscandec:
   LDY #$00
   STY INRADIX
+  STY INDIRECT
 pcscandecloop:
   LDA CMDBUF,X
   CMP #$20 ; skip copying spaces
   BEQ pcscandecskip
+  CMP #$12 ; count indirect symbols
+  BEQ pcscandecind
   CMP #$14 ; if "$" encountered, switch to scanning for hex (and skip $)
   BEQ pcscanhexskip
+  CMP #$3D ; note trailing =
+  BEQ pcscandecexiteq
   CMP #$60 ; copy if A == "-"
   BEQ pcscandeccopy
   CMP #$30 ; stop copying if A < "0"
@@ -522,6 +537,12 @@ pcscandecskip:
   BCS pcscandecexitnonull
   CPX #$20
   BCC pcscandecloop
+  BCS pcscandecexit ; BRA
+pcscandecind:
+  INC INDIRECT
+  BNE pcscandecskip ; BRA
+pcscandecexiteq:
+  INC MEMASSIGN
 pcscandecexit:
   LDA #$00
   STA TEXTBUF,Y
@@ -535,6 +556,8 @@ pcscanhexloop:
   BEQ pcscanhexskip
   CMP #$14 ; skip copying "$"s
   BEQ pcscanhexskip
+  CMP #$3D ; note trailing =
+  BEQ pcscanhexexiteq
   CMP #$30 ; stop copying if A < "0"
   BCC pcscanhexexit
   CMP #$67 ; stop copying if A > "f"
@@ -556,6 +579,9 @@ pcscanhexskip:
   BCS pcscanhexexitnonull
   CPX #$20
   BCC pcscanhexloop
+  BCS pcscanhexexit ; BRA
+pcscanhexexiteq:
+  INC MEMASSIGN
 pcscanhexexit:
   LDA #$00
   STA TEXTBUF,Y
@@ -563,39 +589,77 @@ pcscanhexexitnonull:
   LDA #$01
   STA INRADIX
   RTS
-
-test:
+pcmemreadnextarg:
+  LDA CMDBUF,X
+  AND #$DF ; case-insensitive comparisons follow
+  JMP pcmemchartests ; re-use logic from above
+pcmemb:
+  LDA #$01
+  STA SRCSIZE
+  BNE pcmemreadarg ; BRA
+pcmemw:
+  LDA #$02
+  STA SRCSIZE
+  BNE pcmemreadarg ; BRA
+pcmemd:
+  LDA #$04
+  STA SRCSIZE
+  ; BRA pcmemreadarg
+pcmemreadarg:
   INX
   JSR pcscandec
   LDA INRADIX
   BNE *+8 ; skip JSR and JMP
   JSR dectodword
-  JMP testaftertodw
+  JMP pcmemaccept
   JSR hextodword
-testaftertodw:
+pcmemaccept:
+  LDA MEMASSIGN
+  BEQ pcmemreadout
+  CMP #$02 ; MEMASSIGN == 2 -> we have now read both dest and src
+  BCS pcmemassign
+  INC MEMASSIGN
+  LDA DWORDBUF+0
+  STA DESTWORD+0
+  LDA DWORDBUF+1
+  STA DESTWORD+1
+  LDA SRCSIZE
+  STA DESTSIZE
+  BCC pcmemreadnextarg ; BRA
+pcmemreadout:
   JSR dwordtohex
-  LDA TCURSORLO
-  ORA #$08
-  STA TCURSORLO
-  JSR waitvscana
-  TXA
-  EOR #$FF
-  CLC
-  ADC #$31
-  LDY #$00
-  STA (TCURSORLO),Y
   LDA TCURSORLO
   ORA #$10
   STA TCURSORLO
-testdwtohexloop:
-  LDA TEXTBUF+8,Y
+  LDA #$07
+  EOR SRCSIZE
+  SEC
+  ROL
+  TAY ; set Y to 15 - 2 * SRCSIZE
+  LDA #$14 ; "$"
+  JSR waithscanx
   STA (TCURSORLO),Y
   INY
-  CPY #$08
-  BCC testdwtohexloop
+pcmemdwtohexloop:
+  LDA TEXTBUF,Y
+  JSR waithscanx
+  STA (TCURSORLO),Y
+  INY
+  CPY #$10
+  BCC pcmemdwtohexloop
   LDA #$0D
   JSR printch
   LDA #$0A
+  JSR printch
+  JMP readcommand
+pcmemassign:
+  LDY #$00
+  LDA TCURSORLO
+  ORA #$1E
+  STA TCURSORLO
+  LDA #$4F ; "O"
+  JSR printch
+  LDA #$4B ; "K"
   JSR printch
   JMP readcommand
 
@@ -1592,7 +1656,7 @@ waitvscana:
 nmicode: ; empty, because NMI not presently used
   RTI
 
-  .org $FA6F
+  .org $FAA9
 datalogocolors:
   .byte $CC,$CC,$8A,$8C,$CE,$EE,$EC,$CC
   .byte $AC,$AE,$EE,$EC,$C8,$C8,$AA,$CA
