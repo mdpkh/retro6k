@@ -722,7 +722,8 @@ void DoDebugger(bool toplevel) {
 	int displaystart = debuglogend - displaylines - unimportanttail;
 	SDL_Rect animrect = winpos;
 	SDL_Rect menurect = { 0, 0, winpos.w, winpos.h };
-	for (int t = 1; t <= 8; ++t)
+	static bool animatewindow = true;
+	for (int t = animatewindow ? 1 : 8; t <= 8; ++t)
 	{
 		SDL_SetSurfaceAlphaMod(winbuffer, t * 31);
 		animrect.w = winpos.w * t / 8;
@@ -733,6 +734,7 @@ void DoDebugger(bool toplevel) {
 		SDL_UpdateWindowSurface(mainwindow);
 		SDL_Delay(16);
 	}
+	animatewindow = true;
 	bool repaintlog = true;
 	bool showemumenu = !toplevel;
 	breakpreexecute = false;
@@ -763,6 +765,7 @@ void DoDebugger(bool toplevel) {
 						breakafterrts = true;
 					else
 						breakpreexecute = true;
+					animatewindow = false;
 					goto exitdebugger;
 				case SDLK_HOME:
 					displaystart = debuglogstart;
@@ -1048,17 +1051,20 @@ void DoDebugger(bool toplevel) {
 	}
 exitdebugger:
 	animrect.x = winpos.x;
-	for (int t = 7; t > 0; --t)
+	if (animatewindow)
 	{
-		SDL_SetSurfaceAlphaMod(winbuffer, t * 31);
-		animrect.h = winpos.h * t / 8;
-		menurect.h = animrect.h;
-		menurect.y = winpos.h - animrect.h;
-		animrect.y = (mwsurface->h - animrect.h) >> 1;
-		SDL_BlitSurface(restorescreen, NULL, mwsurface, &winpos);
-		SDL_BlitSurface(winbuffer, &menurect, mwsurface, &animrect);
-		SDL_UpdateWindowSurface(mainwindow);
-		SDL_Delay(16);
+		for (int t = 7; t > 0; --t)
+		{
+			SDL_SetSurfaceAlphaMod(winbuffer, t * 31);
+			animrect.h = winpos.h * t / 8;
+			menurect.h = animrect.h;
+			menurect.y = winpos.h - animrect.h;
+			animrect.y = (mwsurface->h - animrect.h) >> 1;
+			SDL_BlitSurface(restorescreen, NULL, mwsurface, &winpos);
+			SDL_BlitSurface(winbuffer, &menurect, mwsurface, &animrect);
+			SDL_UpdateWindowSurface(mainwindow);
+			SDL_Delay(16);
+		}
 	}
 	SDL_BlitSurface(restorescreen, NULL, mwsurface, &winpos);
 	SDL_FreeSurface(restorescreen);
