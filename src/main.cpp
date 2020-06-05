@@ -93,6 +93,7 @@ int debuglogend = 1;
 int debuglogexpectargs = 0;
 unsigned char stackbase;
 dlogentry* partialinst = nullptr;
+bool breakpreexecute = false;
 std::random_device seedgen;
 std::mt19937 floatgen;
 std::mt19937 noisegen;
@@ -665,7 +666,7 @@ exitabout:
 	SDL_FreeSurface(winbuffer);
 }
 
-void DoDebugger() {
+void DoDebugger(bool toplevel) {
 	SDL_Surface* winbuffer = SDL_CreateRGBSurfaceWithFormat(
 		0,
 		480,
@@ -706,12 +707,18 @@ void DoDebugger() {
 	SDL_UpdateWindowSurface(mainwindow);
 	SDL_BlitSurface(mwsurface, &winpos, restorescreen, NULL);
 	PaintWindow(winbuffer, 0xff, 0x0b, "Debug Log", 0xff);
-	const char* keyshint = "F: Find  \x97  Left/Right: Move Window  \x97  0/Esc: Close Log";
-	int tx0 = (winpos.w - TextWidth(keyshint)) >> 1;
-	DrawText(keyshint, tx0, winpos.h - 20, 0x03, 0xff, winbuffer);
-	int displaylines = (winpos.h - 40) / 16;
-	int dy0 = (winpos.h - displaylines * 16) >> 1;
-	int displaystart = debuglogend - displaylines - 1;
+	const char* keyshint1 = "F: Find  \x97  Left/Right: Move Window  \x97  0/Esc: Emu Menu";
+	int tx0 = (winpos.w - TextWidth(keyshint1)) >> 1;
+	DrawText(keyshint1, tx0, winpos.h - 36, 0x03, 0xff, winbuffer);
+	const char* keyshint2 = "F5: Continue  \x97  F8: Step  \x97  Shift+F8: Exec Sub & Break";
+	tx0 = (winpos.w - TextWidth(keyshint2)) >> 1;
+	DrawText(keyshint2, tx0, winpos.h - 20, 0x03, 0xff, winbuffer);
+	int displaylines = (winpos.h - 56) / 16;
+	int dy0 = (winpos.h - displaylines * 16 - 16) >> 1;
+		int unimportanttail = 0;
+		if (debuglog[(debuglogend - 1) & dlogidxmask].entrytype == dletype::LT_PARTIALINST)
+			unimportanttail = 1;
+	int displaystart = debuglogend - displaylines - unimportanttail;
 	SDL_Rect animrect = winpos;
 	SDL_Rect menurect = { 0, 0, winpos.w, winpos.h };
 	for (int t = 1; t <= 8; ++t)
@@ -726,6 +733,8 @@ void DoDebugger() {
 		SDL_Delay(16);
 	}
 	bool repaintlog = true;
+	bool showemumenu = !toplevel;
+	breakpreexecute = false;
 	while (true)
 	{
 		SDL_Event event;
@@ -742,13 +751,21 @@ void DoDebugger() {
 				case SDLK_0:
 				case SDLK_KP_0:
 				case SDLK_ESCAPE:
+					showemumenu = true;
+					goto exitdebugger;
+				case SDLK_F5:
+					showemumenu = false;
+					goto exitdebugger;
+				case SDLK_F8:
+					showemumenu = false;
+					breakpreexecute = true;
 					goto exitdebugger;
 				case SDLK_HOME:
 					displaystart = debuglogstart;
 					repaintlog = true;
 					break;
 				case SDLK_END:
-					displaystart = debuglogend - displaylines - 1;
+					displaystart = debuglogend - displaylines - unimportanttail;
 					repaintlog = true;
 					break;
 				case SDLK_PAGEUP:
@@ -839,7 +856,7 @@ void DoDebugger() {
 		}
 		if (repaintlog)
 		{
-			SDL_Rect boxrect = { 2, 19, winpos.w - 4, winpos.h - 39 };
+			SDL_Rect boxrect = { 2, dy0, winpos.w - 4, displaylines * 16 };
 			SDL_FillRect(winbuffer, &boxrect, 0xff);
 			div_t dr;
 			for (int i = displaystart, j = 0, y = dy0; j < displaylines; ++i, ++j, y += 16)
@@ -1042,6 +1059,8 @@ exitdebugger:
 	SDL_BlitSurface(restorescreen, NULL, mwsurface, &winpos);
 	SDL_FreeSurface(restorescreen);
 	SDL_FreeSurface(winbuffer);
+	if (toplevel && showemumenu)
+		DoMenu(0);
 }
 
 void DoMenu(int quickoption)
@@ -1372,7 +1391,7 @@ void DoMenu(int quickoption)
 				SDL_SetSurfaceAlphaMod(menubuffer, 0xaa);
 				SDL_BlitSurface(restorescreen, NULL, mwsurface, &winpos);
 				SDL_BlitSurface(menubuffer, &menurect, mwsurface, &animrect);
-				DoDebugger();
+				DoDebugger(false);
 				SDL_SetSurfaceAlphaMod(menubuffer, 0xf8);
 				SDL_BlitSurface(restorescreen, NULL, mwsurface, &winpos);
 				SDL_BlitSurface(menubuffer, &menurect, mwsurface, &animrect);
@@ -2696,6 +2715,8 @@ void LogRead(uint16_t address, uint8_t value)
 		{
 			partialinst->entrytype = dletype::LT_INST;
 			partialinst = nullptr;
+			if (breakpreexecute)
+				DoDebugger();
 		}
 	}
 	else
@@ -3652,7 +3673,7 @@ extern "C" void write6502(uint16_t address, uint8_t value)
 			break;
 		case 0xff:
 			if (value)
-				DoMenu(3);
+				DoDebugger();
 			break;
 		}
 	}
