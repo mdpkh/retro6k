@@ -535,7 +535,7 @@ void DisplayHexWord(char* dest, short val);
 void DisplayMemType(char* dest, pageflags pf);
 void DisplayOpcode(char* dest, unsigned char opc);
 void DoAbout();
-void DoDebugger();
+void DoDebugger(bool toplevel = true);
 void DoMenu(int quickoption);
 void DoPickFile(filetype ft, std::string &path);
 void DrawLogo(int x0, int y0, SDL_Surface* destsurf);
