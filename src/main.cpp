@@ -94,6 +94,7 @@ int debuglogexpectargs = 0;
 unsigned char stackbase;
 dlogentry* partialinst = nullptr;
 bool breakpreexecute = false;
+bool breakafterrts = false;
 std::random_device seedgen;
 std::mt19937 floatgen;
 std::mt19937 noisegen;
@@ -758,7 +759,10 @@ void DoDebugger(bool toplevel) {
 					goto exitdebugger;
 				case SDLK_F8:
 					showemumenu = false;
-					breakpreexecute = true;
+					if (event.key.keysym.mod & KMOD_SHIFT)
+						breakafterrts = true;
+					else
+						breakpreexecute = true;
 					goto exitdebugger;
 				case SDLK_HOME:
 					displaystart = debuglogstart;
@@ -2708,6 +2712,11 @@ void LogRead(uint16_t address, uint8_t value)
 			partialinst->entrytype = dletype::LT_INST;
 			if (breakpreexecute)
 				DoDebugger();
+			if (breakafterrts && partialinst->instentry.opc == 0x60)
+			{
+				breakafterrts = false;
+				breakpreexecute = true;
+			}
 			partialinst = nullptr;
 		}
 	}
