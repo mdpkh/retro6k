@@ -2703,6 +2703,13 @@ void LogRead(uint16_t address, uint8_t value)
 		partialinst->instentry.opc = value;
 		debuglogexpectargs = nargsbyopcode[value];
 		partialinst->instentry.nargs = 0;
+		if (!debuglogexpectargs)
+		{
+			partialinst->entrytype = dletype::LT_INST;
+			if (breakpreexecute)
+				DoDebugger();
+			partialinst = nullptr;
+		}
 	}
 	else if (debuglogexpectargs)
 	{
