@@ -542,6 +542,8 @@ pcscandecind:
   INC INDIRECT
   BNE pcscandecskip ; BRA
 pcscandecexiteq:
+  LDA MEMASSIGN
+  BNE pcscancmderror
   INC MEMASSIGN
 pcscandecexit:
   LDA #$00
@@ -581,6 +583,8 @@ pcscanhexskip:
   BCC pcscanhexloop
   BCS pcscanhexexit ; BRA
 pcscanhexexiteq:
+  LDA MEMASSIGN
+  BNE pcscancmderror
   INC MEMASSIGN
 pcscanhexexit:
   LDA #$00
@@ -590,7 +594,12 @@ pcscanhexexitnonull:
   STA INRADIX
   RTS
 pcmemreadnextarg:
+  INX
+  CPX #$1F
+  BCS pcscancmderror
   LDA CMDBUF,X
+  CMP #$20
+  BEQ pcmemreadnextarg
   AND #$DF ; case-insensitive comparisons follow
   JMP pcmemchartests ; re-use logic from above
 pcmemb:
@@ -954,7 +963,7 @@ dcpwriterundone:
   ; nonzero, but it seems to be too far for a branch to jump
 
 dectodword:
-  LDX #$00
+  STX SAVEX
   LDA TEXTBUF+0
   CMP #$60 ; check for minus sign
   BNE *+3 ; skip next INX
@@ -964,12 +973,13 @@ dectodword:
   STA DWORDBUF+1
   STA DWORDBUF+2
   STA DWORDBUF+3
+  STA SRSCRATCH+12
+  TAX
 dectodwloop0:
   LDA TEXTBUF,X
   BEQ dectodwexit ; stop at null byte
   ; multiply DWORDBUF by 10
   JSR dwordmul2
-  STX SAVEX
   LDX #-4
 dectodwloop3:
   LDA DWORDBUF+4,X
@@ -986,14 +996,13 @@ dectodwloop4:
   STA DWORDBUF+4,X
   INX
   BNE dectodwloop4
-  LDX SAVEX
-  ; add new digit
+  LDX SRSCRATCH+12
+  ; done multiplying by 10, now add new digit
   LDA TEXTBUF,X
   AND #$0F
   CLC
   ADC DWORDBUF+0
   STA DWORDBUF+0
-  STX SAVEX
   LDX #-3
 dectodwloop1:
   LDA DWORDBUF+4,X
@@ -1001,11 +1010,12 @@ dectodwloop1:
   STA DWORDBUF+4,X
   INX
   BNE dectodwloop1
-  LDX SAVEX
-  INX
+  INC SRSCRATCH+12
+  LDX SRSCRATCH+12
   CPX #$10
   BCC dectodwloop0
 dectodwexit:
+  LDX SAVEX
   LDA TEXTBUF+0
   CMP #$60
   ; BNE dectodwpositive
