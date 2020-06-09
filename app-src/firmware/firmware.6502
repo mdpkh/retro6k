@@ -634,8 +634,40 @@ pcmemaccept:
   STA DESTWORD+1
   LDA SRCSIZE
   STA DESTSIZE
+  LDA INDIRECT
+  STA DESTIND
   BCC pcmemreadnextarg ; BRA
 pcmemreadout:
+  LDA INDIRECT
+  STA SRCIND
+  STA DEBUGLOG
+  BEQ pcmrfinalsrc
+pcmrsrcindloop:
+  JSR waitscanx2
+  LDA (DWORDBUF),Y
+  STA POINTER1+0
+  PHA
+  INY
+  JSR waitscanx2
+  LDA (DWORDBUF),Y
+  STA POINTER1+1
+  PHA
+  INY
+  JSR waitscanx2
+  LDA (DWORDBUF),Y
+  STA DWORDBUF+2
+  INY
+  JSR waitscanx2
+  LDA (DWORDBUF),Y
+  STA DWORDBUF+3
+  LDY #$00
+  PLA
+  STA DWORDBUF+1
+  PLA
+  STA DWORDBUF+0
+  DEC SRCIND
+  BNE pcmrsrcindloop
+pcmrfinalsrc:
   JSR dwordtohex
   LDA TCURSORLO
   ORA #$10
@@ -658,7 +690,83 @@ pcmemdwtohexloop:
   BCC pcmemdwtohexloop
   JMP readcommand
 pcmemassign:
+  LDX #-4
+  LDA INDIRECT
+  STA SRCIND
+pcmacopysrcdwordloop:
+  LDA DWORDBUF+4,X
+  STA SRCDWORD+4,X
+  INX
+  BNE pcmacopysrcdwordloop
   LDY #$00
+  LDA DESTIND
+  BEQ pcscancmderror
+pcmadestindloop:
+  DEC DESTIND
+  BEQ pcmafinaldest
+  JSR waithscanx
+  LDA (DESTWORD),Y
+  PHA
+  INY
+  JSR waitscanx2
+  LDA (DESTWORD),Y
+  STA DESTWORD+1
+  DEY
+  PLA
+  STA DESTWORD+0
+  JMP pcmadestindloop
+pcmafinaldest:
+  LDA SRCIND
+  BEQ pcmafinalsrc
+pcmasrcindloop:
+  JSR waitscanx2
+  LDA (SRCDWORD),Y
+  STA POINTER1+0
+  PHA
+  INY
+  JSR waitscanx2
+  LDA (SRCDWORD),Y
+  STA POINTER1+1
+  PHA
+  INY
+  JSR waitscanx2
+  LDA (SRCDWORD),Y
+  STA SRCDWORD+2
+  INY
+  JSR waitscanx2
+  LDA (SRCDWORD),Y
+  STA SRCDWORD+3
+  LDY #$00
+  PLA
+  STA SRCDWORD+1
+  PLA
+  STA SRCDWORD+0
+  DEC SRCIND
+  BNE pcmasrcindloop
+pcmafinalsrc:
+  LDA SRCSIZE
+  CMP DESTSIZE
+  BCS pcmacopyprim
+  ; sign extend if necessary
+  TAX
+  LDA SRCDWORD-1,X
+  ORA #$7F
+  BMI pcmasignextloop
+  LDA #$00
+pcmasignextloop:
+  STA SRCDWORD,X
+  INX
+  CPX #$04
+  BCC pcmasignextloop
+pcmacopyprim:
+  ; LDY #$00 ; Y should already be zero
+  pcmacopyprimloop:
+  JSR waithscanx
+  LDA SRCDWORD,Y
+  STA (DESTWORD),Y
+  INY
+  CPY DESTSIZE
+  BCC pcmacopyprimloop
   LDA TCURSORLO
   ORA #$1E
   STA TCURSORLO
@@ -1109,6 +1217,7 @@ fvmcpagecopyloop:
   RTS
 
 hextodword:
+  STX SAVEX
   LDX #$00
   LDA TEXTBUF+0
   CMP #$60 ; check for minus sign
@@ -1154,6 +1263,7 @@ hextodwloop2:
   INX
   BNE hextodwloop2
 hextodwpositive:
+  LDX SAVEX
   RTS
 
 actoncontrolcode:
@@ -1616,7 +1726,7 @@ cursorup:
 waithscanx:
 ; Subroutine: Wait for start of horizontal blanking interval after active
 ; scanline.
-; Side effects: X register is clobbered.
+; Side effects: X register is clobbered in such a way as to set up for waitscanx2.
   PHA
   LDA VIDEOSTATE
   AND #$CC
@@ -1645,6 +1755,7 @@ waitscanx:
 ; Subroutine: Wait for videostate stored in WSTARGET.
 ; Side effects: X register is clobbered
   LDX WSTARGET
+waitscanx2:
   CPX VIDEOSTATE
   BNE *-3
   RTS
@@ -1664,7 +1775,7 @@ waitvscana:
 nmicode: ; empty, because NMI not presently used
   RTI
 
-  .org $FAA9
+  .org $FC00
 datalogocolors:
   .byte $CC,$CC,$8A,$8C,$CE,$EE,$EC,$CC
   .byte $AC,$AE,$EE,$EC,$C8,$C8,$AA,$CA
