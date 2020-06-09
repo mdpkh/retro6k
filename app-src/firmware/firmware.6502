@@ -645,21 +645,18 @@ pcmemreadout:
   SEC
   ROL
   TAY ; set Y to 15 - 2 * SRCSIZE
+  ORA TCURSORLO
+  STA TCURSORLO
+  STA DEBUGLOG
   LDA #$14 ; "$"
-  JSR waithscanx
-  STA (TCURSORLO),Y
+  JSR printch
   INY
 pcmemdwtohexloop:
   LDA TEXTBUF,Y
-  JSR waithscanx
-  STA (TCURSORLO),Y
+  JSR printch
   INY
   CPY #$10
   BCC pcmemdwtohexloop
-  LDA #$0D
-  JSR printch
-  LDA #$0A
-  JSR printch
   JMP readcommand
 pcmemassign:
   LDY #$00
@@ -1177,8 +1174,9 @@ printch:
 ; Subroutine: Print a character identified by Accumulator, at current cursor
 ; location. If control code, act accordingly. Else, assert selected colors at
 ; current cursor location and advance cursor.
-; Side effects: Y register clobbered.
+; Side effects: X register clobbered.
 NCONTROLCODES = 12
+  STY SAVEY
   LDY CONSFLAGS
   BMI printliteral0
   LDY #$00
@@ -1194,6 +1192,7 @@ printliteral1:
   JSR putcolors
   JSR cursoradvance
   PLA
+  LDY SAVEY
   RTS
 
 printliteral0:
