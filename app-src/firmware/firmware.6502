@@ -647,7 +647,6 @@ pcmemreadout:
   TAY ; set Y to 15 - 2 * SRCSIZE
   ORA TCURSORLO
   STA TCURSORLO
-  STA DEBUGLOG
   LDA #$14 ; "$"
   JSR printch
   INY
