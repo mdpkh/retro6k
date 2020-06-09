@@ -640,33 +640,8 @@ pcmemaccept:
 pcmemreadout:
   LDA INDIRECT
   STA SRCIND
-  STA DEBUGLOG
   BEQ pcmrfinalsrc
-pcmrsrcindloop:
-  JSR waitscanx2
-  LDA (DWORDBUF),Y
-  STA POINTER1+0
-  PHA
-  INY
-  JSR waitscanx2
-  LDA (DWORDBUF),Y
-  STA POINTER1+1
-  PHA
-  INY
-  JSR waitscanx2
-  LDA (DWORDBUF),Y
-  STA DWORDBUF+2
-  INY
-  JSR waitscanx2
-  LDA (DWORDBUF),Y
-  STA DWORDBUF+3
-  LDY #$00
-  PLA
-  STA DWORDBUF+1
-  PLA
-  STA DWORDBUF+0
-  DEC SRCIND
-  BNE pcmrsrcindloop
+  JSR pcmemindirectsrc
 pcmrfinalsrc:
   JSR dwordtohex
   LDA TCURSORLO
@@ -690,9 +665,11 @@ pcmemdwtohexloop:
   BCC pcmemdwtohexloop
   JMP readcommand
 pcmemassign:
-  LDX #-4
   LDA INDIRECT
   STA SRCIND
+  BEQ *+5 ; skip following JSR
+  JSR pcmemindirectsrc
+  LDX #-4
 pcmacopysrcdwordloop:
   LDA DWORDBUF+4,X
   STA SRCDWORD+4,X
@@ -716,34 +693,6 @@ pcmadestindloop:
   STA DESTWORD+0
   JMP pcmadestindloop
 pcmafinaldest:
-  LDA SRCIND
-  BEQ pcmafinalsrc
-pcmasrcindloop:
-  JSR waitscanx2
-  LDA (SRCDWORD),Y
-  STA POINTER1+0
-  PHA
-  INY
-  JSR waitscanx2
-  LDA (SRCDWORD),Y
-  STA POINTER1+1
-  PHA
-  INY
-  JSR waitscanx2
-  LDA (SRCDWORD),Y
-  STA SRCDWORD+2
-  INY
-  JSR waitscanx2
-  LDA (SRCDWORD),Y
-  STA SRCDWORD+3
-  LDY #$00
-  PLA
-  STA SRCDWORD+1
-  PLA
-  STA SRCDWORD+0
-  DEC SRCIND
-  BNE pcmasrcindloop
-pcmafinalsrc:
   LDA SRCSIZE
   CMP DESTSIZE
   BCS pcmacopyprim
@@ -775,6 +724,32 @@ pcmacopyprim:
   LDA #$4B ; "K"
   JSR printch
   JMP readcommand
+pcmemindirectsrc:
+  JSR waithscanx
+  LDA (DWORDBUF),Y
+  STA POINTER1+0
+  PHA
+  INY
+  JSR waitscanx2
+  LDA (DWORDBUF),Y
+  STA POINTER1+1
+  PHA
+  INY
+  JSR waitscanx2
+  LDA (DWORDBUF),Y
+  STA DWORDBUF+2
+  INY
+  JSR waitscanx2
+  LDA (DWORDBUF),Y
+  STA DWORDBUF+3
+  LDY #$00
+  PLA
+  STA DWORDBUF+1
+  PLA
+  STA DWORDBUF+0
+  DEC SRCIND
+  BNE pcmemindirectsrc
+  RTS
 
 calccolorbytes:
 ; Subroutine: Transpose color selections from COLORS[0-3] to COLORBYTES[0-4]
