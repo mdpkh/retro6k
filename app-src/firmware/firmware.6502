@@ -500,6 +500,8 @@ pcscancmdloop:
   BEQ clearscreen
   CMP #"R"
   BEQ entry ; TODO: test following character for rb=reboot, ri=return from int, rs = return from sub
+  CMP #"X"
+  BEQ pcexec
 pcmemchartests:
   CMP #"B"
   BEQ pcmemb
@@ -750,6 +752,34 @@ pcmemindirectsrc:
   DEC SRCIND
   BNE pcmemindirectsrc
   RTS
+
+pcexec:
+  INX
+  JSR pcscandec
+  LDA INRADIX
+  BNE *+8 ; skip JSR and JMP
+  JSR dectodword
+  JMP pcxindirectcheck
+  JSR hextodword
+pcxindirectcheck:
+  ; perform indirection if necessary
+  LDA INDIRECT
+  BEQ pcxgo
+  STA SRCIND
+  JSR pcmemindirectsrc
+pcxgo:
+  ; first, set return address in case we're jumping to something with an RTS
+  LDA #>(readcommand-1)
+  PHA
+  LDA #<(readcommand-1)
+  PHA
+  ; now setup jump indirect
+  LDA DWORDBUF+0
+  STA POINTER3+0
+  LDA DWORDBUF+1
+  STA POINTER3+1
+  ; go
+  JMP (POINTER3)
 
 calccolorbytes:
 ; Subroutine: Transpose color selections from COLORS[0-3] to COLORBYTES[0-4]
@@ -1571,9 +1601,10 @@ cursoradvance:
 cursoradvancecheck:
   CMP #$0A
   BCC cursoradvrts ; if TCURSORHI < $0A, return
+  BNE cursorreset ; if TCURSORHI > $0A, we're way off
   LDA TCURSORLO
   CMP #$40
-  BCC cursoradvrts ; if TCURSORLO < $20, return
+  BCC cursoradvrts ; if TCURSORLO < $40, return
   JMP scrolldown2
 cursoradvrts:
   RTS
@@ -1616,6 +1647,7 @@ cursorleft:
 cursorbackcheck:
   CMP #$08
   BCS cursorbackrts ; if TCURSORHI >= $08, return
+cursorreset:
   LDA #$00
   STA TCURSORLO
   LDA #$08
