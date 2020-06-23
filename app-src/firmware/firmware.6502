@@ -1277,6 +1277,7 @@ btdbitloop:
   LSR SRSCRATCH+7
   BCC btddblbitvalue
   ; add current bit power to accumulator
+btdbigbit:
   CLC
   LDA TEXTBUF+15
   ADC SRSCRATCH+0
@@ -1316,6 +1317,14 @@ btddblbitvalue:
   INX
   CPX NBTODEC
   BCC btdbyteloop
+  LDA SRSCRATCH+6
+  AND #$01
+  BEQ btddoneadding
+  ; add one last high bit
+  LDY #$01 ; otherwise it will try more than one extra bit
+  DEC SRSCRATCH+6 ; clear bigbit flag so this process doesn't repeat
+  JMP btdbigbit
+btddoneadding:
   CLD
   ; unpack BCD
   LDX #15
@@ -1974,7 +1983,7 @@ waitvscana:
 nmicode: ; empty, because NMI not presently used
   RTI
 
-  .org $FC50
+  .org $FC5C
 datalogocolors:
   .byte $CC,$CC,$8A,$8C,$CE,$EE,$EC,$CC
   .byte $AC,$AE,$EE,$EC,$C8,$C8,$AA,$CA
@@ -1995,7 +2004,7 @@ datascreendef:
 datascreenconst:
   .byte $20,$CC,$C0,$00,$0C ; screendef AND $0F != $00 (low nybble is run count, high nybble is index)
 datagfx:
-  .incbin firmwaregfx.compressed
+  .incbin firmwaregfx.compressed,0,582
 datatext: .align 8
   .text ". \xFE\xFF \x80\x81 .  \x0E  \x0E  \x0E  \x0E  . \xFE\xFF \x80\x81 ." ; screendef $00
   .text "\x8F   Retro 6k Fantasy Computer  \x8F" ; screendef $10
