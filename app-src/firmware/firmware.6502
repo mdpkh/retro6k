@@ -34,6 +34,8 @@ POINTER0  = $E0
 POINTER1  = $E2
 POINTER2  = $E4
 POINTER3  = $E6
+NBTODEC   = $E8
+BTODECADJ = $E9
 SRSCRATCH = $F0
 SAVEX     = $FE
 SAVEY     = $FF
@@ -1073,10 +1075,11 @@ dcpwriterundone:
 
 dectodword:
   STX SAVEX
-  LDA TEXTBUF+0
-  CMP #$60 ; check for minus sign
-  BNE *+3 ; skip next INX
-  INX
+  ;LDA TEXTBUF+0
+  ;CMP #$60 ; check for minus sign
+  ;BNE *+3 ; skip next INX
+  ;INX
+  ; the four lines above are completely unnecessary and ineffective because X is clobbered below
   LDA #$00
   STA DWORDBUF+0
   STA DWORDBUF+1
@@ -1152,8 +1155,163 @@ dectodwloop2:
   INX
   BNE dectodwloop2
 
+bytetodec:
+  LDA #1
+  STA NBTODEC
+  BNE bytestodec ; BRA
+wordtodec:
+  LDA #2
+  STA NBTODEC
+  BNE bytestodec ; BRA
 dwordtodec:
-; Subroutine: Convert value in DWORDBUF to decimal as unsigned.
+  LDA #4
+  STA NBTODEC
+bytestodec:
+; Subroutine: Convert value in DWORDBUF (low NBTODEC bytes) to decimal;
+; add or subtract 256^NBTODEC according to BTODECADJ.
+; Side effects: result stored in TEXTBUF[5-15];
+; sign character in TEXTBUF[5]; neg digit count stored in X.
+; Accumulator, Y register clobbered.
+; SRSCRATCH[0-4] holds bit power decimal value
+; SRSCRATCH[6] holds various flags:
+;        80: number is negative
+;         2: number is not minimum value
+;         1: add extra high bit
+  ; interpret BTODECADJ and set negate, bigbit flags according to relevant processor flags
+  LDA BTODECADJ
+  BEQ btdsetupp ; 0 -> positive
+  CMP #$20
+  BEQ btdsetupua ; 32 -> positive, with carry as extra high bit
+  CMP #$40
+  BEQ btdsetupbp ; 64 -> positive, with 1 as extra high bit
+  CMP #$A0
+  BEQ btdsetupn ; -96 -> negative
+  CMP #$C0
+  BEQ btdsetups ; -64 -> negative if N xor V
+  CMP #$E0
+  ;BEQ btdsetupus ; -32 -> negative if not C
+btdsetupus:
+  BCC btdsetupn
+  ; else fall through to btdsetupp
+btdsetupp:
+  LDA #$00
+  STA SRSCRATCH+6
+  BEQ btdinitout
+btdsetupua:
+  BCC btdsetupp
+  ; else fall through to btdsetupbp
+btdsetupbp:
+  LDA #$01
+  STA SRSCRATCH+6
+  BNE btdinitout
+btdsetups:
+  LDX NBTODEC
+  LDA DWORDBUF-1,X ; get N from most significant byte
+  BVC *+4 ; if V clear, skip following EOR imm
+  EOR #$80 ; if V set, flip N
+  BPL btdsetupp ; if resulting N is clear, treat number as positive
+  ; else, fall through to btdsetupn
+btdsetupn:
+  LDA #$80
+  STA SRSCRATCH+6
+btdinitout:
+  LDY #$06 ; Y is output digit index
+  LDA #$00
+  ; initialize decimal accumulator (digit pairs in odd-indexed bytes 7-15)
+btdinitloop:
+  INY
+  STA TEXTBUF,Y
+  INY
+  CPY #$10
+  BCC btdinitloop
+  ; initialize bit value
+  LDA #$01
+  STA SRSCRATCH+0
+  LDA #$00
+  STA SRSCRATCH+1
+  STA SRSCRATCH+2
+  STA SRSCRATCH+3
+  STA SRSCRATCH+4
+  LDX #$00 ; X is input byte index
+  CLC
+  SED
+btdbyteloop:
+  LDA DWORDBUF,X
+  STA SRSCRATCH+7 ; can't just keep it in accumulator
+  LDY #8 ; counter of bits to shift out
+btdbitloop:
+  LSR SRSCRATCH+7
+  BCC btddblbitvalue
+  ; add current bit power to accumulator
+  CLC
+  LDA TEXTBUF+15
+  ADC SRSCRATCH+0
+  STA TEXTBUF+15
+  LDA TEXTBUF+13
+  ADC SRSCRATCH+1
+  STA TEXTBUF+13
+  LDA TEXTBUF+11
+  ADC SRSCRATCH+2
+  STA TEXTBUF+11
+  LDA TEXTBUF+9
+  ADC SRSCRATCH+3
+  STA TEXTBUF+9
+  LDA TEXTBUF+7
+  ADC SRSCRATCH+4
+  STA TEXTBUF+7
+  ; boldly assuming last ADC left carry clear
+btddblbitvalue:
+  ; double bit value
+  LDA SRSCRATCH+0
+  ADC SRSCRATCH+0
+  STA SRSCRATCH+0
+  LDA SRSCRATCH+1
+  ADC SRSCRATCH+1
+  STA SRSCRATCH+1
+  LDA SRSCRATCH+2
+  ADC SRSCRATCH+2
+  STA SRSCRATCH+2
+  LDA SRSCRATCH+3
+  ADC SRSCRATCH+3
+  STA SRSCRATCH+3
+  LDA SRSCRATCH+4
+  ADC SRSCRATCH+4
+  STA SRSCRATCH+4
+  DEY
+  BNE btdbitloop
+  INX
+  CPX NBTODEC
+  BCC btdbyteloop
+  CLD
+  ; unpack BCD
+  LDX #15
+  STX SAVEX ; will hold index of most significant nonzero digit
+btdunpackloop:
+  LDA TEXTBUF,X
+  AND #$0F ; extract low digit
+  BEQ *+4 ; if zero, skip following STX zp
+  STX SAVEX
+  ORA #$30 ; convert to SCE
+  TAY ; hold value of low digit in Y for a jif
+  LDA TEXTBUF,X ; load packed value again
+  STY TEXTBUF,X ; store low digit
+  DEX
+  AND #$F0 ; extract high digit
+  BEQ *+4 ; if zero, skip following STX zp
+  STX SAVEX
+  LSR A
+  LSR A
+  LSR A
+  LSR A
+  ORA #$30 ; convert to SCE
+  STA TEXTBUF,X ; store high digit
+  DEX
+  CPX #$06
+  BCS btdunpackloop ; move on to next pair of digits
+  LDA SAVEX
+  ORA #$F0 ; convert index of most significant nonzero digit from [6,15] to [-10,-1]
+  TAX
+  RTS
 
 dwordtohex:
 ; Subroutine: Convert value in DWORDBUF to uppercase hexadecimal.
@@ -1782,7 +1940,7 @@ waitvscana:
 nmicode: ; empty, because NMI not presently used
   RTI
 
-  .org $FC00
+  .org $FC40
 datalogocolors:
   .byte $CC,$CC,$8A,$8C,$CE,$EE,$EC,$CC
   .byte $AC,$AE,$EE,$EC,$C8,$C8,$AA,$CA
