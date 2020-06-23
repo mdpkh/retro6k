@@ -1196,7 +1196,7 @@ bytestodec:
 ;        80: number is negative
 ;         2: number is not minimum value
 ;         1: add extra high bit
-  ; interpret BTODECADJ and set negate, bigbit flags according to relevant processor flags
+  ; interpret BTODECADJ and set scratch6 flags according to relevant processor flags
   LDA BTODECADJ
   BEQ btdsetupp ; 0 -> positive
   CMP #$20
@@ -1243,6 +1243,8 @@ btdinitloop:
   INY
   CPY #$10
   BCC btdinitloop
+  LDA #$20
+  STA TEXTBUF+5 ; space for positive output
   ; initialize bit value
   LDA #$01
   STA SRSCRATCH+0
