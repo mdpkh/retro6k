@@ -655,6 +655,12 @@ pcmrfinalsrc:
   ; assume here cursor is at beginning of line
   TXA
   TAY
+  ; oh and restore DWORDBUF if it was negated in decimal conversion
+  ; (after copying X to Y because dwordnegate clobbers X and A)
+  LDA SRSCRATCH+6
+  BPL *+5 ; skip following JSR
+  JSR dwordnegate
+  TYA ; get bytestodec-set X value back into accumulator
   CLC
   ADC #$15 ; adjust this to set position of decimal output
   ORA TCURSORLO
@@ -1173,6 +1179,7 @@ dectodwloop2:
   STA DWORDBUF+4,X
   INX
   BNE dectodwloop2
+  RTS
 
 bytetodec:
   LDA #1
@@ -1245,6 +1252,12 @@ btdinitloop:
   BCC btdinitloop
   LDA #$20
   STA TEXTBUF+5 ; space for positive output
+  LDA SRSCRATCH+6
+  BPL btdinitp
+  JSR dwordnegate
+  LDA #$60
+  STA TEXTBUF+5
+btdinitp:
   ; initialize bit value
   LDA #$01
   STA SRSCRATCH+0
@@ -1961,7 +1974,7 @@ waitvscana:
 nmicode: ; empty, because NMI not presently used
   RTI
 
-  .org $FC40
+  .org $FC50
 datalogocolors:
   .byte $CC,$CC,$8A,$8C,$CE,$EE,$EC,$CC
   .byte $AC,$AE,$EE,$EC,$C8,$C8,$AA,$CA
