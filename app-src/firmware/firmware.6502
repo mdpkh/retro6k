@@ -651,7 +651,7 @@ pcmemreadout:
 pcmrfinalsrc:
   LDA SRCSIZE
   STA NBTODEC
-  JSR dwordtodec
+  JSR bytestodec
   ; assume here cursor is at beginning of line
   TXA
   TAY
