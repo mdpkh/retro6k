@@ -426,6 +426,8 @@ startsysshell:
   LDA #$CC ; blink "foreground" colors in bitplanes 3-4 (intensity)
   STA BLINKBITS+3
   STA BLINKBITS+4
+  LDA #$00
+  STA BTODECADJ ; by default, set use unsigned decimal display
 readcommand:
   LDA #$1E ; ">" in SCE
   JSR printch
@@ -647,9 +649,26 @@ pcmemreadout:
   BEQ pcmrfinalsrc
   JSR pcmemindirectsrc
 pcmrfinalsrc:
+  LDA SRCSIZE
+  STA NBTODEC
+  JSR dwordtodec
+  ; assume here cursor is at beginning of line
+  TXA
+  TAY
+  CLC
+  ADC #$15 ; adjust this to set position of decimal output
+  ORA TCURSORLO
+  STA TCURSORLO
+  LDA TEXTBUF+5 ; sign character of output
+  JSR printch
+pcmrdecprintloop:
+  LDA TEXTBUF+16-256,Y
+  JSR printch
+  INY
+  BNE pcmrdecprintloop
   JSR dwordtohex
   LDA TCURSORLO
-  ORA #$10
+  AND #$F0
   STA TCURSORLO
   LDA #$07
   EOR SRCSIZE
