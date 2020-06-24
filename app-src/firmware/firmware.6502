@@ -302,7 +302,7 @@ logodecompressloop:
   CMP #$F1 ; flip page $07 in place
   BEQ flippage7
   CMP #$F2 ; flipcopy page $07 low half to high half
-  BEQ flipcopypage7
+  BEQ flippage7
   TAY
   AND #$F0
   CMP #$C0 ; decompress a page (Y low nybble) into page $07
@@ -312,7 +312,42 @@ logodecompressloop:
 logodecompressloopadvance:
   LDX SAVEX
   INX
-  BNE logodecompressloop ; BRA
+  BNE logodecompressloop ; BRA because X > 0
+logocopypage:
+  LDA #$07 
+  STA FVMCSRC
+  STY FVMCDEST
+  JSR fvmcpage ; sets N and Z based on Acc ($07) when called
+  BNE logodecompressloopadvance ; BRA
+logodecompresspage:
+  TYA
+  AND #$0F
+  JSR decompresspage ; returns with Z set
+  BEQ logodecompressloopadvance ; BRA
+flippage7:
+  AND #$01 ; $F1->$01 for full in-place flip or $F2->$00 for flipcopy low half to high half
+  ROR A ; bit goes to Carry
+  ROR A ; bit goes to A7
+  ROR A ; bit goes to A6
+  STA SRSCRATCH+9
+  BIT SRSCRATCH+9; save that bit in Overflow flag
+  LDX #$80
+  LDY #$7F
+flippage7loop:
+  LDA $0700,Y
+  BVC flippage7halfloop
+  PHA
+  LDA $0700,X
+  JSR flipbytepixels
+  STA $0700,Y
+  PLA
+flippage7halfloop:
+  JSR flipbytepixels
+  STA $0700,X
+  DEY
+  INX
+  BNE flippage7loop
+  BEQ logodecompressloopadvance ; BRA
 logocolors:
   ; cell color overrides common to both aspect ratios
   LDX #$00
@@ -341,7 +376,7 @@ logocolorloop:
   INX
   CPX #$04
   BCC logocolorloop
-  BCS startsysshell
+  BCS startsysshell ; BRA
 logocommonpercolumn:
   LDA #$CC ; bits 0-2 on for "foreground" colors
   STA $0AEC,X
@@ -369,21 +404,21 @@ logocommonpercolumn:
   STA $1000,X
   STA $1008,X
   RTS
-logocopypage:
-  LDA #$07
-  STA FVMCSRC
-  STY FVMCDEST
-  JSR fvmcpage
-  JMP logodecompressloopadvance ; BRA?
-logodecompresspage:
-  TYA
-  AND #$0F
-  JSR decompresspage
-  JMP logodecompressloopadvance ; BRA?
-flippage7:
-  JMP logodecompressloopadvance ; BRA?
-flipcopypage7:
-  JMP logodecompressloopadvance ; BRA?
+flipbytepixels:
+  STY SAVEY
+  LDY #$FC
+flipbytepixelsloop:
+  ROL A
+  ROL A
+  ROR SRSCRATCH+13
+  ROR A
+  ROR SRSCRATCH+13
+  ROL A
+  INY
+  BNE flipbytepixelsloop
+  LDY SAVEY
+  LDA SRSCRATCH+13
+  RTS
 
 startsysshell:
   ; initialize shell state
@@ -920,7 +955,6 @@ decompresspage:
 ; Subroutine: Load page number Acc from compressed data beginning at POINTER0
 ; and store the decompressed data in page 07
 ; Side effects: Acc, X, Y, POINTER1, POINTER2 clobbered
-  ; get starting address of requested page
 CDATASTART     = POINTER0
 DECODELEN      = SRSCRATCH+0 ; not needed?
 READHEADBYTE   = POINTER1
@@ -1968,11 +2002,11 @@ datadecompressinstw:
 datalogowblankcells:
   .byte $0C,$0D,$12,$13,$2C,$33,$CC,$D3,$EC,$ED,$F2,$F3,$00
 datalogocolors:
-  .byte $CC,$CC,$8A,$8C,$CE,$EE,$EC,$CC
-  .byte $AC,$AE,$EE,$EC,$C8,$C8,$AA,$CA
-  .byte $8C,$8C,$EE,$EC,$CA,$EA,$EE,$CE
-  .byte $EA,$EA,$CC,$CA,$AE,$AE,$88,$A8
-  .byte $8A,$88,$A8,$AA,$A8,$88,$CE,$AE
+  .byte $CC,$CC,$8A,$8C,$CE,$EE,$EA,$CA
+  .byte $AC,$AE,$EE,$EC,$C8,$A8,$CC,$CC
+  .byte $8C,$8C,$EE,$EC,$CC,$EC,$EE,$CE
+  .byte $EA,$EA,$CC,$CA,$AE,$CE,$88,$A8
+  .byte $8A,$88,$A8,$AA,$A8,$88,$AE,$AE
 datasyscolors:
   .byte $00,$81,$84,$0D,$02,$83,$86,$0F
   .byte $D0,$59,$5C,$DD,$D2,$5B,$5E,$DF
