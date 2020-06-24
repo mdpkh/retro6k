@@ -768,6 +768,8 @@ pcmacopyprim:
   JSR printch
   JMP readcommand
 pcmemindirectsrc:
+  LDY #$00 ; maybe Y is already zero after reading a hex address, but not
+           ; after reading a decimal address!
   JSR waithscanx
   LDA (DWORDBUF),Y
   STA POINTER1+0
