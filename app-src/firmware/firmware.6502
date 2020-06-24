@@ -120,7 +120,7 @@ initfontloop:
   BEQ initfontloopexit
   JSR fvmcpage
   INX
-  JMP initfontloop
+  BNE initfontloop ; BRA; X != 0
 initfontloopexit:
   ; detect presence of valid cartridge
   ; by checking for magic bytes 47 A9 0C 1E
@@ -227,25 +227,11 @@ initscreencheckend:
   LDA #$00 ; disable FVMC
   STA FVMCDEST
   STA FVMCSRC
-  ; decompress and load graphics common to both aspect ratios
+  ; set up pointer to compressed graphics
   LDA #<datagfx
   STA POINTER0+0
   LDA #>datagfx
   STA POINTER0+1
-  LDA #$03 ; page 3 in compressed data
-  JSR decompresspage
-  LDA #$07
-  STA FVMCSRC
-  LDA #$18 ; page 8 in font memory
-  STA FVMCDEST
-  JSR fvmcpage
-  LDA #$06 ; page 6 in compressed data
-  JSR decompresspage
-  LDA #$07
-  STA FVMCSRC
-  LDA #$1F ; page F in font memory
-  STA FVMCDEST
-  JSR fvmcpage
   ; check aspect ratio
   LDA VIDEOSTATE
   AND #$80
@@ -255,17 +241,17 @@ initscreencheckend:
   LDX #$00
 logocloop:
   TXA
-  ORA #$A0 ; X+A0
+  ORA #$C0 ; X+C0
   STA $096C,X
-  ORA #$08 ; X+A8
-  STA $098C,X
-  EOR #$18 ; X+B0
-  STA $09AC,X
-  ORA #$08 ; X+B8
-  STA $09CC,X
-  EOR #$78 ; X+C0
-  STA $09EC,X
   ORA #$08 ; X+C8
+  STA $098C,X
+  EOR #$18 ; X+D0
+  STA $09AC,X
+  ORA #$08 ; X+D8
+  STA $09CC,X
+  EOR #$38 ; X+E0
+  STA $09EC,X
+  ORA #$08 ; X+E8
   STA $0A0C,X
   JSR logocommonpercolumn ; sets Acc := 0
   STA $094C,X ; use blank characters on rows 10 and 17
@@ -273,33 +259,13 @@ logocloop:
   INX
   CPX #$08
   BCC logocloop
-  LDA #$00 ; page 0 in compressed data
-  JSR decompresspage
-  LDA #$07
-  STA FVMCSRC
-  LDA #$1A ; page A in font memory
-  STA FVMCDEST
-  JSR fvmcpage
-  LDA #$01 ; page 1 in compressed data
-  JSR decompresspage
-  LDA #$07
-  STA FVMCSRC
-  LDA #$1B ; page B in font memory
-  STA FVMCDEST
-  JSR fvmcpage
-  LDA #$02 ; page 2 in compressed data
-  JSR decompresspage
-  LDA #$07
-  STA FVMCSRC
-  LDA #$1C ; page C in font memory
-  STA FVMCDEST
-  JSR fvmcpage
-  JMP logocolors
+  LDX #$00 ; offset for decompress instructions
+  BEQ logodecompressloop ; BRA
 widescreenlogo:  
   ; logo (wide)
   JSR waitvscana
   LDX #$00
-logowloop:
+logowloop1:
   TXA
   ORA #$80 ; X+80
   STA $094C,X
@@ -309,45 +275,44 @@ logowloop:
   STA $098C,X
   ORA #$08 ; X+98
   STA $09AC,X
-  EOR #$78 ; X+E0
+  EOR #$38 ; X+A0
   STA $09CC,X
-  ORA #$08 ; X+E8
+  ORA #$08 ; X+A8
   STA $09EC,X
-  EOR #$18 ; X+F0
+  EOR #$18 ; X+B0
   STA $0A0C,X
-  ORA #$08 ; X+F8
+  ORA #$08 ; X+B8
   STA $0A2C,X
   JSR logocommonpercolumn
   INX
   CPX #$08
-  BCC logowloop
+  BCC logowloop1
   ; blank out cells not used for logo
-  STA $094C
-  STA $094D
-  STA $0952
-  STA $0953
-  STA $096C
-  STA $0973
-  STA $0A0C
-  STA $0A13
-  STA $0A2C
-  STA $0A2D
-  STA $0A32
-  STA $0A33
-  LDA #$04 ; page 4 in compressed data
-  JSR decompresspage
-  LDA #$07
-  STA FVMCSRC
-  LDA #$19 ; page 9 in font memory
-  STA FVMCDEST
-  JSR fvmcpage
-  LDA #$05 ; page 5 in compressed data
-  JSR decompresspage
-  LDA #$07
-  STA FVMCSRC
-  LDA #$1E ; page E in font memory
-  STA FVMCDEST
-  JSR fvmcpage
+  LDY #$FF
+logowloop2:
+  INY
+  LDX datalogowblankcells,Y
+  STA $0940,X
+  BNE logowloop2
+  LDX #(datadecompressinstw-datadecompressinstc) ; offset for decompress instructions
+logodecompressloop:
+  LDA datadecompressinstc,X
+  STX SAVEX
+  BEQ logocolors
+  CMP #$F1 ; flip page $07 in place
+  BEQ flippage7
+  CMP #$F2 ; flipcopy page $07 low half to high half
+  BEQ flipcopypage7
+  TAY
+  AND #$F0
+  CMP #$C0 ; decompress a page (Y low nybble) into page $07
+  BEQ logodecompresspage
+  CMP #$10 ; copy page $07 to page (Y)
+  BEQ logocopypage
+logodecompressloopadvance:
+  LDX SAVEX
+  INX
+  BNE logodecompressloop ; BRA
 logocolors:
   ; cell color overrides common to both aspect ratios
   LDX #$00
@@ -377,7 +342,6 @@ logocolorloop:
   CPX #$04
   BCC logocolorloop
   BCS startsysshell
-
 logocommonpercolumn:
   LDA #$CC ; bits 0-2 on for "foreground" colors
   STA $0AEC,X
@@ -405,6 +369,21 @@ logocommonpercolumn:
   STA $1000,X
   STA $1008,X
   RTS
+logocopypage:
+  LDA #$07
+  STA FVMCSRC
+  STY FVMCDEST
+  JSR fvmcpage
+  JMP logodecompressloopadvance ; BRA?
+logodecompresspage:
+  TYA
+  AND #$0F
+  JSR decompresspage
+  JMP logodecompressloopadvance ; BRA?
+flippage7:
+  JMP logodecompressloopadvance ; BRA?
+flipcopypage7:
+  JMP logodecompressloopadvance ; BRA?
 
 startsysshell:
   ; initialize shell state
@@ -1941,9 +1920,7 @@ waithscanx:
   ORA #$02
   TAX
   PLA
-  CPX VIDEOSTATE
-  BNE *-3
-  RTS
+  JMP waitscanx2
 
 waithscany:
 ; Subroutine: Wait for start of horizontal blanking interval after active
@@ -1983,7 +1960,13 @@ waitvscana:
 nmicode: ; empty, because NMI not presently used
   RTI
 
-  .org $FC5C
+  .org $FC41
+datadecompressinstc:
+  .byte $C2,$18,$C1,$1F,$F2,$1D,$C0,$1C,$F1,$1E,$00
+datadecompressinstw:
+  .byte $C2,$18,$F1,$1B,$C1,$1F,$C3,$19,$F1,$1A,$00
+datalogowblankcells:
+  .byte $0C,$0D,$12,$13,$2C,$33,$CC,$D3,$EC,$ED,$F2,$F3,$00
 datalogocolors:
   .byte $CC,$CC,$8A,$8C,$CE,$EE,$EC,$CC
   .byte $AC,$AE,$EE,$EC,$C8,$C8,$AA,$CA
@@ -2004,13 +1987,13 @@ datascreendef:
 datascreenconst:
   .byte $20,$CC,$C0,$00,$0C ; screendef AND $0F != $00 (low nybble is run count, high nybble is index)
 datagfx:
-  .incbin firmwaregfx.compressed,0,582
+  .incbin firmwaregfx.compressed,0,574
 datatext: .align 8
   .text ". \xFE\xFF \x80\x81 .  \x0E  \x0E  \x0E  \x0E  . \xFE\xFF \x80\x81 ." ; screendef $00
   .text "\x8F   Retro 6k Fantasy Computer  \x8F" ; screendef $10
-  .text "\xF0     Entertainment System\x11    \xF0" ; screendef $20
+  .text "\xFA     Entertainment System\x11    \xFA" ; screendef $20
   .text "   Please insert a cartridge>   " ; screendef $30
-  .text "     F\xF7\xF8\xF9ware version 2031@     " ; screendef $40
+  .text "     F\xFB\xFC\xFDware version 2031@     " ; screendef $40
   .text "\0142019`20 Maggie David \x86\x87\x88 Haynes" ; screendef $50
 initfontsrcpage:
   .byte $E4,$E5,$E6,$E7,$E3,$E2,$E1,$00
