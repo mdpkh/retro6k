@@ -80,7 +80,7 @@ unsigned char soundscvmapregister;
 unsigned char soundqueueregisteroffset;
 unsigned short soundqueuedur[2][16];
 soundqueueentry soundqueue[4][16];
-int soundcndcounter[2];
+short int soundcndcounter[2];
 unsigned char soundncounter[2];
 unsigned short menubeepdur;
 unsigned short menubeepfreq;
@@ -3201,9 +3201,12 @@ void StepSoundSchedules()
 	}
 	for (int v = 0; v < 4; ++v)
 	{
-		for (int i = 0; i < 15; ++i)
-			soundqueue[v][i] = soundqueue[v][i + 1];
-		soundqueue[v][15] = { 0, 0 };
+		if (shiftregister[v])
+		{
+			for (int i = 0; i < 15; ++i)
+				soundqueue[v][i] = soundqueue[v][i + 1];
+			soundqueue[v][15] = { 0, 0 };
+		}
 	}
 	if (scheduleisempty[0] || scheduleisempty[1])
 		; // TODO: trigger interrupt if appropriate flag (?) is set
