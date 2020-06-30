@@ -1990,7 +1990,7 @@ waitvscana:
 nmicode: ; empty, because NMI not presently used
   RTI
 
-  .org $FC41
+  .org $FC45
 datadecompressinstc:
   .byte $C2,$18,$C1,$1F,$F2,$1D,$C0,$1C,$F1,$1E,$00
 datadecompressinstw:
