@@ -13,12 +13,15 @@ SRCDWORD   = $28 ; source address/literal of memcopy command
 SRCIND     = $2C ; source indirect count
 DESTSIZE   = $2E ; 1=byte; 2=word; 4=dword; 32=char*32; 0=zterm
 SRCSIZE    = $2F ; 1=byte; 2=word; 4=dword; 32=char*32; 0=zterm
+PCREG      = $EA ; program counter (minus 1) at interrupt
+PFREG      = $EC ; processor status register at interrupt
+AREG       = $ED ; accumulator at interrupt
+XREG       = $EE ; x index register at interrupt
+YREG       = $EF ; y index register at interrupt
 
 ; zeropage addresses used in subroutines
 TEXTBUF   = $80 ; up to 16 bytes
 DWORDBUF  = $90
-WORDBUF0  = $94
-WORDBUF1  = $96
 TCURSORLO = $98 ; bits 0-4: text cursor column; bits 5-7: text cursor row b0-2
 TCURSORHI = $99 ; bits 0-1: text cursor row bits 3-4
 TCBLINK   = $9A ; bits 0-4: cursor blink cycle counter
@@ -58,6 +61,11 @@ DEBUGLOG        = $03FF
 ; firmware version signature
   .word 20310 ; 2031-development
 entry: ; system power-on or reset
+  ; set up fallback address for RTS
+  JSR initmain
+recover:
+  JMP entry
+initmain:
   ; misc initialization
   SEI
   CLD
@@ -503,7 +511,7 @@ pcscancmdloop:
   CMP #"C"
   BEQ clearscreen
   CMP #"R"
-  BEQ entry ; TODO: test following character for rb=reboot, ri=return from int, rs = return from sub
+  BEQ pcr
   CMP #"X"
   BEQ pcexec
 pcmemchartests:
@@ -514,6 +522,8 @@ pcmemchartests:
   CMP #"W"
   BEQ pcmemw
   BNE pcscancmderror ; BRA else
+pcr:
+  RTS ; return to caller, sys entry, or interrupt point
 pcscandec:
   LDY #$00
   STY INRADIX
@@ -1977,7 +1987,26 @@ waitvscana:
   BNE *-3 ; CMP again
   RTS
 
-nmicode: ; empty, because NMI not presently used
+nmicode: ; save state and go to interactive prompt
+  STA AREG
+  STX XREG
+  STY YREG
+  PLA
+  STA PFREG
+  PLA
+  STA PCREG
+  PLA
+  STA PCREG+1
+  JSR startsysshell
+  LDA PCREG+1
+  PHA
+  LDA PCREG
+  PHA
+  LDA PFREG
+  PHA
+  LDA AREG
+  LDX XREG
+  LDY YREG
   RTI
 
   .org $FC37
@@ -2040,7 +2069,8 @@ controlcodetargets:
 cartsig:
   .byte $47,$A9,$0C,$1E
 ; 6502 program counter initialization vectors
-  .org $FFFA
+  .org $FFF8
+  .word startsysshell ; R6k-specific: interactive shell entry vector with intent to return
   .word nmicode ; NMI vector, in firmware
   .word entry ; reset vector, in firmware
   .word $2010 ; interrupt request vector, in cartridge
