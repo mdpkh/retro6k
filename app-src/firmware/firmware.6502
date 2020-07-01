@@ -1,4 +1,7 @@
 ; Retro6K System Firmware
+; zeropage addresses used by screen init
+LOGOBREAKCHAR = $00
+
 ; zeropage addresses used by interactive console
 CMDBUF     = $00 ; 32 bytes
 INRADIX    = $20 ; 0=decimal; 1=hexadecimal
@@ -61,11 +64,11 @@ entry: ; system power-on or reset
   LDA #$00
   STA FVMCSRC
   STA FVMCDEST
-  LDX #$F0
-dlsoffloop:
-  STX DLSOFF ; turn off debug log suppression
+  LDX #>printch
+dlsloop:
+  STX DLSOFF
   INX
-  BNE dlsoffloop
+  BNE dlsloop
   JSR waitvscana
   ; display cartridge identification in bottom of screen
   LDX #$00
@@ -122,20 +125,16 @@ initfontloop:
   INX
   BNE initfontloop ; BRA; X != 0
 initfontloopexit:
+  LDX #$00
+checkcartsigloop:
   ; detect presence of valid cartridge
   ; by checking for magic bytes 47 A9 0C 1E
-  LDA $200A
-  CMP #$47
+  LDA $200A,X
+  CMP cartsig,X
   BNE nocart
-  LDA $200B
-  CMP #$A9
-  BNE nocart
-  LDA $200C
-  CMP #$0C
-  BNE nocart
-  LDA $200D
-  CMP #$1E
-  BNE nocart
+  INX
+  CPX #$04
+  BCC checkcartsigloop
   ; if we got this far, jump to cartridge start vector
   JMP ($200E)
 nocart: ; no cartridge inserted
@@ -232,69 +231,78 @@ initscreencheckend:
   STA POINTER0+0
   LDA #>datagfx
   STA POINTER0+1
+  ; set up logo character blacklist (empty) in page 6
+  LDA #$00
+  LDX #$00
+logowskipcharinitloop:
+  STA $0600,X
+  INX
+  BNE logowskipcharinitloop
   ; check aspect ratio
   LDA VIDEOSTATE
   AND #$80
   BNE widescreenlogo
   ; logo (classic)
-  JSR waitvscana
-  LDX #$00
-logocloop:
-  TXA
-  ORA #$C0 ; X+C0
-  STA $096C,X
-  ORA #$08 ; X+C8
-  STA $098C,X
-  EOR #$18 ; X+D0
-  STA $09AC,X
-  ORA #$08 ; X+D8
-  STA $09CC,X
-  EOR #$38 ; X+E0
-  STA $09EC,X
-  ORA #$08 ; X+E8
-  STA $0A0C,X
-  JSR logocommonpercolumn ; sets Acc := 0
-  STA $094C,X ; use blank characters on rows 10 and 17
-  STA $0A2C,X
-  INX
-  CPX #$08
-  BCC logocloop
-  LDX #$00 ; offset for decompress instructions
-  BEQ logodecompressloop ; BRA
+  LDY #$C0 ; starting character value for logo block
+  LDA #$6C
+  STA TCURSORLO
+  LDA #$F0 ; break character
+  STA LOGOBREAKCHAR
+  LDA #$00 ; offset for decompress instructions
+  BEQ logocharblock ; BRA
 widescreenlogo:  
   ; logo (wide)
-  JSR waitvscana
   LDX #$00
-logowloop1:
-  TXA
-  ORA #$80 ; X+80
-  STA $094C,X
-  ORA #$08 ; X+88
-  STA $096C,X
-  EOR #$18 ; X+90
-  STA $098C,X
-  ORA #$08 ; X+98
-  STA $09AC,X
-  EOR #$38 ; X+A0
-  STA $09CC,X
-  ORA #$08 ; X+A8
-  STA $09EC,X
-  EOR #$18 ; X+B0
-  STA $0A0C,X
-  ORA #$08 ; X+B8
-  STA $0A2C,X
-  JSR logocommonpercolumn
+logowskipcharpopulateloop:
+  LDA logowskipchars,X
+  BEQ logowskipcharpopulateloopexit
   INX
-  CPX #$08
-  BCC logowloop1
-  ; blank out cells not used for logo
-  LDY #$FF
-logowloop2:
+  TAY
+  LDA #$04
+  STA $0600,Y
+  BNE logowskipcharpopulateloop ; BRA: Z cleared by LDA
+logowskipcharpopulateloopexit:
+  LDY #$80 ; starting character value for logo block
+  LDA #$4C
+  STA TCURSORLO
+  LDA #$C0 ; break character
+  STA LOGOBREAKCHAR
+  LDA #(datadecompressinstw-datadecompressinstc) ; offset for decompress instructions
+logocharblock:
+  PHA
+  JSR initshellmisc
+  LDA #$18
+  STA COLORS+1
+  LDA #$3F
+  STA COLORS+3
+  ; write sequential characters to rectangular area $094C-$0A33
+  LDA #$09
+  STA TCURSORHI
+logocharblockloop:
+  LDA $0600,Y ; either $00 or $04
+  BNE logocharblockskip
+  TYA
+  BMI logocharblockskip
+  STA DEBUGLOG
+logocharblockskip:
+  JSR printch ; A is either value copied from Y or $04 (right cursor)
   INY
-  LDX datalogowblankcells,Y
-  STA $0940,X
-  BNE logowloop2
-  LDX #(datadecompressinstw-datadecompressinstc) ; offset for decompress instructions
+  CPY LOGOBREAKCHAR
+  BCS logocharblockloopexit
+  LDA TCURSORLO
+  AND #$1F
+  CMP #$14
+  BCC logocharblockloop
+  CLC
+  LDA TCURSORLO
+  ADC #$18
+  STA TCURSORLO
+  BCC logocharblockloop
+  INC TCURSORHI
+  BCS logocharblockloop
+logocharblockloopexit:
+  PLA
+  TAX
 logodecompressloop:
   LDA datadecompressinstc,X
   STX SAVEX
@@ -377,33 +385,6 @@ logocolorloop:
   CPX #$04
   BCC logocolorloop
   BCS startsysshell ; BRA
-logocommonpercolumn:
-  LDA #$CC ; bits 0-2 on for "foreground" colors
-  STA $0AEC,X
-  STA $0B0C,X
-  STA $0B2C,X
-  STA $0B4C,X
-  STA $0C0C,X
-  STA $0C2C,X
-  STA $0C4C,X
-  STA $0C6C,X
-  STA $0D2C,X
-  STA $0D4C,X
-  STA $0D6C,X
-  STA $0D8C,X
-  LDA #$AA ; bits 3-4 on for "secondary" colors
-  STA $0E4C,X
-  STA $0E6C,X
-  STA $0E8C,X
-  STA $0EAC,X
-  STA $0F6C,X
-  STA $0F8C,X
-  STA $0FAC,X
-  STA $0FCC,X
-  LDA #$00 ; blank out character 00
-  STA $1000,X
-  STA $1008,X
-  RTS
 flipbytepixels:
   STY SAVEY
   LDY #$FC
@@ -420,14 +401,10 @@ flipbytepixelsloop:
   LDA SRSCRATCH+13
   RTS
 
-startsysshell:
-  ; initialize shell state
-  LDA #$20
-  STA TCURSORLO
-  LDA #$0A
-  STA TCURSORHI
+initshellmisc:
   LDA #$00
   STA TCBLINK
+  STA CONSFLAGS
   STA COLORS+0
   STA COLORS+1
   LDA #$07
@@ -442,6 +419,15 @@ startsysshell:
   STA BLINKBITS+4
   LDA #$00
   STA BTODECADJ ; by default, set use unsigned decimal display
+  RTS
+
+startsysshell:
+  ; initialize shell state
+  LDA #$20
+  STA TCURSORLO
+  LDA #$0A
+  STA TCURSORHI
+  JSR initshellmisc
 readcommand:
   LDA #$1E ; ">" in SCE
   JSR printch
@@ -1484,7 +1470,7 @@ hextodwpositive:
 actoncontrolcode:
 ; Subroutine: Act on control code designated by Y (index into control code
 ; table, not actual control code)
-; Side effects: Accumulator clobbered, Y register doubled
+; Side effects: Accumulator clobbered, Y register loaded from SAVEY
   TYA
   ASL
   TAY
@@ -1492,6 +1478,7 @@ actoncontrolcode:
   STA SRSCRATCH+12
   LDA controlcodetargets+1,Y
   STA SRSCRATCH+13
+  LDY SAVEY
   JMP (SRSCRATCH+12)
 
 printch:
@@ -1740,6 +1727,7 @@ textdeleteshiftloopexit:
   PLA ; restore cursor position
   STA TCURSORLO
   PLA ; restore Acc
+  LDY SAVEY
   RTS
 
 textinsert:
@@ -1768,6 +1756,7 @@ textinsertshiftloopexit:
   PLA ; restore cursor position
   STA TCURSORLO
   PLA ; restore Acc
+  LDY SAVEY
   RTS
 
 beep:
@@ -1817,6 +1806,7 @@ cursoradvancecheck:
   BCC cursoradvrts ; if TCURSORLO < $40, return
   JMP scrolldown2
 cursoradvrts:
+  LDY SAVEY ; assume we got here through printch
   RTS
 
 cursordown:
@@ -1990,7 +1980,9 @@ waitvscana:
 nmicode: ; empty, because NMI not presently used
   RTI
 
-  .org $FC45
+  .org $FC37
+logowskipchars:
+  .byte $80,$81,$86,$87,$88,$8F,$B0,$B7,$B8,$B9,$BE,$BF,$00
 datadecompressinstc:
   .byte $C2,$18,$C1,$1F,$F2,$1D,$C0,$1C,$F1,$1E,$00
 datadecompressinstw:
@@ -2045,7 +2037,8 @@ controlcodetargets:
   .word cursorup
   .word textinsert
   .word textdelete
-
+cartsig:
+  .byte $47,$A9,$0C,$1E
 ; 6502 program counter initialization vectors
   .org $FFFA
   .word nmicode ; NMI vector, in firmware
